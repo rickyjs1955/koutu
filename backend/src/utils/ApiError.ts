@@ -1,4 +1,4 @@
-// src/utils/ApiError.ts
+// /backend/src/utils/ApiError.ts
 
 /**
  * Custom error class for API errors

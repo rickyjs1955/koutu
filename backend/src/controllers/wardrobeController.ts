@@ -1,4 +1,4 @@
-// src/controllers/wardrobeController.ts
+// /backend/src/controllers/wardrobeController.ts
 import { Request, Response, NextFunction } from 'express';
 import { ApiError } from '../utils/ApiError';
 import { wardrobeModel } from '../models/wardrobeModel';

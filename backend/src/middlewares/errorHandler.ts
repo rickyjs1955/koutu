@@ -1,4 +1,4 @@
-// src/middlewares/errorHandler.ts
+// /backend/src/middlewares/errorHandler.ts
 import { Request, Response, NextFunction } from 'express';
 
 interface AppError extends Error {

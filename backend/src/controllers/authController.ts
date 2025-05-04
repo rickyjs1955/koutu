@@ -1,4 +1,4 @@
-// src/controllers/authController.ts
+// backend/src/controllers/authController.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';

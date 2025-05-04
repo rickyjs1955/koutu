@@ -1,4 +1,4 @@
-// src/routes/wardrobeRoutes.ts - Updated with validators
+// /backend/src/routes/wardrobeRoutes.ts - Updated with validators
 import express from 'express';
 import { wardrobeController } from '../controllers/wardrobeController';
 import { authenticate } from '../middlewares/auth';

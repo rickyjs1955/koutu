@@ -1,4 +1,4 @@
-// src/models/userModel.ts
+// /backend/src/models/userModel.ts
 import { query } from './db';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';

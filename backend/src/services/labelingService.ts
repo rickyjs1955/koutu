@@ -1,4 +1,4 @@
-// src/services/labelingService.ts
+// /backend/src/services/labelingService.ts
 import sharp from 'sharp';
 import path from 'path';
 import { storageService } from './storageService';

@@ -1,0 +1,1 @@
+// /frontend/src/api/imageApi.ts

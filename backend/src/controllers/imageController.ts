@@ -1,4 +1,4 @@
-// src/controllers/imageController.ts
+// /backend/src/controllers/imageController.ts
 import { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';

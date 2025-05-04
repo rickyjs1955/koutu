@@ -1,4 +1,4 @@
-// src/services/imageProcessingService.ts
+// /backend/src/services/imageProcessingService.ts
 import sharp from 'sharp';
 import path from 'path';
 import { storageService } from './storageService';

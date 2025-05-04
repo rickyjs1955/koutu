@@ -1,3 +1,5 @@
+// /backend/src/routes/garmentRoutes.ts
+
 import express from 'express';
 import { garmentController } from '../controllers/garmentController';
 import { authenticate } from '../middlewares/auth';

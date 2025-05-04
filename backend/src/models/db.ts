@@ -1,4 +1,4 @@
-// src/models/db.ts
+// /backend/src/models/db.ts
 import { Pool } from 'pg';
 import { config } from '../config';
 

@@ -1,4 +1,4 @@
-// src/models/imageModel.ts
+// /backend/src/models/imageModel.ts
 import { query } from './db';
 import { v4 as uuidv4 } from 'uuid';
 

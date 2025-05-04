@@ -1,0 +1,1 @@
+// /shared/src/schemas/image.ts

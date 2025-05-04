@@ -1,4 +1,4 @@
-// src/routes/imageRoutes.ts
+// /backend/src/routes/imageRoutes.ts
 import express from 'express';
 import { imageController } from '../controllers/imageController';
 import { authenticate } from '../middlewares/auth';

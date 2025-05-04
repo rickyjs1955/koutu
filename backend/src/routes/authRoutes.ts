@@ -1,4 +1,4 @@
-// src/routes/authRoutes.ts - Updated with validators
+// /backend/src/routes/authRoutes.ts - Updated with validators
 import express from 'express';
 import { authController } from '../controllers/authController';
 import { authenticate } from '../middlewares/auth';
