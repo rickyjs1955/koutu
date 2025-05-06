@@ -1,4 +1,4 @@
-// /frontend/src/api/index.ts
+// /frontend/src/api/index.ts - Updated with polygon API
 import axios from 'axios';
 
 // Base API URL from environment variables
@@ -47,3 +47,4 @@ export * from './authApi';
 export * from './garmentApi';
 export * from './imageApi';
 export * from './wardrobeApi';
+export * from './polygonApi'; // Add polygon API

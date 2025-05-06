@@ -213,3 +213,102 @@ After running the database seed script, you can use the following test user:
 ## License
 
 This project is licensed under the MIT License
+
+## Update 1
+Polygon Annotation Feature
+This document describes the polygon annotation feature added to the Koutu application, which allows users to create, view, and manage polygon annotations for garment images.
+Features
+
+Polygon Drawing: Interactive polygon creation on images
+Polygon Storage: Secure storage of polygon data with image associations
+Polygon Viewing: View all polygons for an image
+Polygon Management: Edit and delete polygons
+
+Technical Implementation
+Backend Components
+
+Database Schema:
+
+New polygons table with foreign key references to original_images
+Stores polygon vertices, metadata, and relationship to parent image
+Implements trigger to track polygon count per image
+
+
+API Endpoints:
+
+POST /api/v1/polygons: Create a new polygon
+GET /api/v1/polygons/image/:imageId: Get all polygons for an image
+GET /api/v1/polygons/:id: Get a specific polygon
+PUT /api/v1/polygons/:id: Update a polygon
+DELETE /api/v1/polygons/:id: Delete a polygon
+
+
+Data Storage:
+
+Polygon data stored in PostgreSQL database
+Additional JSON files stored in Firebase Storage for AI/ML operations
+Each polygon maintains a parent-child relationship with its original image
+
+
+
+Frontend Components
+
+PolygonDrawer: React component for creating polygons on images
+
+Uses React Konva for canvas manipulation
+Provides drawing interface with point placement
+Handles polygon completion and submission
+
+
+PolygonViewer: Component for displaying existing polygons
+
+Renders polygons with unique colors
+Supports polygon selection
+Shows polygon metadata
+
+
+PolygonList: Component for managing polygon annotations
+
+Lists all polygons for an image
+Provides deletion functionality
+Supports polygon selection
+
+
+ImageAnnotationPage: Integrated page for annotation workflow
+
+Combines drawing, viewing, and management components
+Supports toggling between view and draw modes
+Shows polygon metadata
+
+
+
+Data Structure
+Each polygon consists of:
+
+Array of points (x, y coordinates)
+Metadata including label, original image dimensions, and scaling information
+Reference to parent image via original_image_id
+
+Integration with AI/ML Pipeline
+The polygon data is designed to be easily used for AI/ML training:
+
+All polygons are stored with normalized coordinates
+Original image dimensions are preserved in metadata
+Additional JSON files are created in Firebase Storage
+Each JSON file contains both polygon and parent image information
+
+Usage Flow
+
+User uploads an image to the platform
+User navigates to the image annotation page
+User toggles to "Draw Mode" and creates polygon(s) around garments
+System stores the polygon data with image association
+User can view and manage all polygons for an image
+
+Future Enhancements
+
+Automatic labeling of polygons using AI
+Bulk polygon operations
+Annotation templates for common garment types
+Multi-user annotation with conflict resolution
+Annotation quality metrics and validation

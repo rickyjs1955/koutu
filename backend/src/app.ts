@@ -1,4 +1,4 @@
-// backend/src/app.ts
+// /backend/src/app.ts - Update with polygon routes
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -10,6 +10,7 @@ import { garmentRoutes } from './routes/garmentRoutes';
 import { wardrobeRoutes } from './routes/wardrobeRoutes';
 import { exportRoutes } from './routes/exportRoutes';
 import { fileRoutes } from './routes/fileRoutes';
+import { polygonRoutes } from './routes/polygonRoutes'; // Import polygon routes
 
 // Initialize express app
 const app = express();
@@ -26,7 +27,8 @@ app.use('/api/v1/images', imageRoutes);
 app.use('/api/v1/garments', garmentRoutes);
 app.use('/api/v1/wardrobes', wardrobeRoutes);
 app.use('/api/v1/export', exportRoutes);
-app.use('/api/v1/files', fileRoutes); // Add new file routes
+app.use('/api/v1/files', fileRoutes);
+app.use('/api/v1/polygons', polygonRoutes); // Add polygon routes
 
 // Health check endpoint
 app.get('/health', (req, res) => {
