@@ -1,17 +1,49 @@
-// /backend/src/routes/exportRoutes.ts
+// backend/src/routes/exportRoutes.ts
 import express from 'express';
 import { exportController } from '../controllers/exportController';
-import { authenticate } from '../middlewares/auth';
+import { auth } from '../middlewares/auth';
+import { validate } from '../middlewares/validate';
+import { mlExportRequestSchema } from '@koutu/shared/schemas/export';
 
 const router = express.Router();
 
-// All routes require authentication
-router.use(authenticate);
+// Protected routes - require authentication
+router.use(auth);
 
-// Export user data as JSON response
-router.get('/data', exportController.exportData);
+// Existing export routes
+// GET /api/v1/export/data
+// GET /api/v1/export/file
 
-// Export user data to file and return file path
-router.get('/file', exportController.exportDataToFile);
+// New ML export routes
+router.post(
+  '/ml',
+  validate(mlExportRequestSchema),
+  exportController.createMLExport
+);
 
-export { router as exportRoutes };
+router.get(
+  '/ml/jobs',
+  exportController.getUserExportJobs
+);
+
+router.get(
+  '/ml/jobs/:jobId',
+  exportController.getExportJob
+);
+
+router.delete(
+  '/ml/jobs/:jobId',
+  exportController.cancelExportJob
+);
+
+router.get(
+  '/ml/download/:jobId',
+  exportController.downloadExport
+);
+
+router.get(
+  '/ml/stats',
+  exportController.getDatasetStats
+);
+
+export default router;

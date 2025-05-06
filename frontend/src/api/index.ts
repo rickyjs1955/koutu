@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 // Base API URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
 
 // Create a base axios instance with common configuration
 export const api = axios.create({
@@ -48,3 +48,4 @@ export * from './garmentApi';
 export * from './imageApi';
 export * from './wardrobeApi';
 export * from './polygonApi'; // Add polygon API
+export * from './exportApi'; // Add export API

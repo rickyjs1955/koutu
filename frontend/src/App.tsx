@@ -3,6 +3,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import { MLExportDashboard } from './pages/MLExportDashboard';
 
 // Create a QueryClient for React Query
 const queryClient = new QueryClient({
@@ -120,6 +121,7 @@ const App: React.FC = () => {
               <Route path="/garments/:id" element={<ProtectedRoute><GarmentDetail /></ProtectedRoute>} />
               <Route path="/wardrobes" element={<ProtectedRoute><WardrobeList /></ProtectedRoute>} />
               <Route path="/wardrobes/:id" element={<ProtectedRoute><WardrobeDetail /></ProtectedRoute>} />
+              <Route path="/export/ml" element={<MLExportDashboard />} />
               
               {/* 404 route */}
               <Route path="*" element={<NotFound />} />
