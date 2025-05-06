@@ -8,7 +8,7 @@ import { authRoutes } from './routes/authRoutes';
 import { imageRoutes } from './routes/imageRoutes';
 import { garmentRoutes } from './routes/garmentRoutes';
 import { wardrobeRoutes } from './routes/wardrobeRoutes';
-import { exportRoutes } from './routes/exportRoutes';
+import exportRoutes from './routes/exportRoutes';
 import { fileRoutes } from './routes/fileRoutes';
 import { polygonRoutes } from './routes/polygonRoutes'; // Import polygon routes
 
