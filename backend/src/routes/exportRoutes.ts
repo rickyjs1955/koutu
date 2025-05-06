@@ -1,14 +1,14 @@
 // backend/src/routes/exportRoutes.ts
 import express from 'express';
 import { exportController } from '../controllers/exportController';
-import { auth } from '../middlewares/auth';
+import { authenticate } from '../middlewares/auth';
 import { validate } from '../middlewares/validate';
 import { mlExportRequestSchema } from '@koutu/shared/schemas/export';
 
 const router = express.Router();
 
 // Protected routes - require authentication
-router.use(auth);
+router.use(authenticate);
 
 // Existing export routes
 // GET /api/v1/export/data

@@ -1,7 +1,5 @@
-// shared/src/schemas/export.ts
+// /shared/src/schemas/export.ts
 import { z } from 'zod';
-import { GarmentSchema } from './garment';
-import { ImageSchema } from './image';
 
 // Polygon point schema
 export const pointSchema = z.object({
