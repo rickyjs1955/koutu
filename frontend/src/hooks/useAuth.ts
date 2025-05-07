@@ -13,6 +13,10 @@ interface AuthContextType {
   register: (data: RegisterUserInput) => Promise<void>;
   logout: () => void;
   error: Error | null;
+  loginWithToken: (token: string) => Promise<void>;
+  linkedProviders: string[];
+  linkProvider: (provider: string) => void;
+  unlinkProvider: (provider: string) => Promise<void>;
 }
 
 // Create context with default values
@@ -23,7 +27,11 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   register: async () => {},
   logout: () => {},
-  error: null
+  error: null,
+  loginWithToken: async () => {},
+  linkedProviders: [],
+  linkProvider: () => {},
+  unlinkProvider: async () => {}
 });
 
 // Auth provider props
@@ -35,6 +43,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [error, setError] = useState<Error | null>(null);
   const queryClient = useQueryClient();
+  // REMOVED: const [linkedProviders, setLinkedProviders] = useState<string[]>([]);
   
   // Check if user is already logged in
   const initialIsAuthenticated = authApi.isLoggedIn();
@@ -49,6 +58,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   
   // Initialize user as null instead of undefined
   const user = userData || null;
+  // DERIVE linkedProviders from the user object
+  const linkedProviders = user?.linkedProviders || [];
   
   // Login mutation
   const loginMutation = useMutation({
@@ -78,20 +89,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   
   // Login handler
   const login = async (data: LoginUserInput) => {
-    try {
-      await loginMutation.mutateAsync(data);
-    } catch (err) {
-      // Error is handled in the mutation
-    }
+    // Error is handled in the mutation's onError, so try/catch can be removed if not needed for other logic
+    await loginMutation.mutateAsync(data).catch(() => { /* Optional: specific UI feedback if needed */ });
   };
   
   // Register handler
   const register = async (data: RegisterUserInput) => {
-    try {
-      await registerMutation.mutateAsync(data);
-    } catch (err) {
-      // Error is handled in the mutation
-    }
+    // Error is handled in the mutation's onError, so try/catch can be removed if not needed for other logic
+    await registerMutation.mutateAsync(data).catch(() => { /* Optional: specific UI feedback if needed */ });
   };
   
   // Logout handler
@@ -105,9 +110,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Determine if user is authenticated
   const isAuthenticated = !!user;
   
-  // Loading state - use isLoading instead of isPending for React Query v4
+  // Loading state
   const isLoading = isLoadingUser || loginMutation.isLoading || registerMutation.isLoading;
   
+  // Define context methods directly or as clearly named handlers
+  const contextLoginWithToken = async (token: string) => {
+    setError(null); // Clear previous errors
+    try {
+      // authApi.loginWithToken sets the token and returns the user data
+      const userResponse = await authApi.loginWithToken(token);
+      // Update current user data in React Query cache
+      queryClient.setQueryData(['currentUser'], userResponse);
+      // linkedProviders will update automatically as it's derived from 'user'
+    } catch (err) {
+      localStorage.removeItem('token'); // Ensure token is cleared on error
+      setError(err as Error);
+      throw err; // Re-throw so the caller can react if needed
+    }
+  };
+
+  const contextLinkProvider = (provider: string) => {
+    const redirectUrl = window.location.href;
+    window.location.href = `${process.env.REACT_APP_API_URL}/oauth/${provider}/authorize?redirect=${encodeURIComponent(redirectUrl)}`;
+  };
+
+  const contextUnlinkProvider = async (provider: string) => {
+    setError(null); // Clear previous errors
+    try {
+      await authApi.unlinkProvider(provider);
+      // Invalidate user data to refetch and update linkedProviders
+      queryClient.invalidateQueries(['currentUser']);
+    } catch (err) {
+      setError(err as Error);
+      throw err; // Re-throw so the caller can react if needed
+    }
+  };
+
   // Provide auth context
   const value: AuthContextType = {
     user,
@@ -116,7 +154,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     register,
     logout,
-    error
+    error,
+    loginWithToken: contextLoginWithToken,
+    linkedProviders, // Now derived from user
+    linkProvider: contextLinkProvider,
+    unlinkProvider: contextUnlinkProvider,
   };
   
   /* Use standard function return without parentheses */

@@ -5,9 +5,12 @@ import { z } from 'zod';
 export const UserSchema = z.object({
   id: z.string().uuid().optional(),
   email: z.string().email(),
+  name: z.string().optional(), // Add this line for user's name
   password_hash: z.string().optional(), // Only used in backend
   created_at: z.date().optional(),
-  updated_at: z.date().optional()
+  updated_at: z.date().optional(),
+  linkedProviders: z.array(z.string()).optional(),
+  oauth_provider: z.string().optional()
 });
 
 // Schema for creating a new user

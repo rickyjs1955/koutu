@@ -10,7 +10,8 @@ import { garmentRoutes } from './routes/garmentRoutes';
 import { wardrobeRoutes } from './routes/wardrobeRoutes';
 import exportRoutes from './routes/exportRoutes';
 import { fileRoutes } from './routes/fileRoutes';
-import { polygonRoutes } from './routes/polygonRoutes'; // Import polygon routes
+import { polygonRoutes } from './routes/polygonRoutes';
+import { oauthRoutes } from './routes/oauthRoutes';
 
 // Initialize express app
 const app = express();
@@ -28,7 +29,8 @@ app.use('/api/v1/garments', garmentRoutes);
 app.use('/api/v1/wardrobes', wardrobeRoutes);
 app.use('/api/v1/export', exportRoutes);
 app.use('/api/v1/files', fileRoutes);
-app.use('/api/v1/polygons', polygonRoutes); // Add polygon routes
+app.use('/api/v1/polygons', polygonRoutes);
+app.use('/api/v1/oauth', oauthRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

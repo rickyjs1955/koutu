@@ -33,6 +33,19 @@ export const config = {
   
   // Storage mode - 'local' or 'firebase'
   storageMode: process.env.STORAGE_MODE || 'firebase',
+
+  // App URL for OAuth redirects
+  appUrl: process.env.APP_URL || 'http://localhost:3000',
+  
+  // OAuth
+  oauth: {
+    googleClientId: process.env.GOOGLE_CLIENT_ID,
+    googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    microsoftClientId: process.env.MICROSOFT_CLIENT_ID,
+    microsoftClientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+    githubClientId: process.env.GITHUB_CLIENT_ID,
+    githubClientSecret: process.env.GITHUB_CLIENT_SECRET,
+  },
 };
 
 // Helper functions to check environment

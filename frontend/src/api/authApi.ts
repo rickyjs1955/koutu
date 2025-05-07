@@ -54,5 +54,22 @@ export const authApi = {
    */
   isLoggedIn(): boolean {
     return !!localStorage.getItem('token');
+  },
+
+  /**
+   * Get the current user's token
+   */
+  loginWithToken: async (token: string) => {
+    // Store the token (e.g., in localStorage)
+    localStorage.setItem('token', token);
+    // Return the user data, similar to regular login
+    return await authApi.me();
+  },
+
+  /**
+   * Unlink an OAuth provider from the user account
+   */
+  async unlinkProvider(provider: string): Promise<void> {
+    await api.delete(`/auth/providers/${provider}`);
   }
 };

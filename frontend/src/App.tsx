@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { MLExportDashboard } from './pages/MLExportDashboard';
+import OAuthCallbackPage from './pages/OAuthCallbackPage';
 
 // Create a QueryClient for React Query
 const queryClient = new QueryClient({
@@ -122,6 +123,7 @@ const App: React.FC = () => {
               <Route path="/wardrobes" element={<ProtectedRoute><WardrobeList /></ProtectedRoute>} />
               <Route path="/wardrobes/:id" element={<ProtectedRoute><WardrobeDetail /></ProtectedRoute>} />
               <Route path="/export/ml" element={<MLExportDashboard />} />
+              <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
               
               {/* 404 route */}
               <Route path="*" element={<NotFound />} />

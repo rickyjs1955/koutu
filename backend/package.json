@@ -24,7 +24,11 @@
     "pg": "^8.11.1",
     "sharp": "^0.32.1",
     "uuid": "^9.0.0",
-    "zod": "^3.21.4"
+    "zod": "^3.21.4",
+    "passport": "^0.6.0",
+    "passport-google-oauth20": "^2.0.0",
+    "passport-github2": "^0.1.12",
+    "express-session": "^1.17.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.0",
@@ -43,6 +47,10 @@
     "supertest": "^6.3.3",
     "ts-jest": "^29.1.1",
     "ts-node": "^10.9.1",
-    "typescript": "^5.1.6"
+    "typescript": "^5.1.6",
+    "@types/passport": "^1.0.12",
+    "@types/passport-google-oauth20": "^2.0.11",
+    "@types/passport-github2": "^1.2.5",
+    "@types/express-session": "^1.17.7"    
   }
 }

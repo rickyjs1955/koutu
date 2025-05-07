@@ -32,6 +32,14 @@ export interface UserOutput {
   created_at: Date;
 }
 
+export interface CreateOAuthUserInput {
+  email: string;
+  name?: string;
+  avatar_url?: string;
+  oauth_provider: string;
+  oauth_id: string;
+}
+
 /**
  * User model with database operations
  */
@@ -165,6 +173,83 @@ export const userModel = {
       imageCount: parseInt(imageCountResult.rows[0].image_count, 10),
       garmentCount: parseInt(garmentCountResult.rows[0].garment_count, 10),
       wardrobeCount: parseInt(wardrobeCountResult.rows[0].wardrobe_count, 10)
+    };
+  },
+
+  async findByOAuth(provider: string, providerId: string): Promise<User | null> {
+    // First, check the user_oauth_providers table for linked accounts
+    const linkedResult = await query(
+      `SELECT u.* FROM users u
+       JOIN user_oauth_providers p ON u.id = p.user_id
+       WHERE p.provider = $1 AND p.provider_id = $2`,
+      [provider, providerId]
+    );
+  
+    if (linkedResult.rows.length > 0) {
+      return linkedResult.rows[0];
+    }
+  
+    // Then check the users table for direct OAuth accounts
+    const result = await query(
+      'SELECT * FROM users WHERE oauth_provider = $1 AND oauth_id = $2',
+      [provider, providerId]
+    );
+  
+    return result.rows[0] || null;
+  },
+  
+  async createOAuthUser(data: CreateOAuthUserInput): Promise<UserOutput> {
+    const { email, name, avatar_url, oauth_provider, oauth_id } = data;
+    
+    // Check if user with email already exists
+    const existingUser = await query('SELECT * FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) {
+      throw ApiError.conflict('User with this email already exists', 'EMAIL_IN_USE');
+    }
+    
+    // Generate UUID
+    const id = uuidv4();
+    
+    // Insert user
+    const result = await query(
+      `INSERT INTO users 
+      (id, email, name, avatar_url, oauth_provider, oauth_id, created_at, updated_at) 
+      VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) 
+      RETURNING id, email, name, avatar_url, created_at`,
+      [id, email, name || null, avatar_url || null, oauth_provider, oauth_id]
+    );
+    
+    return result.rows[0];
+  },
+  
+  async getUserWithOAuthProviders(id: string): Promise<any> {
+    const userResult = await query(
+      'SELECT id, email, name, avatar_url, oauth_provider, created_at FROM users WHERE id = $1',
+      [id]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return null;
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Get linked OAuth providers
+    const providersResult = await query(
+      'SELECT provider FROM user_oauth_providers WHERE user_id = $1',
+      [id]
+    );
+    
+    const linkedProviders = providersResult.rows.map(row => row.provider);
+    
+    // If the user has a direct OAuth provider, add it to the list
+    if (user.oauth_provider) {
+      linkedProviders.push(user.oauth_provider);
+    }
+    
+    return {
+      ...user,
+      linkedProviders
     };
   }
 };
