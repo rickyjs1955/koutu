@@ -41,3 +41,17 @@ export const imageProcessingService = {
     return sharp(absolutePath).metadata();
   }
 };
+
+export async function processImage(file: any, userId: string, garmentId: string) {
+  // Add your image processing logic here
+  return {
+    id: 'processed-image-id',
+    url: 'https://storage.example.com/processed-image.jpg'
+  };
+}
+
+// Ensure removeBackground is also exported if needed
+export async function removeBackground(imageId: string) {
+  // Add your background removal logic here
+  return { success: true };
+}

@@ -49,6 +49,6 @@ export const config = {
 };
 
 // Helper functions to check environment
-export const isProd = (): boolean => config.nodeEnv === 'production';
-export const isDev = (): boolean => config.nodeEnv === 'development';
-export const isTest = (): boolean => config.nodeEnv === 'test';
+export const isProd = () => process.env.NODE_ENV === 'production';
+export const isDev = () => process.env.NODE_ENV === 'development';
+export const isTest = () => process.env.NODE_ENV === 'test';
