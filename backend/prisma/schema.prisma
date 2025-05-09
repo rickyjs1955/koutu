@@ -1,0 +1,61 @@
+// filepath: c:\Users\monmo\koutu\backend\prisma\schema.prisma
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"  // Specify the output path explicitly
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  name      String?
+  password  String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  wardrobes Wardrobe[]
+}
+
+model Wardrobe {
+  id        String    @id @default(uuid())
+  name      String
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  garments  Garment[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Garment {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  wardrobeId  String
+  wardrobe    Wardrobe @relation(fields: [wardrobeId], references: [id], onDelete: Cascade)
+  images      Image[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Image {
+  id         String    @id @default(uuid())
+  url        String
+  filename   String
+  garmentId  String
+  garment    Garment   @relation(fields: [garmentId], references: [id], onDelete: Cascade)
+  polygons   Polygon[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Polygon {
+  id        String   @id @default(uuid())
+  points    Json
+  imageId   String
+  image     Image    @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

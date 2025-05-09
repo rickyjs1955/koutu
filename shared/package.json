@@ -6,12 +6,19 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "jest --config jest.config.cjs",
+    "test:watch": "jest --config jest.config.cjs --watch",
+    "test:coverage": "jest --config jest.config.cjs --coverage"
   },
   "dependencies": {
     "zod": "^3.21.4"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.3",
+    "cross-env": "^7.0.3",
+    "jest": "^29.6.1",
+    "ts-jest": "^29.1.1",
     "typescript": "^5.1.6"
   }
 }

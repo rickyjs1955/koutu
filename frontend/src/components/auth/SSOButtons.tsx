@@ -1,5 +1,6 @@
 // /frontend/src/components/auth/SSOButtons.tsx
 import React from 'react';
+import { getApiBaseUrl } from '../../utils/env';
 
 // SVG icons for providers
 const GoogleIcon = () => (
@@ -33,7 +34,8 @@ interface SSOButtonsProps {
 }
 
 const SSOButtons: React.FC<SSOButtonsProps> = ({ redirectUrl = '' }) => {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+  // Use a utility function to get the API base URL instead of import.meta.env directly
+  const baseUrl = getApiBaseUrl();
   
   const getAuthUrl = (provider: string) => {
     const redirectParam = redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : '';
