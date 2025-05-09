@@ -104,7 +104,7 @@ describe('Auth Controller Unit Tests', () => {
     
     next = jest.fn();
   });
-
+  
   describe('register method', () => {
     test('userModel.create should be called with correct parameters', async () => {
       const localMockUser: User = {
@@ -213,6 +213,22 @@ describe('Auth Controller Unit Tests', () => {
       
       expect(next).toHaveBeenCalledWith(error);
     });
+
+    test('should return 409 when email already exists', async () => {
+      (userModel.findByEmail as jest.Mock).mockResolvedValue(mockUser); // Simulate email found
+      const specificError = new ApiError('Email already registered', 409, 'CONFLICT');
+      (userModel.create as jest.Mock).mockRejectedValue(specificError);
+
+      await authController.register(req, res, next);
+
+      expect(userModel.create).toHaveBeenCalledWith({
+        email: 'test@example.com',
+        password: 'password123'
+      });
+      expect(next).toHaveBeenCalledWith(expect.any(ApiError));
+      expect(next.mock.calls[0][0].statusCode).toBe(409);
+      expect(next.mock.calls[0][0].message).toMatch(/email already registered/i); 
+  });
   });
 
   describe('login method', () => {
