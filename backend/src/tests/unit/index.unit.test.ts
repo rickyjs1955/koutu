@@ -1,6 +1,12 @@
 // backend/src/tests/unit/index.unit.test.ts
-import path from 'path';
-import { config, isProd, isDev, isTest } from '../../config/index';
+
+import path from "path";
+
+const mockDotenvConfig = jest.fn();
+jest.mock('dotenv', () => ({
+  config: mockDotenvConfig,
+}));
+
 
 /**
  * Configuration Module Unit Test Suite
@@ -34,22 +40,22 @@ import { config, isProd, isDev, isTest } from '../../config/index';
  */
 
 describe('Configuration Module', () => {
-  // Store original environment
-  const originalEnv = process.env;
+  const originalProcessEnv = { ...process.env };
   
   beforeEach(() => {
-    // Reset the environment before each test
-    jest.resetModules();
-    process.env = { ...originalEnv };
+    mockDotenvConfig.mockClear(); // Clear calls for each test
+    jest.resetModules();          // Reset module cache
+    process.env = { ...originalProcessEnv }; // Reset environment
   });
   
   afterAll(() => {
-    // Restore original environment after all tests
-    process.env = originalEnv;
+    process.env = originalProcessEnv;
+    jest.unmock('dotenv'); // Clean up the global mock
   });
 
   describe('Configuration Object', () => {
     test('should have the correct structure with all required sections', () => {
+        const { config } = require('../../config/index');
         expect(config).toHaveProperty('port');
         expect(config).toHaveProperty('nodeEnv');
         expect(config).toHaveProperty('databaseUrl');
@@ -65,16 +71,62 @@ describe('Configuration Module', () => {
     });
 
     test('should have correct default values when environment variables are not set', () => {
-        expect(config.port).toBe("3000");
-        expect(config.nodeEnv).toBe('development');
-        expect(config.jwtExpiresIn).toBe('1d');
-        expect(config.maxFileSize).toBe(5242880); // 5MB
-        expect(config.logLevel).toBe('info');
-        expect(config.storageMode).toBe('firebase');
-        expect(config.appUrl).toBe('http://localhost:3000');
+      jest.isolateModules(() => { 
+        const isolatedScopeOriginalEnv = { ...process.env };
+        const mockDotenvConfig = jest.fn();
+
+        // Use jest.doMock here
+        jest.doMock('dotenv', () => {
+          return {
+            config: mockDotenvConfig,
+          };
         });
 
+        const keysToClear = [
+          'NODE_ENV', 'PORT', 'DATABASE_URL', 'JWT_SECRET', 'JWT_EXPIRES_IN',
+          'MAX_FILE_SIZE', 'LOG_LEVEL', 'STORAGE_MODE', 'APP_URL',
+          'FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL',
+          'FIREBASE_STORAGE_BUCKET', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET',
+          'MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET', 'GITHUB_CLIENT_ID',
+          'GITHUB_CLIENT_SECRET'
+        ];
+        keysToClear.forEach(key => delete process.env[key]);
+        
+        const { config: freshConfig } = require('../../config/index');
+
+        expect(mockDotenvConfig).toHaveBeenCalled();
+        expect(freshConfig.port).toBe(3000); // Expecting number due to || 3000 fallback
+        expect(freshConfig.nodeEnv).toBe('development');
+        expect(freshConfig.databaseUrl).toBeUndefined();
+        expect(freshConfig.jwtSecret).toBeUndefined();
+        expect(freshConfig.jwtExpiresIn).toBe('1d');
+        expect(freshConfig.maxFileSize).toBe(5242880); // 5MB
+        
+        // Firebase defaults
+        expect(freshConfig.firebase.projectId).toBeUndefined();
+        expect(freshConfig.firebase.privateKey).toBe('');
+        expect(freshConfig.firebase.clientEmail).toBe('');
+        expect(freshConfig.firebase.storageBucket).toBe('');
+        
+        expect(freshConfig.logLevel).toBe('info');
+        expect(freshConfig.storageMode).toBe('firebase');
+        expect(freshConfig.appUrl).toBe('http://localhost:3000');
+        
+        // OAuth defaults
+        expect(freshConfig.oauth.googleClientId).toBeUndefined();
+        expect(freshConfig.oauth.googleClientSecret).toBeUndefined();
+        expect(freshConfig.oauth.microsoftClientId).toBeUndefined();
+        expect(freshConfig.oauth.microsoftClientSecret).toBeUndefined();
+        expect(freshConfig.oauth.githubClientId).toBeUndefined();
+        expect(freshConfig.oauth.githubClientSecret).toBeUndefined();
+
+        process.env = isolatedScopeOriginalEnv;
+        jest.unmock('dotenv');        
+        });
+      });
+
     test('should correctly construct the uploads directory path', () => {
+        const { config } = require('../../config/index');
         const expectedPath = path.join(__dirname, '../../../../uploads');
         expect(config.uploadsDir).toBe(expectedPath);
     });
@@ -135,10 +187,31 @@ describe('Configuration Module', () => {
         expect(config.oauth.githubClientSecret).toBe('github-secret');
       });
     });
+
+    test('should set maxFileSize to NaN if MAX_FILE_SIZE is an invalid number string', () => {
+      process.env.MAX_FILE_SIZE = 'not-a-number';
+      
+      jest.isolateModules(() => {
+        const { config: freshConfig } = require('../../config/index');
+        // parseInt('not-a-number', 10) results in NaN
+        expect(isNaN(freshConfig.maxFileSize)).toBe(true);
+      });
+    });
+
+    test('should set maxFileSize to the default value if MAX_FILE_SIZE is an empty string', () => {
+      process.env.MAX_FILE_SIZE = '';
+      
+      jest.isolateModules(() => {
+        const { config: freshConfig } = require('../../config/index');
+        // When MAX_FILE_SIZE is '', it uses the default '5242880' due to the || operator
+        expect(freshConfig.maxFileSize).toBe(5242880); 
+      });
+    });
   });
 
   describe('Environment Helper Functions', () => {
     test('isProd should return true only in production environment', () => {
+      const { isProd } = require('../../config/index');
       process.env.NODE_ENV = 'production';
       expect(isProd()).toBe(true);
       
@@ -150,6 +223,7 @@ describe('Configuration Module', () => {
     });
     
     test('isDev should return true only in development environment', () => {
+      const { isDev } = require('../../config/index');
       process.env.NODE_ENV = 'development';
       expect(isDev()).toBe(true);
       
@@ -161,6 +235,7 @@ describe('Configuration Module', () => {
     });
     
     test('isTest should return true only in test environment', () => {
+      const { isTest } = require('../../config/index');
       process.env.NODE_ENV = 'test';
       expect(isTest()).toBe(true);
       
