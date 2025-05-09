@@ -210,39 +210,63 @@ describe('Configuration Module', () => {
 
   describe('Environment Helper Functions', () => {
     test('isProd should return true only in production environment', () => {
-      const { isProd } = require('../../config/index');
-      process.env.NODE_ENV = 'production';
-      expect(isProd()).toBe(true);
+      jest.isolateModules(() => {
+        process.env.NODE_ENV = 'production';
+        const { isProd } = require('../../config/index');
+        expect(isProd()).toBe(true);
+      });
       
-      process.env.NODE_ENV = 'development';
-      expect(isProd()).toBe(false);
+      jest.isolateModules(() => {
+        process.env.NODE_ENV = 'development';
+        const { isProd } = require('../../config/index');
+        expect(isProd()).toBe(false);
+      });
       
-      process.env.NODE_ENV = 'test';
-      expect(isProd()).toBe(false);
+      jest.isolateModules(() => {
+        process.env.NODE_ENV = 'test';
+        const { isProd } = require('../../config/index');
+        expect(isProd()).toBe(false);
+      });
     });
     
     test('isDev should return true only in development environment', () => {
-      const { isDev } = require('../../config/index');
-      process.env.NODE_ENV = 'development';
-      expect(isDev()).toBe(true);
+      jest.isolateModules(() => {
+        process.env.NODE_ENV = 'development';
+        const { isDev } = require('../../config/index');
+        expect(isDev()).toBe(true);
+      });
       
-      process.env.NODE_ENV = 'production';
-      expect(isDev()).toBe(false);
+      jest.isolateModules(() => {
+        process.env.NODE_ENV = 'production';
+        const { isDev } = require('../../config/index');
+        expect(isDev()).toBe(false);
+      });
       
-      process.env.NODE_ENV = 'test';
-      expect(isDev()).toBe(false);
+      jest.isolateModules(() => {
+        process.env.NODE_ENV = 'test';
+        const { isDev } = require('../../config/index');
+        expect(isDev()).toBe(false);
+      });
     });
     
     test('isTest should return true only in test environment', () => {
-      const { isTest } = require('../../config/index');
-      process.env.NODE_ENV = 'test';
-      expect(isTest()).toBe(true);
+      jest.isolateModules(() => {
+        process.env.NODE_ENV = 'test';
+        const { isTest } = require('../../config/index');
+        expect(isTest()).toBe(true);
+      });
       
-      process.env.NODE_ENV = 'production';
-      expect(isTest()).toBe(false);
+      jest.isolateModules(() => {
+        process.env.NODE_ENV = 'production';
+        const { isTest } = require('../../config/index');
+        expect(isTest()).toBe(false);
+      });
       
-      process.env.NODE_ENV = 'development';
-      expect(isTest()).toBe(false);
+      jest.isolateModules(() => {
+        process.env.NODE_ENV = 'development';
+        const { isTest } = require('../../config/index');
+        expect(isTest()).toBe(false);
+      });
     });
   });
 });
