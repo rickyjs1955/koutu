@@ -7,7 +7,6 @@ jest.mock('dotenv', () => ({
   config: mockDotenvConfig,
 }));
 
-
 /**
  * Configuration Module Unit Test Suite
  * ------------------------------------
