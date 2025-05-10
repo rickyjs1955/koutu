@@ -1,4 +1,4 @@
-// backend/src/tests/integration/firebase.int.test.ts
+// /backend/src/tests/integration/firebase.int.test.ts
 
 import { jest } from '@jest/globals';
 
