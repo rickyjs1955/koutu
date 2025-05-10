@@ -38,7 +38,7 @@ jest.mock('dotenv', () => ({
  * - Environment helpers
  */
 
-describe('Configuration Module', () => {
+describe('Config Module Unit Tests', () => {
   const originalProcessEnv = { ...process.env };
   
   beforeEach(() => {
