@@ -1,6 +1,5 @@
 // /backend/src/tests/security/firebase.security.test.ts
 
-
 /**
  * Firebase Configuration Security Tests
  * ---------------------------------------
