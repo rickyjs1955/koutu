@@ -4,9 +4,12 @@
  * OAuth Security Test Suite
  *
  * This test suite focuses on security aspects of the OAuth configuration:
- * - Ensures that sensitive parameters like client secrets are not exposed in authorization URLs.
- * - Validates that all required URL parameters are present and properly encoded.
- * - Checks that malicious inputs in the state parameter are safely handled to prevent injection attacks.
+ * - Ensures that sensitive parameters like client secrets are not exposed in authorization URLs
+ * - Validates that all required URL parameters are present and properly encoded
+ * - Checks that malicious inputs in the state parameter are safely handled to prevent injection attacks
+ * - Verifies proper handling of edge cases (empty or extremely long state parameters)
+ * - Confirms that only the specified scopes are requested from OAuth providers
+ * - Tests redirect URI encoding to prevent open redirect vulnerabilities
  */
 
 import { oauthConfig, getAuthorizationUrl } from '../../config/oauth';
