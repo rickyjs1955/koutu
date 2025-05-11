@@ -1,25 +1,5 @@
 // /backend/src/tests/unit/oauth.unit.test.ts
 
-import { jest } from '@jest/globals';
-
-// Mock the config before importing the module under test
-jest.mock('../../../src/config/index', () => ({
-    config: {
-        appUrl: 'http://localhost:3000',
-        oauth: {
-        googleClientId: 'google-client-id',
-        googleClientSecret: 'google-client-secret',
-        microsoftClientId: 'microsoft-client-id',
-        microsoftClientSecret: 'microsoft-client-secret',
-        githubClientId: 'github-client-id',
-        githubClientSecret: 'github-client-secret',
-        }
-    }
-}));
-
-// Import the module after mocking its dependencies
-import { oauthConfig, getAuthorizationUrl } from '../../../src/config/oauth';
-
 /**
  * OAuth Configuration Unit Tests
  * 
@@ -32,6 +12,26 @@ import { oauthConfig, getAuthorizationUrl } from '../../../src/config/oauth';
  * The tests use Jest's mocking capabilities to simulate different configuration scenarios.
  * Dependencies are mocked to isolate the module under test and provide controlled test conditions.
  */
+
+import { jest } from '@jest/globals';
+
+// Mock the config before importing the module under test
+jest.mock('../../../src/config/index', () => ({
+    config: {
+        appUrl: 'http://localhost:3000',
+        oauth: {
+            googleClientId: 'google-client-id',
+            googleClientSecret: 'google-client-secret',
+            microsoftClientId: 'microsoft-client-id',
+            microsoftClientSecret: 'microsoft-client-secret',
+            githubClientId: 'github-client-id',
+            githubClientSecret: 'github-client-secret',
+        }
+    }
+}));
+
+// Import the module after mocking its dependencies
+import { oauthConfig, getAuthorizationUrl } from '../../../src/config/oauth';
 
 describe('OAuth Configuration', () => {
     describe('oauthConfig object', () => {
@@ -84,8 +84,8 @@ describe('OAuth Configuration', () => {
             // Mock with empty OAuth config
             jest.mock('../../../src/config/index', () => ({
                 config: {
-                appUrl: 'http://localhost:3000',
-                oauth: undefined
+                    appUrl: 'http://localhost:3000',
+                    oauth: undefined
                 }
             }));
             
@@ -148,9 +148,63 @@ describe('OAuth Configuration', () => {
             const params = new URLSearchParams(urlObj.search);
             expect(params.get('state')).toBe(state);
             
-            // Alternatively, check with the correct encoding for URLSearchParams
+            // Alternatively, check with the encoding replacement used by URLSearchParams
             const encodedStateForUrlParams = state.replace(/ /g, '+').replace(/&/g, '%26');
             expect(url).toContain(`state=${encodedStateForUrlParams}`);
+        });
+
+        test('should generate correct authorization URL for Microsoft with empty state', () => {
+            const state = '';
+            const url = getAuthorizationUrl('microsoft', state);
+            
+            const urlObj = new URL(url);
+            const params = new URLSearchParams(urlObj.search);
+            expect(params.get('state')).toBe(state);
+        });
+
+        test('should throw an error or handle invalid provider gracefully', () => {
+            const state = 'test-state';
+            // Use @ts-expect-error to acknowledge the deliberate type error for testing purposes
+            // @ts-expect-error
+            expect(() => getAuthorizationUrl('unknownprovider', state)).toThrow();
+            // Depending on desired behavior, you might expect a specific error type or message.
+            // For example: .toThrow(TypeError); or .toThrow("Cannot read properties of undefined (reading 'clientId')");
+        });
+
+        test('should handle missing appUrl in config for redirectUri generation', () => {
+            jest.isolateModules(() => {
+                // This mock is scoped to this isolateModules block
+                jest.mock('../../../src/config/index', () => ({
+                    config: {
+                        // appUrl is intentionally missing
+                        oauth: {
+                            googleClientId: 'google-client-id', // You can use distinct values to be extra sure
+                            googleClientSecret: 'google-client-secret',
+                            // Ensure other providers are also defined if getAuthorizationUrl is called with them
+                            microsoftClientId: 'microsoft-client-id',
+                            microsoftClientSecret: 'microsoft-client-secret',
+                            githubClientId: 'github-client-id',
+                            githubClientSecret: 'github-client-secret',
+                        }
+                    }
+                }));
+
+                // Requiring the module inside isolateModules ensures it gets the above mock
+                const { oauthConfig: updatedOauthConfig, getAuthorizationUrl: updatedGetAuthorizationUrl } = require('../../../src/config/oauth');
+
+                // Check how redirectUri is formed in oauthConfig when appUrl is missing
+                // For `${undefined}/path` it becomes "undefined/path"
+                expect(updatedOauthConfig.google.redirectUri).toBe('undefined/api/v1/oauth/google/callback');
+
+                const state = 'test-state-no-app-url';
+                const url = updatedGetAuthorizationUrl('google', state);
+                
+                // The redirect_uri parameter in the URL should reflect the malformed redirectUri
+                const expectedRedirectUri = encodeURIComponent('undefined/api/v1/oauth/google/callback');
+                expect(url).toContain(`redirect_uri=${expectedRedirectUri}`);
+            });
+            // Note: jest.isolateModules handles the reset.
+            // The top-level mock for '../../../src/config/index' will apply to other tests outside this block.
         });
     });
 });
