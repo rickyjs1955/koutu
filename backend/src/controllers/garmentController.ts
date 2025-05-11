@@ -6,73 +6,81 @@ import { imageModel } from '../models/imageModel';
 import { labelingService } from '../services/labelingService';
 import { 
   GarmentResponse, 
-  CreateGarmentInput 
+  CreateGarmentInput
 } from '../../../shared/src/schemas/garment';
 
 export const garmentController = {
   async createGarment(req: Request, res: Response, next: NextFunction) {
     try {
-      // req.body is already validated and typed as CreateGarmentInput
-      const data: CreateGarmentInput = req.body;
-      
+      // Authentication check (could be moved to auth middleware)
       if (!req.user) {
         return next(ApiError.unauthorized('User not authenticated'));
       }
+
+      const { original_image_id, mask_data, metadata } = req.body as CreateGarmentInput;
+
+      // Find the original image
+      const originalImage = await imageModel.findById(original_image_id);
       
-      // Check if the original image exists and belongs to the user
-      // Fixed: Use original_image_id instead of originalImageId
-      const originalImage = await imageModel.findById(data.original_image_id);
+      // Check if image exists
       if (!originalImage) {
         return next(ApiError.notFound('Original image not found'));
       }
-      
+
+      // Check if user owns the image
       if (originalImage.user_id !== req.user.id) {
         return next(ApiError.forbidden('You do not have permission to use this image'));
       }
-      
-      // Apply the mask to the image
-      // Fixed: Use mask_data instead of maskData
+
+      // Business rule: validate image status
+      if (originalImage.status !== 'new') {
+        if (originalImage.status === 'labeled') {
+          return next(ApiError.badRequest('This image has already been used to create a garment'));
+        } else {
+          return next(ApiError.badRequest('Image must be in "new" status before creating a garment'));
+        }
+      }
+
+      // Process the image using labeling service
       const { maskedImagePath, maskPath } = await labelingService.applyMaskToImage(
         originalImage.file_path,
-        data.mask_data
+        mask_data
       );
-      
-      // Update the original image status to 'labeled'
-      // Fixed: Use original_image_id instead of originalImageId
-      await imageModel.updateStatus(data.original_image_id, 'labeled');
-      
-      // Create the garment item
-      const garment = await garmentModel.create({
+
+      // Update image status to labeled
+      await imageModel.updateStatus(original_image_id, 'labeled');
+
+      // Create the garment record
+      const createdGarment = await garmentModel.create({
         user_id: req.user.id,
-        original_image_id: data.original_image_id,
+        original_image_id,
         file_path: maskedImagePath,
         mask_path: maskPath,
-        metadata: data.metadata
+        metadata,
       });
-      
-      // Return the response matching our schema
-      const response: GarmentResponse = {
-        id: garment.id,
-        original_image_id: garment.original_image_id,
-        file_path: garment.file_path,
-        mask_path: garment.mask_path,
-        // Fixed: Ensure metadata matches the expected type
+
+      // Format response
+      const garmentResponse: GarmentResponse = {
+        id: createdGarment.id,
+        original_image_id: createdGarment.original_image_id,
+        file_path: createdGarment.file_path,
+        mask_path: createdGarment.mask_path,
         metadata: {
-          type: garment.metadata.type as any, // Type assertion to fix compatibility
-          color: garment.metadata.color,
-          pattern: garment.metadata.pattern,
-          season: garment.metadata.season,
-          brand: garment.metadata.brand,
-          tags: garment.metadata.tags
+          type: createdGarment.metadata.type,
+          color: createdGarment.metadata.color,
+          pattern: createdGarment.metadata.pattern,
+          season: createdGarment.metadata.season,
+          brand: createdGarment.metadata.brand,
+          tags: Array.isArray(createdGarment.metadata.tags) ? createdGarment.metadata.tags : []
         },
-        created_at: garment.created_at,
-        updated_at: garment.updated_at,
-        data_version: garment.data_version
+        created_at: createdGarment.created_at,
+        updated_at: createdGarment.updated_at,
+        data_version: createdGarment.data_version,
       };
-      
-      res.status(201).json({
+
+      return res.status(201).json({
         status: 'success',
-        data: { garment: response }
+        data: { garment: garmentResponse },
       });
     } catch (error) {
       next(error);

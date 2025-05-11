@@ -241,6 +241,7 @@ export declare const GarmentResponseSchema: z.ZodObject<{
     updated_at?: Date | undefined;
     data_version?: number | undefined;
 }>;
+export type GarmentMetadata = z.infer<typeof GarmentSchema.shape.metadata>;
 export type Garment = z.infer<typeof GarmentSchema>;
 export type CreateGarmentInput = z.infer<typeof CreateGarmentSchema>;
 export type UpdateGarmentMetadata = z.infer<typeof UpdateGarmentMetadataSchema>;

@@ -44,6 +44,7 @@ export const UpdateGarmentMetadataSchema = z.object({
 export const GarmentResponseSchema = GarmentSchema;
 
 // Derived TypeScript types
+export type GarmentMetadata = z.infer<typeof GarmentSchema.shape.metadata>; // Define and export GarmentMetadata
 export type Garment = z.infer<typeof GarmentSchema>;
 export type CreateGarmentInput = z.infer<typeof CreateGarmentSchema>;
 export type UpdateGarmentMetadata = z.infer<typeof UpdateGarmentMetadataSchema>;

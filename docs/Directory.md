@@ -38,9 +38,9 @@ Shared:
 7. /shared/src/schemas/oauth.ts
 8. /shared/src/schemas/index.ts
 Backend:
-1. /backend/src/config/index.ts
-2. /backend/src/config/firebase.ts
-3. /backend/src/config/oauth.ts
+1. /backend/src/config/index.ts (UIS)
+2. /backend/src/config/firebase.ts (UIS)
+3. /backend/src/config/oauth.ts (UIS)
 4. /backend/src/controllers/garmentController.ts
 5. /backend/src/controllers/imageController.ts
 6. /backend/src/controllers/exportController.ts
