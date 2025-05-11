@@ -93,7 +93,31 @@ export const garmentController = {
       // Function returns undefined here too
     }
   },
-  
+
+  async getGarments(req: Request, res: Response, next: NextFunction) {
+    try {
+      // Check authentication
+      if (!req.user) {
+        next(ApiError.unauthorized('User not authenticated'));
+        return;
+      }
+      
+      // Get all garments for the current user
+      const garments = await garmentModel.findByUserId(req.user.id);
+      
+      // Return the list of garments
+      res.status(200).json({
+        status: 'success',
+        data: { 
+          garments,
+          count: garments.length 
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+    
   // Consolidated getGarment method
   async getGarment(req: Request, res: Response, next: NextFunction) {
     try {
