@@ -15,9 +15,12 @@ export const garmentController = {
       // Authentication check
       if (!req.user) {
         next(ApiError.unauthorized('User not authenticated'));
-        return; // Add explicit return after next()
+        return;
       }
 
+      // TypeScript type guard
+      const userId = req.user.id;
+      
       const { original_image_id, mask_data, metadata } = req.body as CreateGarmentInput;
 
       // Find the original image
@@ -26,13 +29,13 @@ export const garmentController = {
       // Check if image exists
       if (!originalImage) {
         next(ApiError.notFound('Original image not found'));
-        return; // Add explicit return
+        return;
       }
 
       // Check if user owns the image
-      if (originalImage.user_id !== req.user.id) {
+      if (originalImage.user_id !== userId) {
         next(ApiError.forbidden('You do not have permission to use this image'));
-        return; // Add explicit return
+        return;
       }
 
       // Business rule: validate image status
@@ -42,7 +45,7 @@ export const garmentController = {
         } else {
           next(ApiError.badRequest('Image must be in "new" status before creating a garment'));
         }
-        return; // Add explicit return
+        return;
       }
 
       // Process the image using labeling service
@@ -56,41 +59,44 @@ export const garmentController = {
 
       // Create the garment record
       const createdGarment = await garmentModel.create({
-        user_id: req.user.id,
+        user_id: userId,
         original_image_id,
         file_path: maskedImagePath,
         mask_path: maskPath,
         metadata,
       });
 
-      // Format response object
-      const garmentResponse = {
+      // Create safe garment object with sanitized paths and filtered metadata
+      const safeGarment = {
         id: createdGarment.id,
+        user_id: createdGarment.user_id,
         original_image_id: createdGarment.original_image_id,
-        file_path: createdGarment.file_path,
-        mask_path: createdGarment.mask_path,
+        // Sanitize file paths to use API routes instead of file system paths
+        file_path: `/api/garments/${createdGarment.id}/image`,
+        mask_path: `/api/garments/${createdGarment.id}/mask`,
+        // Filter metadata to only include allowed fields
         metadata: {
-          type: createdGarment.metadata.type,
-          color: createdGarment.metadata.color,
-          pattern: createdGarment.metadata.pattern,
-          season: createdGarment.metadata.season,
-          brand: createdGarment.metadata.brand,
-          tags: Array.isArray(createdGarment.metadata.tags) ? createdGarment.metadata.tags : []
+          type: createdGarment.metadata?.type,
+          color: createdGarment.metadata?.color,
+          pattern: createdGarment.metadata?.pattern,
+          season: createdGarment.metadata?.season,
+          brand: createdGarment.metadata?.brand,
+          tags: Array.isArray(createdGarment.metadata?.tags) ? createdGarment.metadata.tags : []
         },
         created_at: createdGarment.created_at,
         updated_at: createdGarment.updated_at,
-        data_version: createdGarment.data_version,
+        data_version: createdGarment.data_version
       };
 
-      // Don't return this expression
+      // Return sanitized response
       res.status(201).json({
         status: 'success',
-        data: { garment: garmentResponse },
+        data: { garment: safeGarment }
       });
-      // Function implicitly returns undefined here
     } catch (error) {
-      next(error);
-      // Function returns undefined here too
+      // Sanitize error to prevent leaking implementation details
+      const sanitizedError = ApiError.internal('An error occurred while creating the garment');
+      next(sanitizedError);
     }
   },
 
@@ -101,20 +107,50 @@ export const garmentController = {
         next(ApiError.unauthorized('User not authenticated'));
         return;
       }
+
+      // TypeScript type guard - ensures req.user is recognized as defined
+      const userId = req.user.id;
       
       // Get all garments for the current user
       const garments = await garmentModel.findByUserId(req.user.id);
       
+      // Add this validation to double-check user ownership
+      const verifiedGarments = garments.filter(g => g.user_id === userId);
+
+      // Create safe garment objects with filtered metadata and sanitized paths
+      const safeGarments = verifiedGarments.map(garment => ({
+        id: garment.id,
+        user_id: garment.user_id,
+        original_image_id: garment.original_image_id,
+        // Sanitize file paths to use API routes instead of file system paths
+        file_path: `/api/garments/${garment.id}/image`,
+        mask_path: `/api/garments/${garment.id}/mask`,
+        // Filter metadata to only include allowed fields
+        metadata: {
+          type: garment.metadata?.type,
+          color: garment.metadata?.color,
+          pattern: garment.metadata?.pattern,
+          season: garment.metadata?.season,
+          brand: garment.metadata?.brand,
+          tags: Array.isArray(garment.metadata?.tags) ? garment.metadata.tags : []
+        },
+        created_at: garment.created_at,
+        updated_at: garment.updated_at,
+        data_version: garment.data_version
+      }));
+
       // Return the list of garments
       res.status(200).json({
         status: 'success',
         data: { 
-          garments,
-          count: garments.length 
+          garments: safeGarments,
+          count: safeGarments.length 
         }
       });
     } catch (error) {
-      next(error);
+      // Sanitize error to prevent leaking implementation details
+      const sanitizedError = ApiError.internal('An error occurred while retrieving garments');
+      next(sanitizedError);
     }
   },
     
@@ -129,6 +165,9 @@ export const garmentController = {
         return;
       }
       
+      // TypeScript type guard
+      const userId = req.user.id;
+      
       // Fetch garment from database
       const garment = await garmentModel.findById(id);
       
@@ -139,18 +178,42 @@ export const garmentController = {
       }
       
       // Check if user owns this garment
-      if (garment.user_id !== req.user.id) {
+      if (garment.user_id !== userId) {
         next(ApiError.forbidden('You do not have permission to access this garment'));
         return;
       }
       
-      // Return garment data
+      // Create a safe garment object with sanitized paths and filtered metadata
+      const safeGarment = {
+        id: garment.id,
+        user_id: garment.user_id,
+        original_image_id: garment.original_image_id,
+        // Sanitize file paths to use API routes instead of file system paths
+        file_path: `/api/garments/${garment.id}/image`,
+        mask_path: `/api/garments/${garment.id}/mask`,
+        // Filter metadata to only include allowed fields
+        metadata: {
+          type: garment.metadata?.type,
+          color: garment.metadata?.color,
+          pattern: garment.metadata?.pattern,
+          season: garment.metadata?.season,
+          brand: garment.metadata?.brand,
+          tags: Array.isArray(garment.metadata?.tags) ? garment.metadata.tags : []
+        },
+        created_at: garment.created_at,
+        updated_at: garment.updated_at,
+        data_version: garment.data_version
+      };
+      
+      // Return sanitized garment data
       res.status(200).json({
         status: 'success',
-        data: { garment }
+        data: { garment: safeGarment }
       });
     } catch (error) {
-      next(error);
+      // Sanitize error to prevent leaking implementation details
+      const sanitizedError = ApiError.internal('An error occurred while retrieving the garment');
+      next(sanitizedError);
     }
   },
   
@@ -165,6 +228,9 @@ export const garmentController = {
         return;
       }
       
+      // TypeScript type guard
+      const userId = req.user.id;
+      
       // Find garment
       const garment = await garmentModel.findById(id);
       
@@ -175,21 +241,63 @@ export const garmentController = {
       }
       
       // Check if user owns this garment
-      if (garment.user_id !== req.user.id) {
+      if (garment.user_id !== userId) {
         next(ApiError.forbidden('You do not have permission to update this garment'));
         return;
       }
       
-      // Update metadata
-      const updatedGarment = await garmentModel.updateMetadata(id, metadata);
+      // Sanitize and validate metadata input - only accept allowed fields
+      const sanitizedMetadata = {
+        type: metadata.type,
+        color: metadata.color,
+        pattern: metadata.pattern,
+        season: metadata.season,
+        brand: metadata.brand,
+        tags: Array.isArray(metadata.tags) ? metadata.tags : []
+      };
       
-      // Return updated garment
+      // Update metadata with sanitized input - wrap in proper structure
+      const updatedGarment = await garmentModel.updateMetadata(id, { 
+        metadata: sanitizedMetadata 
+      });
+
+      // Check if update was successful
+      if (!updatedGarment) {
+        next(ApiError.internal('Failed to update garment metadata'));
+        return;
+      }
+      
+      // Create a safe response object
+      const safeGarment = {
+        id: updatedGarment.id,
+        user_id: updatedGarment.user_id,
+        original_image_id: updatedGarment.original_image_id,
+        // Sanitize file paths to use API routes instead of file system paths
+        file_path: `/api/garments/${updatedGarment.id}/image`,
+        mask_path: `/api/garments/${updatedGarment.id}/mask`,
+        // Filter metadata to only include allowed fields
+        metadata: {
+          type: updatedGarment.metadata?.type,
+          color: updatedGarment.metadata?.color,
+          pattern: updatedGarment.metadata?.pattern,
+          season: updatedGarment.metadata?.season,
+          brand: updatedGarment.metadata?.brand,
+          tags: Array.isArray(updatedGarment.metadata?.tags) ? updatedGarment.metadata.tags : []
+        },
+        created_at: updatedGarment.created_at,
+        updated_at: updatedGarment.updated_at,
+        data_version: updatedGarment.data_version
+      };
+      
+      // Return sanitized garment data
       res.status(200).json({
         status: 'success',
-        data: { garment: updatedGarment }
+        data: { garment: safeGarment }
       });
     } catch (error) {
-      next(error);
+      // Sanitize error to prevent leaking implementation details
+      const sanitizedError = ApiError.internal('An error occurred while updating the garment metadata');
+      next(sanitizedError);
     }
   },
   
@@ -203,6 +311,9 @@ export const garmentController = {
         return;
       }
       
+      // TypeScript type guard
+      const userId = req.user.id;
+      
       // Find garment
       const garment = await garmentModel.findById(id);
       
@@ -213,7 +324,7 @@ export const garmentController = {
       }
       
       // Check if user owns this garment
-      if (garment.user_id !== req.user.id) {
+      if (garment.user_id !== userId) {
         next(ApiError.forbidden('You do not have permission to delete this garment'));
         return;
       }
@@ -227,7 +338,9 @@ export const garmentController = {
         message: 'Garment deleted successfully'
       });
     } catch (error) {
-      next(error);
+      // Sanitize error to prevent leaking implementation details
+      const sanitizedError = ApiError.internal('An error occurred while deleting the garment');
+      next(sanitizedError);
     }
   }
 };
