@@ -67,11 +67,9 @@ jest.mock('../../services/labelingService', () => ({
 import { Request, Response, NextFunction } from 'express';
 import { garmentController } from '../../controllers/garmentController';
 import { garmentModel } from '../../models/garmentModel';
-import { ApiError } from '../../utils/ApiError';
 import { imageModel } from '../../models/imageModel';
 import { labelingService } from '../../services/labelingService';
 import { CreateGarmentInput } from '../../../../shared/src/schemas/garment';
-
 
 describe('Garment Controller Integration Tests', () => {
   // No need for database setup/teardown with mocks
