@@ -1,5 +1,4 @@
-// backend/src/controllers/garmentController.test.ts
-
+// filepath: /backend/src/tests/integration/garmentController.int.test.ts
 /**
  * Integration Test Suite for Garment Controller
  *

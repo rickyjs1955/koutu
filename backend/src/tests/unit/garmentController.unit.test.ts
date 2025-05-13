@@ -1,4 +1,4 @@
-// backend/src/controllers/garmentController.test.ts
+// filepath: /backend/src/tests/unit/garmentController.unit.test.ts
 
 // Mock external dependencies
 jest.mock('firebase-admin', () => ({
