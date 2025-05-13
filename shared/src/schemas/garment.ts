@@ -4,6 +4,7 @@ import { z } from 'zod';
 // Base schema for a garment item
 export const GarmentSchema = z.object({
   id: z.string().uuid().optional(), // Optional for creation, required after DB insertion
+  user_id: z.string().uuid(), // User ID of the owner
   original_image_id: z.string().uuid(),
   file_path: z.string(),
   mask_path: z.string(),

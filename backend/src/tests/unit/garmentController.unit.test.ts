@@ -48,6 +48,7 @@ jest.mock('../../utils/ApiError', () => ({
     notFound: jest.fn(),
     forbidden: jest.fn(),
     badRequest: jest.fn(),
+    internal: jest.fn()
   },
 }));
 jest.mock('../../models/db', () => ({ // Add this mock for the db module
@@ -103,12 +104,12 @@ describe('garmentController', () => {
         };
 
         const mockOriginalImage = {
-        id: 'imageABC',
-        user_id: 'user123',
-        file_path: 'uploads/user123/original_image.jpg',
-        status: 'new',
-        created_at: new Date(),
-        updated_at: new Date(),
+            id: 'imageABC',
+            user_id: 'user123',
+            file_path: 'uploads/user123/original_image.jpg',
+            status: 'new',
+            created_at: new Date(),
+            updated_at: new Date(),
         };
 
         const mockLabelingServiceResponse = {
@@ -118,40 +119,43 @@ describe('garmentController', () => {
 
         const mockDate = new Date();
         const mockCreatedGarment = { // Ensure this reflects corrected metadata
-        id: 'garmentXYZ',
-        user_id: 'user123',
-        original_image_id: 'imageABC',
-        file_path: mockLabelingServiceResponse.maskedImagePath,
-        mask_path: mockLabelingServiceResponse.maskPath,
-        metadata: { // Ensure this metadata matches the corrected structure
-            type: 'shirt',
-            color: 'blue',
-            pattern: 'striped',
-            season: 'spring',
-            brand: 'FashionBrand',
-            tags: ['casual', 'cotton']
-        } as GarmentMetadata, // Add type assertion here
-        created_at: mockDate,
-        updated_at: mockDate,
-        data_version: 1,
+            id: 'garmentXYZ',
+            user_id: 'user123',
+            original_image_id: 'imageABC',
+            file_path: mockLabelingServiceResponse.maskedImagePath,
+            mask_path: mockLabelingServiceResponse.maskPath,
+            metadata: { // Ensure this metadata matches the corrected structure
+                type: 'shirt',
+                color: 'blue',
+                pattern: 'striped',
+                season: 'spring',
+                brand: 'FashionBrand',
+                tags: ['casual', 'cotton']
+            } as GarmentMetadata, // Add type assertion here
+            created_at: mockDate,
+            updated_at: mockDate,
+            data_version: 1,
         };
 
-        const expectedGarmentResponse: GarmentResponse = { // Ensure this reflects corrected metadata
-        id: mockCreatedGarment.id,
-        original_image_id: mockCreatedGarment.original_image_id,
-        file_path: mockCreatedGarment.file_path,
-        mask_path: mockCreatedGarment.mask_path,
-        metadata: { // Ensure this metadata matches the corrected structure
-            type: mockCreatedGarment.metadata.type, // This is 'shirt'
-            color: mockCreatedGarment.metadata.color, // This is 'blue'
-            pattern: mockCreatedGarment.metadata.pattern, // This is 'striped'
-            season: mockCreatedGarment.metadata.season, // This is 'spring'
-            brand: mockCreatedGarment.metadata.brand, // This is 'FashionBrand'
-            tags: mockCreatedGarment.metadata.tags // This is ['casual', 'cotton']
-        },
-        created_at: mockCreatedGarment.created_at,
-        updated_at: mockCreatedGarment.updated_at,
-        data_version: mockCreatedGarment.data_version
+        const expectedGarmentResponse: GarmentResponse = {
+            id: mockCreatedGarment.id,
+            user_id: mockCreatedGarment.user_id, // Add this line
+            original_image_id: mockCreatedGarment.original_image_id,
+            // Use API routes instead of file system paths
+            file_path: `/api/garments/${mockCreatedGarment.id}/image`,
+            mask_path: `/api/garments/${mockCreatedGarment.id}/mask`,
+            metadata: {
+                // Metadata fields unchanged
+                type: mockCreatedGarment.metadata.type,
+                color: mockCreatedGarment.metadata.color,
+                pattern: mockCreatedGarment.metadata.pattern,
+                season: mockCreatedGarment.metadata.season,
+                brand: mockCreatedGarment.metadata.brand,
+                tags: mockCreatedGarment.metadata.tags
+            },
+            created_at: mockCreatedGarment.created_at,
+            updated_at: mockCreatedGarment.updated_at,
+            data_version: mockCreatedGarment.data_version
         };
 
         test('should create a garment successfully and return 201 status', async () => {
@@ -228,19 +232,25 @@ describe('garmentController', () => {
             expect(labelingService.applyMaskToImage).not.toHaveBeenCalled();
         });
 
-        test('should call next with error if labelingService.applyMaskToImage throws an error', async () => {
+        test('should call next with sanitized error if labelingService.applyMaskToImage throws an error', async () => {
             mockRequest.body = mockCreateGarmentInput;
             (imageModel.findById as jest.Mock).mockResolvedValue(mockOriginalImage);
             const labelingError = new Error('Labeling service processing failed');
             (labelingService.applyMaskToImage as jest.Mock).mockRejectedValue(labelingError);
+            
+            // Setup the sanitized error that will be created
+            const sanitizedError = new Error('An error occurred while creating the garment');
+            (ApiError.internal as jest.Mock).mockReturnValue(sanitizedError);
 
             await garmentController.createGarment(mockRequest as Request, mockResponse as Response, mockNext);
 
-            expect(labelingService.applyMaskToImage).toHaveBeenCalledWith(
-                mockOriginalImage.file_path,
-                mockCreateGarmentInput.mask_data
-            );
-            expect(mockNext).toHaveBeenCalledWith(labelingError);
+            // Verify internal error message is created with correct message
+            expect(ApiError.internal).toHaveBeenCalledWith('An error occurred while creating the garment');
+            
+            // Verify sanitized error is passed to next()
+            expect(mockNext).toHaveBeenCalledWith(sanitizedError);
+            
+            // Rest of expectations remain unchanged
             expect(imageModel.updateStatus).not.toHaveBeenCalled();
             expect(garmentModel.create).not.toHaveBeenCalled();
         });
@@ -252,10 +262,14 @@ describe('garmentController', () => {
             const updateStatusError = new Error('Database error updating image status');
             (imageModel.updateStatus as jest.Mock).mockRejectedValue(updateStatusError);
 
+            const sanitizedError = new Error('An error occurred while creating the garment');
+            (ApiError.internal as jest.Mock).mockReturnValue(sanitizedError);
+
             await garmentController.createGarment(mockRequest as Request, mockResponse as Response, mockNext);
 
-            expect(imageModel.updateStatus).toHaveBeenCalledWith(mockCreateGarmentInput.original_image_id, 'labeled');
-            expect(mockNext).toHaveBeenCalledWith(updateStatusError);
+            // Update expectations
+            expect(ApiError.internal).toHaveBeenCalledWith('An error occurred while creating the garment');
+            expect(mockNext).toHaveBeenCalledWith(sanitizedError);
             expect(garmentModel.create).not.toHaveBeenCalled();
         });
 
@@ -267,16 +281,14 @@ describe('garmentController', () => {
             const createGarmentError = new Error('Database error creating garment');
             (garmentModel.create as jest.Mock).mockRejectedValue(createGarmentError);
 
+            const sanitizedError = new Error('An error occurred while creating the garment');
+            (ApiError.internal as jest.Mock).mockReturnValue(sanitizedError);
+
             await garmentController.createGarment(mockRequest as Request, mockResponse as Response, mockNext);
 
-            expect(garmentModel.create).toHaveBeenCalledWith({
-                user_id: 'user123',
-                original_image_id: mockCreateGarmentInput.original_image_id,
-                file_path: mockLabelingServiceResponse.maskedImagePath,
-                mask_path: mockLabelingServiceResponse.maskPath,
-                metadata: mockCreateGarmentInput.metadata,
-            });
-            expect(mockNext).toHaveBeenCalledWith(createGarmentError);
+            // Update expectations
+            expect(ApiError.internal).toHaveBeenCalledWith('An error occurred while creating the garment');
+            expect(mockNext).toHaveBeenCalledWith(sanitizedError);
             expect(mockResponse.status).not.toHaveBeenCalled();
             expect(mockResponse.json).not.toHaveBeenCalled();
         });

@@ -102,8 +102,35 @@ describe('Garment Controller Integration Tests', () => {
     it('should return all garments for authenticated user', async () => {
       // Mock data
       const mockGarments = [
-        { id: 'garment-1', user_id: 'test-user-id' },
-        { id: 'garment-2', user_id: 'test-user-id' }
+        { 
+          id: 'garment-1', 
+          user_id: 'test-user-id',
+          original_image_id: 'image-1',
+          file_path: '/actual/file/path1.jpg',
+          mask_path: '/actual/mask/path1.png',
+          metadata: { type: 'shirt', color: 'blue' },
+          created_at: new Date(),
+          updated_at: new Date(),
+          data_version: 1
+        },
+        { 
+          id: 'garment-2', 
+          user_id: 'test-user-id',
+          original_image_id: 'image-2',
+          file_path: '/actual/file/path2.jpg',
+          mask_path: '/actual/mask/path2.png',
+          metadata: { 
+            type: 'pants', 
+            color: 'black',
+            pattern: undefined,  
+            season: undefined,
+            brand: undefined,
+            tags: [] 
+           },
+          created_at: new Date(),
+          updated_at: new Date(),
+          data_version: 1
+        }
       ];
       
       // Setup the model mock to return garments
@@ -121,8 +148,25 @@ describe('Garment Controller Integration Tests', () => {
       expect(mockResponse.status).toHaveBeenCalledWith(200);
       expect(mockResponse.json).toHaveBeenCalledWith({
         status: 'success',
-        data: {
-          garments: mockGarments,
+        data: { 
+          garments: mockGarments.map(g => ({
+            id: g.id,
+            user_id: g.user_id,
+            original_image_id: g.original_image_id,
+            file_path: `/api/garments/${g.id}/image`,
+            mask_path: `/api/garments/${g.id}/mask`,
+            metadata: {
+              type: g.metadata?.type,
+              color: g.metadata?.color,
+              pattern: g.metadata?.pattern,
+              season: g.metadata?.season,
+              brand: g.metadata?.brand,
+              tags: Array.isArray(g.metadata?.tags) ? g.metadata.tags : []
+            },
+            created_at: g.created_at,
+            updated_at: g.updated_at,
+            data_version: g.data_version
+          })),
           count: 2
         }
       });
@@ -168,7 +212,12 @@ describe('Garment Controller Integration Tests', () => {
       expect(garmentModel.findByUserId).toHaveBeenCalledWith('test-user-id');
       expect(mockResponse.status).not.toHaveBeenCalled();
       expect(mockResponse.json).not.toHaveBeenCalled();
-      expect(mockNext).toHaveBeenCalledWith(mockError);
+      expect(mockNext).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'An error occurred while retrieving garments',
+          statusCode: 500
+        })
+      );
     });
     
     it('should handle empty garment list correctly', async () => {
@@ -196,22 +245,58 @@ describe('Garment Controller Integration Tests', () => {
     });
 
     it('should return garment for owner', async () => {
-    const garment = { id: 'garment-1', user_id: 'test-user-id' };
-    (garmentModel.findById as jest.Mock).mockResolvedValue(garment);
+      const garment = { 
+        id: 'garment-1', 
+        user_id: 'test-user-id',
+        original_image_id: 'image-1',
+        file_path: '/actual/file/path.jpg',
+        mask_path: '/actual/mask/path.png',
+        metadata: { 
+          type: 'shirt', 
+          color: 'blue',
+          pattern: undefined,  
+          season: undefined,
+          brand: undefined, 
+          tags: [] 
+        },
+        created_at: new Date(),
+        updated_at: new Date(),
+        data_version: 1
+      };
+      (garmentModel.findById as jest.Mock).mockResolvedValue(garment);
 
-    await garmentController.getGarment(
-      mockRequest as Request,
-      mockResponse as Response,
-      mockNext
-    );
+      await garmentController.getGarment(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext
+      );
 
-    expect(garmentModel.findById).toHaveBeenCalledWith('garment-1');
-    expect(mockResponse.status).toHaveBeenCalledWith(200);
-    expect(mockResponse.json).toHaveBeenCalledWith({
-      status: 'success',
-      data: { garment }
-    });
-    expect(mockNext).not.toHaveBeenCalled();
+      expect(garmentModel.findById).toHaveBeenCalledWith('garment-1');
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        status: 'success',
+        data: { 
+          garment: {
+            id: garment.id,
+            user_id: garment.user_id,
+            original_image_id: garment.original_image_id,
+            file_path: `/api/garments/${garment.id}/image`,
+            mask_path: `/api/garments/${garment.id}/mask`,
+            metadata: {
+              type: garment.metadata?.type,
+              color: garment.metadata?.color,
+              pattern: garment.metadata?.pattern,
+              season: garment.metadata?.season,
+              brand: garment.metadata?.brand,
+              tags: Array.isArray(garment.metadata?.tags) ? garment.metadata.tags : []
+            },
+            created_at: garment.created_at,
+            updated_at: garment.updated_at,
+            data_version: garment.data_version
+          }
+        }
+      });
+      expect(mockNext).not.toHaveBeenCalled();
     });
 
     it('should return 404 if garment not found', async () => {
@@ -296,7 +381,14 @@ describe('Garment Controller Integration Tests', () => {
         original_image_id: imageId,
         file_path: mockProcessedPaths.maskedImagePath,
         mask_path: mockProcessedPaths.maskPath,
-        metadata: requestBodyMetadata, // The metadata from the request
+        metadata: {
+          type: requestBodyMetadata.type,
+          color: requestBodyMetadata.color,
+          pattern: requestBodyMetadata.pattern,
+          season: requestBodyMetadata.season,
+          brand: requestBodyMetadata.brand,
+          tags: Array.isArray(requestBodyMetadata.tags) ? requestBodyMetadata.tags : []
+        }
       };
 
       // This is what the garmentModel.create mock will return.
@@ -305,6 +397,7 @@ describe('Garment Controller Integration Tests', () => {
       // Metadata includes optional fields as undefined if that's the behavior.
       const garmentReturnedByModelMock = {
         id: 'new-garment-id',
+        user_id: userId,
         original_image_id: imageId, // No user_id if not in GarmentResponseSchema
         file_path: mockProcessedPaths.maskedImagePath,
         mask_path: mockProcessedPaths.maskPath,
@@ -336,9 +429,11 @@ describe('Garment Controller Integration Tests', () => {
       // This is what we expect the final JSON response's garment object to look like.
       const expectedGarmentInJsonResponse = {
         id: 'new-garment-id',
-        original_image_id: imageId, // No user_id
-        file_path: mockProcessedPaths.maskedImagePath,
-        mask_path: mockProcessedPaths.maskPath,
+        user_id: garmentReturnedByModelMock.user_id, // Include user_id in expected response
+        original_image_id: imageId,
+        // Change to API routes format
+        file_path: `/api/garments/new-garment-id/image`,
+        mask_path: `/api/garments/new-garment-id/mask`,
         metadata: {
           type: requestBodyMetadata.type,
           color: requestBodyMetadata.color,
@@ -347,8 +442,8 @@ describe('Garment Controller Integration Tests', () => {
           brand: requestBodyMetadata.brand || undefined,
           tags: requestBodyMetadata.tags || [],
         },
-        created_at: expect.any(Date), // Use matcher for dates
-        updated_at: expect.any(Date), // Use matcher for dates
+        created_at: expect.any(Date),
+        updated_at: expect.any(Date),
         data_version: 1,
       };
 
@@ -399,7 +494,12 @@ describe('Garment Controller Integration Tests', () => {
       (imageModel.findById as jest.Mock).mockResolvedValue(mockOriginalImage);
       (labelingService.applyMaskToImage as jest.Mock).mockRejectedValue(serviceError);
       await garmentController.createGarment(mockRequest as Request, mockResponse as Response, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(serviceError);
+      expect(mockNext).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'An error occurred while creating the garment',
+          statusCode: 500
+        })
+      );
     });
   });
 
@@ -410,7 +510,13 @@ describe('Garment Controller Integration Tests', () => {
     const userId = 'test-user-id';
     const garmentId = 'garment-to-update-id';
     const initialMetadata = { type: 'shirt', color: 'blue', season: 'summer', brand: 'OldBrand', tags: ['casual'] };
-    const updatedMetadataPayload = { type: 'shirt', color: 'red', season: 'autumn', brand: 'NewBrand', tags: ['formal', 'office'] };
+    const updatedMetadataPayload = { 
+      type: 'shirt', 
+      color: 'red', 
+      pattern: 'striped',
+      season: 'autumn', 
+      brand: 'NewBrand', 
+      tags: ['formal', 'office'] };
 
     beforeEach(() => {
       mockRequest = {
@@ -427,7 +533,16 @@ describe('Garment Controller Integration Tests', () => {
 
     it('should update garment metadata successfully', async () => {
       const mockExistingGarment = { id: garmentId, user_id: userId, metadata: initialMetadata };
-      const mockUpdatedGarment = { ...mockExistingGarment, metadata: updatedMetadataPayload, updated_at: new Date() };
+      const mockUpdatedGarment = { 
+        ...mockExistingGarment, 
+        metadata: updatedMetadataPayload, 
+        original_image_id: 'image-1',
+        file_path: '/path/to/file.jpg',
+        mask_path: '/path/to/mask.png',
+        created_at: new Date(),
+        updated_at: new Date(),
+        data_version: 1
+      };
 
       (garmentModel.findById as jest.Mock).mockResolvedValue(mockExistingGarment);
       (garmentModel.updateMetadata as jest.Mock).mockResolvedValue(mockUpdatedGarment);
@@ -435,11 +550,42 @@ describe('Garment Controller Integration Tests', () => {
       await garmentController.updateGarmentMetadata(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(garmentModel.findById).toHaveBeenCalledWith(garmentId);
-      expect(garmentModel.updateMetadata).toHaveBeenCalledWith(garmentId, updatedMetadataPayload);
+      expect(garmentModel.updateMetadata).toHaveBeenCalledWith(
+        garmentId, 
+        { 
+          metadata: {
+            type: updatedMetadataPayload.type,
+            color: updatedMetadataPayload.color,
+            pattern: updatedMetadataPayload.pattern,
+            season: updatedMetadataPayload.season,
+            brand: updatedMetadataPayload.brand,
+            tags: Array.isArray(updatedMetadataPayload.tags) ? updatedMetadataPayload.tags : []
+          }
+        }
+      );
       expect(mockResponse.status).toHaveBeenCalledWith(200);
       expect(mockResponse.json).toHaveBeenCalledWith({
         status: 'success',
-        data: { garment: mockUpdatedGarment },
+        data: { 
+          garment: {
+            id: mockUpdatedGarment.id,
+            user_id: mockUpdatedGarment.user_id,
+            original_image_id: mockUpdatedGarment.original_image_id,
+            file_path: `/api/garments/${mockUpdatedGarment.id}/image`,
+            mask_path: `/api/garments/${mockUpdatedGarment.id}/mask`,
+            metadata: {
+              type: mockUpdatedGarment.metadata?.type,
+              color: mockUpdatedGarment.metadata?.color,
+              pattern: mockUpdatedGarment.metadata?.pattern,
+              season: mockUpdatedGarment.metadata?.season,
+              brand: mockUpdatedGarment.metadata?.brand,
+              tags: Array.isArray(mockUpdatedGarment.metadata?.tags) ? mockUpdatedGarment.metadata.tags : []
+            },
+            created_at: mockUpdatedGarment.created_at,
+            updated_at: mockUpdatedGarment.updated_at,
+            data_version: mockUpdatedGarment.data_version
+          }
+        }
       });
       expect(mockNext).not.toHaveBeenCalled();
     });
@@ -469,7 +615,12 @@ describe('Garment Controller Integration Tests', () => {
       (garmentModel.findById as jest.Mock).mockResolvedValue(mockExistingGarment);
       (garmentModel.updateMetadata as jest.Mock).mockRejectedValue(dbError);
       await garmentController.updateGarmentMetadata(mockRequest as Request, mockResponse as Response, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(dbError);
+      expect(mockNext).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'An error occurred while updating the garment metadata',
+          statusCode: 500
+        })
+      );
     });
   });
 
@@ -493,7 +644,7 @@ describe('Garment Controller Integration Tests', () => {
     it('should delete garment for owner', async () => {
       const garment = { id: 'garment-1', user_id: 'test-user-id' };
       (garmentModel.findById as jest.Mock).mockResolvedValue(garment);
-      (garmentModel.delete as jest.Mock).mockResolvedValue(undefined);
+      (garmentModel.delete as jest.Mock).mockResolvedValue(true);
 
       await garmentController.deleteGarment(
         mockRequest as Request,

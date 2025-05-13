@@ -57,13 +57,23 @@ export const garmentController = {
       // Update image status to labeled
       await imageModel.updateStatus(original_image_id, 'labeled');
 
-      // Create the garment record
+      // Sanitize metadata input
+      const sanitizedMetadata = {
+        type: metadata?.type,
+        color: metadata?.color,
+        pattern: metadata?.pattern,
+        season: metadata?.season,
+        brand: metadata?.brand,
+        tags: Array.isArray(metadata?.tags) ? metadata.tags : []
+      };
+
+      // Create with sanitized metadata
       const createdGarment = await garmentModel.create({
         user_id: userId,
         original_image_id,
         file_path: maskedImagePath,
         mask_path: maskPath,
-        metadata,
+        metadata: sanitizedMetadata,
       });
 
       // Create safe garment object with sanitized paths and filtered metadata
@@ -103,7 +113,7 @@ export const garmentController = {
   async getGarments(req: Request, res: Response, next: NextFunction) {
     try {
       // Check authentication
-      if (!req.user) {
+      if (!req.user || !req.user.id) {
         next(ApiError.unauthorized('User not authenticated'));
         return;
       }
@@ -330,7 +340,13 @@ export const garmentController = {
       }
       
       // Delete the garment
-      await garmentModel.delete(id);
+      const deleteResult = await garmentModel.delete(id);
+
+      // Check if deletion was successful
+      if (!deleteResult) {
+        next(ApiError.internal('Failed to delete garment'));
+        return;
+      }
       
       // Return success response
       res.status(200).json({
