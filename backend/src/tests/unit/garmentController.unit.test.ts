@@ -1,4 +1,24 @@
 // filepath: /backend/src/tests/unit/garmentController.unit.test.ts
+/**
+ * Unit Test Suite for Garment Controller
+ *
+ * This test suite focuses on validating the behavior of the garmentController methods
+ * in isolation. All external dependencies, such as models, services, and Firebase,
+ * are mocked to ensure the tests focus solely on the controller logic.
+ *
+ * Key Areas Covered:
+ * 1. Authentication and authorization checks
+ * 2. Input validation and business rule enforcement
+ * 3. Proper interaction with mocked models and services
+ * 4. Error handling and response formatting
+ *
+ * Covered Methods:
+ * - createGarment: Tests garment creation, including image validation, metadata handling,
+ *   and interaction with the labeling service.
+ *
+ * This suite ensures that the controller methods behave as expected under various scenarios,
+ * including success cases, invalid inputs, and error conditions.
+ */
 
 // Mock external dependencies
 jest.mock('firebase-admin', () => ({
@@ -306,61 +326,5 @@ describe('garmentController', () => {
             expect(imageModel.updateStatus).not.toHaveBeenCalled();
             expect(garmentModel.create).not.toHaveBeenCalled();
         });
-        
-        /* Should be moved to the validation middleware
-        test('should handle invalid mask_data (empty data array)', async () => {
-            const invalidInput = {
-                ...mockCreateGarmentInput,
-                mask_data: {
-                    width: 100,
-                    height: 100,
-                    data: [] // Empty data array
-                }
-            };
-            mockRequest.body = invalidInput;
-            (imageModel.findById as jest.Mock).mockResolvedValue(mockOriginalImage);
-            
-            const badRequestError = new Error('Invalid mask data: data array cannot be empty');
-            (ApiError.badRequest as jest.Mock).mockReturnValue(badRequestError);
-
-            await garmentController.createGarment(mockRequest as Request, mockResponse as Response, mockNext);
-
-            // Verify the ApiError.badRequest is called with correct message
-            expect(ApiError.badRequest).toHaveBeenCalledWith('Invalid mask data: data array cannot be empty');
-            // Verify the error is passed to next()
-            expect(mockNext).toHaveBeenCalledWith(badRequestError);
-            // Verify that processing stopped before reaching these methods
-            expect(labelingService.applyMaskToImage).not.toHaveBeenCalled();
-            expect(imageModel.updateStatus).not.toHaveBeenCalled();
-            expect(garmentModel.create).not.toHaveBeenCalled();
-        });
-
-        test('should handle mask_data with mismatched dimensions', async () => {
-            const invalidInput = {
-                ...mockCreateGarmentInput,
-                mask_data: {
-                    width: 100,
-                    height: 100,
-                    data: Array(50).fill(0) // Data array length doesn't match width*height
-                }
-            };
-            mockRequest.body = invalidInput;
-            (imageModel.findById as jest.Mock).mockResolvedValue(mockOriginalImage);
-            
-            const badRequestError = new Error('Invalid mask data: data array length does not match width*height');
-            (ApiError.badRequest as jest.Mock).mockReturnValue(badRequestError);
-
-            await garmentController.createGarment(mockRequest as Request, mockResponse as Response, mockNext);
-
-            // Verify the ApiError.badRequest is called with correct message
-            expect(ApiError.badRequest).toHaveBeenCalledWith('Invalid mask data: data array length does not match width*height');
-            // Verify the error is passed to next()
-            expect(mockNext).toHaveBeenCalledWith(badRequestError);
-            // Verify that processing stopped before reaching these methods
-            expect(labelingService.applyMaskToImage).not.toHaveBeenCalled();
-            expect(imageModel.updateStatus).not.toHaveBeenCalled();
-            expect(garmentModel.create).not.toHaveBeenCalled();
-        });
-        */
     });
 });
