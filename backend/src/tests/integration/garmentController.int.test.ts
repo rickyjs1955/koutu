@@ -1,3 +1,28 @@
+// backend/src/controllers/garmentController.test.ts
+
+/**
+ * Integration Test Suite for Garment Controller
+ *
+ * This test suite validates the behavior of the garmentController methods
+ * using a hybrid approach. The database and external services are mocked,
+ * allowing us to focus on the controller logic, including:
+ *
+ * 1. Authentication and authorization checks
+ * 2. Business rule enforcement
+ * 3. Proper interaction with mocked models and services
+ * 4. Error handling and response formatting
+ *
+ * Covered Methods:
+ * - getGarments: Retrieves all garments for an authenticated user.
+ * - getGarment: Fetches a specific garment with ownership validation.
+ * - createGarment: Handles garment creation, including image processing and metadata validation.
+ * - updateGarmentMetadata: Updates garment metadata with ownership checks.
+ * - deleteGarment: Deletes a garment with proper ownership validation.
+ *
+ * This suite is designed to be adaptable for future true integration tests
+ * with a real database, ensuring comprehensive test coverage.
+ */
+
 // Mock dependencies before importing
 jest.mock('../../models/garmentModel', () => ({
   garmentModel: {
