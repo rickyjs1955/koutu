@@ -1,11 +1,46 @@
-// /backend/src/controllers/garmentController.ts
+// filepath: /backend/src/controllers/garmentController.ts
+
+/**
+ * Garment Controller
+ * 
+ * Handles all garment-related operations in the application, providing a secure layer
+ * between client requests and data access. This controller implements comprehensive
+ * security measures including authentication verification, authorization checks,
+ * data sanitization, and error handling.
+ * 
+ * Security Features:
+ * - Authentication verification on all endpoints
+ * - Authorization checks to ensure users can only access their own garments
+ * - Path sanitization to prevent directory traversal and exposure
+ * - Metadata filtering to prevent sensitive data leakage
+ * - Input validation and sanitization to prevent injection attacks
+ * - Error sanitization to prevent implementation details exposure
+ * - Double verification of user ownership beyond database queries
+ * 
+ * Operations:
+ * - createGarment: Creates a new garment from an existing image and mask data
+ * - getGarments: Retrieves all garments owned by the authenticated user
+ * - getGarment: Retrieves a specific garment by ID (with ownership verification)
+ * - updateGarmentMetadata: Updates metadata for a specific garment
+ * - deleteGarment: Removes a garment from the system
+ * 
+ * Data Flow:
+ * - Receives client requests with authentication context
+ * - Validates permissions and input data
+ * - Interacts with models (garmentModel, imageModel)
+ * - Uses services (labelingService) for business operations
+ * - Sanitizes response data before returning to client
+ * 
+ * Note: All methods implement consistent error handling that logs detailed errors
+ * for debugging while only returning sanitized error messages to clients.
+ */
+
 import { Request, Response, NextFunction } from 'express';
 import { ApiError } from '../utils/ApiError';
 import { garmentModel } from '../models/garmentModel';
 import { imageModel } from '../models/imageModel';
 import { labelingService } from '../services/labelingService';
-import { 
-  GarmentResponse, 
+import {  
   CreateGarmentInput
 } from '../../../shared/src/schemas/garment';
 
