@@ -1,3 +1,4 @@
+// filepath: /backend/src/tests/security/garmentController.security.test.ts
 /**
  * Security Test Suite for Garment Controller
  *
