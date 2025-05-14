@@ -1,9 +1,22 @@
-import { Request, Response, NextFunction } from 'express';
-import { validate } from '../../middlewares/validate';
-import { z } from 'zod';
-import { ApiError } from '../../utils/ApiError';
+// filepath: /backend/src/tests/unit/validate.unit.test.ts
 
-// Mock ApiError
+/**
+ * Unit Test Suite for validate.ts Middleware
+ * 
+ * This suite provides focused unit tests for the custom Express validation middleware using Zod.
+ * 
+ * Key Features:
+ * - Mocks dependencies (ApiError) for isolated testing of middleware logic.
+ * - Verifies correct behavior for valid and invalid input, including multiple validation errors.
+ * - Tests error formatting and propagation to next() for both Zod and non-Zod errors.
+ * - Ensures correct handling of different validation sources (body, query, params).
+ * - Confirms that data transformation (e.g., type coercion) is applied as expected.
+ * - Maintains TypeScript type safety and clear separation of concerns.
+ * 
+ * This suite ensures the middleware's core logic is robust and reliable in isolation from the Express framework.
+ */
+
+// Mock ApiError for testing
 jest.mock('../../utils/ApiError', () => ({
   ApiError: {
     badRequest: jest.fn((message, code) => ({
@@ -13,6 +26,11 @@ jest.mock('../../utils/ApiError', () => ({
     }))
   }
 }));
+
+import { Request, Response, NextFunction } from 'express';
+import { validate } from '../../middlewares/validate';
+import { z } from 'zod';
+import { ApiError } from '../../utils/ApiError';
 
 describe('validate middleware', () => {
     let mockRequest: Partial<Request>;

@@ -1,3 +1,22 @@
+// filepath: /backend/src/tests/integration/validate.int.test.ts
+
+/**
+ * Integration Test Suite for validate.ts Middleware
+ * 
+ * This suite provides comprehensive integration tests for the custom Express validation middleware using Zod.
+ * 
+ * Key Features:
+ * - Covers all validation sources: request body, query parameters, and URL params.
+ * - Tests both valid and invalid input, including edge cases like nested objects, arrays, async refinements, and empty input.
+ * - Verifies error formatting, status codes, and error propagation through middleware chains.
+ * - Demonstrates both global and route-specific error handling patterns, ensuring consistent error responses.
+ * - Uses a hybrid approach: real Express app and HTTP requests (via supertest), but without external dependencies.
+ * - Ensures middleware works correctly in isolation and when chained with other middleware.
+ * - TypeScript type safety is maintained throughout, with explicit handling for error middleware signatures.
+ * 
+ * This suite not only validates correctness but also serves as documentation for how to use and extend the validation middleware.
+ */
+
 // Mock ApiError for testing
 jest.mock('../../utils/ApiError', () => ({
   ApiError: {
