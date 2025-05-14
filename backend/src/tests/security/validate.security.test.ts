@@ -1,22 +1,39 @@
 // filepath: /backend/src/tests/security/validate.security.test.ts
 
 /**
- * Security Test Suite for validate.ts Middleware
- *
- * This suite focuses on testing the resilience of the validation middleware
- * against common security vulnerabilities related to input processing.
- *
- * Key Areas Tested:
- * - Large payloads (potential for DoS).
- * - Deeply nested structures (potential for DoS / stack overflow).
- * - Prototype pollution attempts.
- * - Malformed or unexpected data types.
- * - Behavior with overly long strings or parameter values.
- * - Robustness of Zod's parsing and coercion in security-sensitive contexts.
- *
- * The goal is to ensure the middleware, along with Zod and Express,
- * handles potentially malicious inputs gracefully without crashing, leaking
- * sensitive information, or allowing validation bypass.
+ * Comprehensive Security Test Suite for Validation Middleware
+ * 
+ * This suite thoroughly tests the validation middleware against a wide range of
+ * security vulnerabilities and edge cases. It ensures the middleware properly
+ * handles malicious or malformed inputs without crashing, leaking information,
+ * or allowing validation bypass.
+ * 
+ * Security vectors tested:
+ * 
+ * 1. DoS and Resource Exhaustion
+ *    - Extremely large payloads
+ *    - Deeply nested JSON structures
+ *    - Memory/CPU intensive operations
+ * 
+ * 2. Input Validation Bypass
+ *    - Prototype pollution attempts
+ *    - Type confusion/coercion attacks
+ *    - Unexpected data formats (arrays vs objects, null values)
+ * 
+ * 3. Malicious Content
+ *    - SQL injection patterns
+ *    - Path traversal attempts
+ *    - ReDoS (Regular Expression DoS)
+ *    - Unicode/encoding tricks
+ * 
+ * 4. Error Handling
+ *    - Ensures errors are properly sanitized
+ *    - Validates consistent error formats
+ *    - Confirms appropriate HTTP status codes
+ * 
+ * Each test uses isolated Express instances where needed and custom error handlers
+ * to verify exact behavior. The suite has been carefully designed to test dangerous
+ * patterns without risking the stability of the test runner itself.
  */
 
 // Mock ApiError similar to integration tests for consistent error objects
@@ -39,7 +56,6 @@ import express, { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import request from 'supertest';
 import { validate } from '../../middlewares/validate';
-import { ApiError } from '../../utils/ApiError'; // Though mocked, import for type usage if needed
 
 describe('Validation Middleware Security', () => {
     let app: express.Application;
@@ -397,4 +413,156 @@ describe('Validation Middleware Security', () => {
     // - Strings that look like file paths or commands.
     // - Test with schemas that use z.coerce and try to break coercion.
     // - Test with schemas that use .regex() and provide ReDoS vulnerable strings (if applicable to user's schemas).
+    
+    describe('Content-based Input Attacks', () => {
+    // SQL injection-like strings
+    // Path traversal/command-like strings
+    // Coercion abuse
+    // ReDoS
+    // Unicode/encoding edge cases
+        it('should reject SQL injection-like strings if schema uses regex', async () => {
+            const sqlSchema = z.object({
+                username: z.string().regex(/^[a-zA-Z0-9_]+$/) // Only allow safe chars
+            });
+            app.post('/sql-injection-test', validate(sqlSchema), (_req, res): void => { res.status(200).json({ status: 'ok' }); });
+            app.use(((err: any, _req: Request, res: Response, _next: NextFunction) => {
+                res.status(err.statusCode || 400).json({ message: err.message, code: err.code || 'VALIDATION_ERROR' });
+            }) as express.ErrorRequestHandler);
+
+            const response = await request(app)
+                .post('/sql-injection-test')
+                .send({ username: "' OR 1=1; --" });
+
+            expect(response.status).toBe(400);
+            expect(response.body.code).toBe('VALIDATION_ERROR');
+            expect(response.body.message).toContain('username');
+        });
+
+        it('should reject file path traversal strings if schema uses regex', async () => {
+            const pathSchema = z.object({
+                filename: z.string().regex(/^[a-zA-Z0-9_\-.]+$/) // No slashes allowed
+            });
+            app.post('/path-traversal-test', validate(pathSchema), (_req, res): void => { res.status(200).json({ status: 'ok' }); });
+            app.use(((err: any, _req: Request, res: Response, _next: NextFunction) => {
+                res.status(err.statusCode || 400).json({ message: err.message, code: err.code || 'VALIDATION_ERROR' });
+            }) as express.ErrorRequestHandler);
+
+            const response = await request(app)
+                .post('/path-traversal-test')
+                .send({ filename: "../../etc/passwd" });
+
+            expect(response.status).toBe(400);
+            expect(response.body.code).toBe('VALIDATION_ERROR');
+            expect(response.body.message).toContain('filename');
+        });
+
+        it('should not allow coercion to bypass validation', async () => {
+            const coerceSchema = z.object({
+                age: z.coerce.number().int().min(0).max(120)
+            });
+            app.post('/coerce-test', validate(coerceSchema), (_req, res): void => { res.status(200).json({ status: 'ok' }); });
+            app.use(((err: any, _req: Request, res: Response, _next: NextFunction) => {
+                res.status(err.statusCode || 400).json({ message: err.message, code: err.code || 'VALIDATION_ERROR' });
+            }) as express.ErrorRequestHandler);
+
+            const response = await request(app)
+                .post('/coerce-test')
+                .send({ age: "not-a-number" });
+
+            expect(response.status).toBe(400);
+            expect(response.body.code).toBe('VALIDATION_ERROR');
+            expect(response.body.message).toContain('age');
+        });
+        
+        it('should handle ReDoS attempts gracefully', async () => {
+            jest.setTimeout(2000);
+            const safeRegexSchema = z.object({
+                input: z.string().regex(/^a+$/)
+            });
+            app.post('/redos-test', validate(safeRegexSchema), (_req, res): void => { res.status(200).json({ status: 'ok' }); });
+            app.use(((err: any, _req: Request, res: Response, _next: NextFunction) => {
+                res.status(err.statusCode || 400).json({ message: err.message, code: err.code || 'VALIDATION_ERROR' });
+            }) as express.ErrorRequestHandler);
+
+            // This string can cause catastrophic backtracking in some regex engines
+            const evilInput = 'a'.repeat(30) + '!';
+            const response = await request(app)
+                .post('/redos-test')
+                .send({ input: evilInput });
+
+            // The test should complete quickly and not hang
+            expect(response.status).toBe(400);
+            expect(response.body.code).toBe('VALIDATION_ERROR');
+        });
+
+        it('should reject invisible or control characters if schema restricts', async () => {
+            const unicodeSchema = z.object({
+                nickname: z.string().regex(/^[\w]+$/) // Only word characters
+            });
+            app.post('/unicode-test', validate(unicodeSchema), (_req, res): void => { res.status(200).json({ status: 'ok' }); });
+            app.use(((err: any, _req: Request, res: Response, _next: NextFunction) => {
+                res.status(err.statusCode || 400).json({ message: err.message, code: err.code || 'VALIDATION_ERROR' });
+            }) as express.ErrorRequestHandler);
+
+            const response = await request(app)
+                .post('/unicode-test')
+                .send({ nickname: "user\u200Bname" }); // Contains zero-width space
+
+            expect(response.status).toBe(400);
+            expect(response.body.code).toBe('VALIDATION_ERROR');
+        });
+    });
+
+    describe('Advanced Edge Cases', () => {
+        it('should handle schema with circular references gracefully', async () => {
+            // Create a schema with potential for circular references
+            const circularSchema = z.object({
+                name: z.string(),
+                child: z.lazy((): z.ZodTypeAny => circularSchema).optional()
+            });
+            
+            app.post('/circular-schema-test', validate(circularSchema), (_req, res) => {
+                res.status(200).json({ status: 'ok' });
+            });
+            app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+                res.status(err.statusCode || 400).json({ message: err.message, code: err.code || 'VALIDATION_ERROR' });
+            });
+
+            // Test with a deeply but finitely nested object matching the schema
+            let testObj: any = { name: "leaf" };
+            for (let i = 0; i < 20; i++) {
+                testObj = { name: `level${i}`, child: testObj };
+            }
+
+            const response = await request(app)
+                .post('/circular-schema-test')
+                .send(testObj);
+
+            // Should handle valid data with the circular schema
+            expect(response.status).toBe(200);
+        });
+
+        it('should handle objects with extremely long property names', async () => {
+            const longPropSchema = z.object({}).catchall(z.string());
+            
+            app.post('/long-property-names-test', validate(longPropSchema), (_req, res) => {
+                res.status(200).json({ status: 'ok' });
+            });
+            app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+                res.status(err.statusCode || 400).json({ message: err.message, code: err.code || 'VALIDATION_ERROR' });
+            });
+
+            // Create an object with a very long property name
+            const longPropName = 'a'.repeat(2000);
+            const testObj = { [longPropName]: "value" };
+
+            const response = await request(app)
+                .post('/long-property-names-test')
+                .send(testObj);
+
+            // Express/body-parser may reject this, or it might pass to Zod
+            // The key is that it doesn't crash the server
+            expect(response.status).not.toBe(500);
+        });
+    });
 });
