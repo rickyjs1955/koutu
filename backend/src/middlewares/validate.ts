@@ -1,29 +1,43 @@
-// /backend/src/middlewares/validate.ts
-import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
+import { NextFunction, Request, Response } from 'express';
+import { z } from 'zod';
 import { ApiError } from '../utils/ApiError';
 
-// Middleware factory for request validation using Zod schemas
-export const validate = (schema: AnyZodObject, source: 'body' | 'query' | 'params' = 'body') => {
-  return async (req: Request, res: Response, next: NextFunction) => {
+type RequestSource = 'body' | 'query' | 'params';
+
+/**
+ * Middleware factory for validating request data against a Zod schema
+ * @param schema The Zod schema to validate against
+ * @param source Where to find the data to validate (body, query, params)
+ * @returns Express middleware function
+ */
+export const validate = (schema: z.AnyZodObject, source: RequestSource = 'body') => {
+  return async (req: Request, _res: Response, next: NextFunction) => {
     try {
-      const data = await schema.parseAsync(req[source]);
-      req[source] = data; // Replace with validated and transformed data
+      // Validate the data from the specified source
+      const validatedData = await schema.parseAsync(req[source]);
+      
+      // Replace the request data with the validated version
+      req[source] = validatedData;
+      
+      // Continue to the next middleware
       next();
     } catch (error) {
-      if (error instanceof ZodError) {
-        // Format Zod errors for consistent API responses
-        const errors = error.errors.map(err => ({
-          path: err.path.join('.'),
-          message: err.message
-        }));
+      // If it's a Zod validation error, format it nicely
+      if (error instanceof z.ZodError) {
+        // Format the validation error message
+        const errorMessage = `Validation error: ${error.errors.map(
+          (e) => `${e.path.join('.')}: ${e.message}`
+        ).join(', ')}`;
         
-        return next(ApiError.badRequest(
-          `Validation error: ${errors.map(e => `${e.path}: ${e.message}`).join(', ')}`,
-          'VALIDATION_ERROR'
-        ));
+        // Create an API error with a proper HTTP status code and error code
+        const apiError = ApiError.badRequest(errorMessage, 'VALIDATION_ERROR');
+        
+        // Pass the error to the error handling middleware
+        next(apiError);
+      } else {
+        // Pass non-Zod errors directly
+        next(error);
       }
-      next(error);
     }
   };
 };
