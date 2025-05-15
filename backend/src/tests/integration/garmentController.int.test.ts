@@ -264,6 +264,10 @@ describe('Garment Controller Integration Tests', () => {
         data_version: 1
       };
       (garmentModel.findById as jest.Mock).mockResolvedValue(garment);
+      (imageModel.findById as jest.Mock).mockResolvedValue({
+        id: 'image-1',
+        user_id: 'test-user-id'
+      });
 
       await garmentController.getGarment(
         mockRequest as Request,

@@ -227,6 +227,21 @@ export const garmentController = {
         next(ApiError.forbidden('You do not have permission to access this garment'));
         return;
       }
+
+      // Fetch the original image
+      const image = await imageModel.findById(garment.original_image_id);
+
+      // Check if image exists
+      if (!image) {
+        next(ApiError.notFound('Image not found'));
+        return;
+      }
+
+      // Check if user owns the image
+      if (image.user_id !== userId) {
+        next(ApiError.forbidden('You do not have permission to access this image'));
+        return;
+      }
       
       // Create a safe garment object with sanitized paths and filtered metadata
       const safeGarment = {

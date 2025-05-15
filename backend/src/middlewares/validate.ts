@@ -6,9 +6,6 @@ type RequestSource = 'body' | 'query' | 'params';
 
 /**
  * Middleware factory for validating request data against a Zod schema
- * @param schema The Zod schema to validate against
- * @param source Where to find the data to validate (body, query, params)
- * @returns Express middleware function
  */
 export const validate = (schema: z.AnyZodObject, source: RequestSource = 'body') => {
   return async (req: Request, _res: Response, next: NextFunction) => {
@@ -35,7 +32,13 @@ export const validate = (schema: z.AnyZodObject, source: RequestSource = 'body')
         // Pass the error to the error handling middleware
         next(apiError);
       } else {
-        // Pass non-Zod errors directly
+        // Ensure non-Zod errors also have a statusCode
+        if (typeof error === 'object' && error !== null && 'statusCode' in error) {
+          const typedError = error as { statusCode?: number };
+          if (!typedError.statusCode) {
+            typedError.statusCode = 500; // Or another appropriate code
+          }
+        }
         next(error);
       }
     }
