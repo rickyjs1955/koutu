@@ -138,8 +138,7 @@ describe('garmentController', () => {
         };
 
         const expectedGarmentResponse: GarmentResponse = {
-            id: mockCreatedGarment.id,
-            user_id: mockCreatedGarment.user_id, // Add this line
+            id: mockCreatedGarment.id,            
             original_image_id: mockCreatedGarment.original_image_id,
             // Use API routes instead of file system paths
             file_path: `/api/garments/${mockCreatedGarment.id}/image`,

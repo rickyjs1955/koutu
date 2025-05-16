@@ -151,7 +151,6 @@ describe('Garment Controller Integration Tests', () => {
         data: { 
           garments: mockGarments.map(g => ({
             id: g.id,
-            user_id: g.user_id,
             original_image_id: g.original_image_id,
             file_path: `/api/garments/${g.id}/image`,
             mask_path: `/api/garments/${g.id}/mask`,
@@ -282,7 +281,7 @@ describe('Garment Controller Integration Tests', () => {
         data: { 
           garment: {
             id: garment.id,
-            user_id: garment.user_id,
+            // user_id: garment.user_id, // DTO omits user_id, so remove from expectation
             original_image_id: garment.original_image_id,
             file_path: `/api/garments/${garment.id}/image`,
             mask_path: `/api/garments/${garment.id}/mask`,
@@ -433,7 +432,6 @@ describe('Garment Controller Integration Tests', () => {
       // This is what we expect the final JSON response's garment object to look like.
       const expectedGarmentInJsonResponse = {
         id: 'new-garment-id',
-        user_id: garmentReturnedByModelMock.user_id, // Include user_id in expected response
         original_image_id: imageId,
         // Change to API routes format
         file_path: `/api/garments/new-garment-id/image`,
@@ -526,7 +524,7 @@ describe('Garment Controller Integration Tests', () => {
       mockRequest = {
         user: { id: userId, email: 'test@example.com' },
         params: { id: garmentId },
-        body: updatedMetadataPayload,
+        body: { metadata: updatedMetadataPayload },
       };
       mockResponse = {
         status: jest.fn().mockReturnThis(),
@@ -573,7 +571,6 @@ describe('Garment Controller Integration Tests', () => {
         data: { 
           garment: {
             id: mockUpdatedGarment.id,
-            user_id: mockUpdatedGarment.user_id,
             original_image_id: mockUpdatedGarment.original_image_id,
             file_path: `/api/garments/${mockUpdatedGarment.id}/image`,
             mask_path: `/api/garments/${mockUpdatedGarment.id}/mask`,

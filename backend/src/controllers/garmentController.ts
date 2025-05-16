@@ -114,7 +114,7 @@ export const garmentController = {
       // Create safe garment object with sanitized paths and filtered metadata
       const safeGarment = {
         id: createdGarment.id,
-        user_id: createdGarment.user_id,
+        // user_id: createdGarment.user_id, // Omit user_id from the RESPONSE DTO for consistency
         original_image_id: createdGarment.original_image_id,
         // Sanitize file paths to use API routes instead of file system paths
         file_path: `/api/garments/${createdGarment.id}/image`,
@@ -165,7 +165,7 @@ export const garmentController = {
       // Create safe garment objects with filtered metadata and sanitized paths
       const safeGarments = verifiedGarments.map(garment => ({
         id: garment.id,
-        user_id: garment.user_id,
+        // user_id: garment.user_id, // user_id is intentionally omitted
         original_image_id: garment.original_image_id,
         // Sanitize file paths to use API routes instead of file system paths
         file_path: `/api/garments/${garment.id}/image`,
@@ -243,10 +243,11 @@ export const garmentController = {
         return;
       }
       
-      // Create a safe garment object with sanitized paths and filtered metadata
-      const safeGarment = {
+      // Create a safe garment object (DTO) with sanitized paths, filtered metadata,
+      // and user_id omitted.
+      const garmentResponseDto = {
         id: garment.id,
-        user_id: garment.user_id,
+        // user_id: garment.user_id, // user_id is intentionally omitted
         original_image_id: garment.original_image_id,
         // Sanitize file paths to use API routes instead of file system paths
         file_path: `/api/garments/${garment.id}/image`,
@@ -268,7 +269,7 @@ export const garmentController = {
       // Return sanitized garment data
       res.status(200).json({
         status: 'success',
-        data: { garment: safeGarment }
+        data: { garment: garmentResponseDto }
       });
     } catch (error) {
       // Sanitize error to prevent leaking implementation details
@@ -280,8 +281,8 @@ export const garmentController = {
   async updateGarmentMetadata(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const metadata = req.body;
-      
+      const incomingMetadata = req.body.metadata;
+
       // Check authentication
       if (!req.user) {
         next(ApiError.unauthorized('User not authenticated'));
@@ -308,12 +309,12 @@ export const garmentController = {
       
       // Sanitize and validate metadata input - only accept allowed fields
       const sanitizedMetadata = {
-        type: metadata.type,
-        color: metadata.color,
-        pattern: metadata.pattern,
-        season: metadata.season,
-        brand: metadata.brand,
-        tags: Array.isArray(metadata.tags) ? metadata.tags : []
+        type: incomingMetadata?.type,
+        color: incomingMetadata?.color,
+        pattern: incomingMetadata?.pattern,
+        season: incomingMetadata?.season,
+        brand: incomingMetadata?.brand,
+        tags: Array.isArray(incomingMetadata?.tags) ? incomingMetadata.tags : []
       };
       
       // Update metadata with sanitized input - wrap in proper structure
@@ -330,7 +331,7 @@ export const garmentController = {
       // Create a safe response object
       const safeGarment = {
         id: updatedGarment.id,
-        user_id: updatedGarment.user_id,
+        // user_id: updatedGarment.user_id, // Omit user_id for consistency
         original_image_id: updatedGarment.original_image_id,
         // Sanitize file paths to use API routes instead of file system paths
         file_path: `/api/garments/${updatedGarment.id}/image`,

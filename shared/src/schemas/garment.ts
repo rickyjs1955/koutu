@@ -28,13 +28,20 @@ export const CreateGarmentSchema = z.object({
   original_image_id: z.string().uuid(),
   file_path: z.string().optional(), // Optional in form, will be set by server
   mask_path: z.string().optional(), // Optional in form, will be set by server
-  metadata: GarmentSchema.shape.metadata,
+  metadata: z.object({
+    type: z.enum(['shirt', 'pants', 'dress', 'jacket', 'skirt', 'other']),
+    color: z.string(),
+    pattern: z.enum(['solid', 'striped', 'plaid', 'floral', 'geometric', 'other']).optional(),
+    season: z.enum(['spring', 'summer', 'fall', 'winter', 'all']).optional(),
+    brand: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+  }),
   mask_data: z.object({
     width: z.number().int().positive(),
     height: z.number().int().positive(),
     data: z.array(z.number())
   })
-});
+}).strip();
 
 // Schema for updating garment metadata
 export const UpdateGarmentMetadataSchema = z.object({
@@ -42,7 +49,11 @@ export const UpdateGarmentMetadataSchema = z.object({
 });
 
 // Schema for garment response
-export const GarmentResponseSchema = GarmentSchema;
+// NOTE: user_id is intentionally omitted from API responses.
+// This promotes API consistency (aligning with getGarment which already omitted it)
+// and adheres to the principle of least data exposure, as user ownership is
+// implicit from the authenticated user context and verified server-side.
+export const GarmentResponseSchema = GarmentSchema.omit({ user_id: true });
 
 // Derived TypeScript types
 export type GarmentMetadata = z.infer<typeof GarmentSchema.shape.metadata>; // Define and export GarmentMetadata

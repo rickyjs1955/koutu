@@ -147,25 +147,44 @@ describe('Garment Controller Security Tests', () => {
             mockRequest.user = { id: userId, email: 'user@example.com' } as any;
             
             // Simulate a compromised model that returns mixed ownership data
-            const mockGarments = [
+            const mockGarmentsFromModel = [
                 { 
                 id: 'garment1', 
-                user_id: userId,
-                metadata: {}
+                user_id: userId, // User's garment
+                metadata: {},
+                // Add other fields expected by the DTO mapping if necessary for other assertions
+                file_path: 'internal/path1.jpg', 
+                mask_path: 'internal/mask1.png',
+                original_image_id: 'img1',
+                created_at: new Date(),
+                updated_at: new Date(),
+                data_version: 1
                 },
                 { 
                 id: 'garment2', 
                 user_id: otherUserId, // Different user's garment
-                metadata: {}
+                metadata: {},
+                file_path: 'internal/path2.jpg',
+                mask_path: 'internal/mask2.png',
+                original_image_id: 'img2',
+                created_at: new Date(),
+                updated_at: new Date(),
+                data_version: 1
                 },
                 { 
                 id: 'garment3', 
-                user_id: userId,
-                metadata: {}
+                user_id: userId, // User's garment
+                metadata: {},
+                file_path: 'internal/path3.jpg',
+                mask_path: 'internal/mask3.png',
+                original_image_id: 'img3',
+                created_at: new Date(),
+                updated_at: new Date(),
+                data_version: 1
                 }
             ];
             
-            (garmentModel.findByUserId as jest.Mock).mockResolvedValue(mockGarments);
+            (garmentModel.findByUserId as jest.Mock).mockResolvedValue(mockGarmentsFromModel);
             
             await garmentController.getGarments(
                 mockRequest as Request,
@@ -176,10 +195,17 @@ describe('Garment Controller Security Tests', () => {
             // Get the garments from the response
             const responseData = (mockResponse.json as jest.Mock).mock.calls[0][0].data.garments;
             
-            // Verify only user's garments are returned
+            // Verify only user's garments are returned by checking the count and their IDs
             expect(responseData.length).toBe(2); // Only two garments should remain
-            expect(responseData.some((g: TestGarment) => g.user_id === otherUserId)).toBe(false);
-            expect(responseData.every((g: TestGarment) => g.user_id === userId)).toBe(true);
+            
+            const responseGarmentIds = responseData.map((g: any) => g.id);
+            expect(responseGarmentIds).toContain('garment1');
+            expect(responseGarmentIds).toContain('garment3');
+            expect(responseGarmentIds).not.toContain('garment2');
+
+            // The following checks are no longer possible if user_id is omitted from response DTO
+            // expect(responseData.some((g: TestGarment) => g.user_id === otherUserId)).toBe(false);
+            // expect(responseData.every((g: TestGarment) => g.user_id === userId)).toBe(true);
         });
     });
     
