@@ -13,7 +13,7 @@ Frontend:
 12. /frontend/src/components/polygon/PolygonViewer.tsx
 13. /frontend/src/components/export/MLExportForm.tsx
 14. /frontend/src/components/export/MLExportJobsList.tsx
-15. /frontend/src/components/auth/SSOButtons.tsx
+15. /frontend/src/components/auth/SSOButtons.tsx NEED MODIFY FOR IG
 16. /frontend/src/components/auth/OAuthCallback.tsx
 17. /frontend/src/hooks/useAuth.ts
 18. /frontend/src/hooks/useWardrobes.ts
@@ -35,13 +35,13 @@ Shared:
 4. /shared/src/schemas/export.ts
 5. /shared/src/schemas/image.ts
 6. /shared/src/schemas/polygon.ts
-7. /shared/src/schemas/oauth.ts
+7. /shared/src/schemas/oauth.ts NEED MODIFY FOR IG
 8. /shared/src/schemas/index.ts
 Backend:
-1. /backend/src/config/index.ts (UIS)
-2. /backend/src/config/firebase.ts (UIS)
-3. /backend/src/config/oauth.ts (UIS)
-4. /backend/src/controllers/garmentController.ts
+1. /backend/src/config/index.ts (UIS) NEED MODIFY FOR IG
+2. /backend/src/config/firebase.ts (UIS) 
+3. /backend/src/config/oauth.ts (UIS) NEED MODIFY FOR IG
+4. /backend/src/controllers/garmentController.ts (UIS)
 5. /backend/src/controllers/imageController.ts
 6. /backend/src/controllers/exportController.ts
 7. /backend/src/controllers/authController.ts
@@ -50,7 +50,7 @@ Backend:
 10. /backend/src/controllers/oauthController.ts
 11. /backend/src/middlewares/auth.ts
 12. /backend/src/middlewares/errorHandler.ts
-13. /backend/src/middlewares/validate.ts
+13. /backend/src/middlewares/validate.ts (UIS)
 14. /backend/src/models/userModel.ts
 15. /backend/src/models/db.ts
 16. /backend/src/models/wardrobeModel.ts
@@ -59,7 +59,7 @@ Backend:
 19. /backend/src/models/polygonModel.ts
 20. /backend/src/routes/authRoutes.ts
 21. /backend/src/routes/wardrobeRoutes.ts
-22. /backend/src/routes/garmentRoutes.ts
+22. /backend/src/routes/garmentRoutes.ts (UIS)
 23. /backend/src/routes/exportRoutes.ts
 24. /backend/src/routes/imageRoutes.ts
 25. /backend/src/routes/fileRoutes.ts
@@ -69,7 +69,7 @@ Backend:
 29. /backend/src/services/exportService.ts
 30. /backend/src/services/imageProcessingService.ts
 31. /backend/src/services/storageService.ts
-32. /backend/src/services/oauthService.ts
+32. /backend/src/services/oauthService.ts NEED MODIFY FOR IG
 33. /backend/src/utils/ApiError.ts
 34. /backend/src/validators/index.ts
 35. /backend/src/app.ts
