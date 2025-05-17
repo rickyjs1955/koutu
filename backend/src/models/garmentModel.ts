@@ -1,6 +1,6 @@
 // /backend/src/models/garmentModel.ts
-import { query } from './db';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4, validate as isUuid } from 'uuid';
+import { getQueryFunction } from '../utils/modelUtils';
 
 export interface Garment {
   id: string;
@@ -31,7 +31,8 @@ export const garmentModel = {
     const { user_id, original_image_id, file_path, mask_path, metadata = {} } = data;
     const id = uuidv4();
     
-    const result = await query(
+    const db = getQueryFunction();
+    const result = await db(
       `INSERT INTO garment_items 
        (id, user_id, original_image_id, file_path, mask_path, metadata, created_at, updated_at, data_version) 
        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), 1) 
@@ -43,7 +44,13 @@ export const garmentModel = {
   },
   
   async findById(id: string): Promise<Garment | null> {
-    const result = await query(
+    // Add UUID validation
+    if (!isUuid(id)) {
+      return null; // Early return for invalid UUID format
+    }
+
+    const db = getQueryFunction();
+    const result = await db(
       'SELECT * FROM garment_items WHERE id = $1',
       [id]
     );
@@ -52,7 +59,8 @@ export const garmentModel = {
   },
   
   async findByUserId(userId: string): Promise<Garment[]> {
-    const result = await query(
+    const db = getQueryFunction();
+    const result = await db(
       'SELECT * FROM garment_items WHERE user_id = $1 ORDER BY created_at DESC',
       [userId]
     );
@@ -61,6 +69,11 @@ export const garmentModel = {
   },
   
   async updateMetadata(id: string, data: UpdateGarmentMetadataInput): Promise<Garment | null> {
+    // Add UUID validation
+    if (!isUuid(id)) {
+      return null; // Early return for invalid UUID
+    }
+
     const garment = await this.findById(id);
     if (!garment) return null;
     
@@ -70,7 +83,8 @@ export const garmentModel = {
       ...data.metadata
     };
     
-    const result = await query(
+    const db = getQueryFunction();
+    const result = await db(
       `UPDATE garment_items 
        SET metadata = $1, updated_at = NOW(), data_version = data_version + 1 
        WHERE id = $2 
@@ -82,7 +96,13 @@ export const garmentModel = {
   },
   
   async delete(id: string): Promise<boolean> {
-    const result = await query(
+    // Add UUID validation
+    if (!isUuid(id)) {
+      return false; // Early return for invalid UUID
+    }
+
+    const db = getQueryFunction();
+    const result = await db(
       'DELETE FROM garment_items WHERE id = $1',
       [id]
     );

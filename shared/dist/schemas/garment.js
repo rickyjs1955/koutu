@@ -6,6 +6,7 @@ const zod_1 = require("zod");
 // Base schema for a garment item
 exports.GarmentSchema = zod_1.z.object({
     id: zod_1.z.string().uuid().optional(), // Optional for creation, required after DB insertion
+    user_id: zod_1.z.string().uuid(), // User ID of the owner
     original_image_id: zod_1.z.string().uuid(),
     file_path: zod_1.z.string(),
     mask_path: zod_1.z.string(),
@@ -28,17 +29,28 @@ exports.CreateGarmentSchema = zod_1.z.object({
     original_image_id: zod_1.z.string().uuid(),
     file_path: zod_1.z.string().optional(), // Optional in form, will be set by server
     mask_path: zod_1.z.string().optional(), // Optional in form, will be set by server
-    metadata: exports.GarmentSchema.shape.metadata,
+    metadata: zod_1.z.object({
+        type: zod_1.z.enum(['shirt', 'pants', 'dress', 'jacket', 'skirt', 'other']),
+        color: zod_1.z.string(),
+        pattern: zod_1.z.enum(['solid', 'striped', 'plaid', 'floral', 'geometric', 'other']).optional(),
+        season: zod_1.z.enum(['spring', 'summer', 'fall', 'winter', 'all']).optional(),
+        brand: zod_1.z.string().optional(),
+        tags: zod_1.z.array(zod_1.z.string()).optional(),
+    }),
     mask_data: zod_1.z.object({
         width: zod_1.z.number().int().positive(),
         height: zod_1.z.number().int().positive(),
         data: zod_1.z.array(zod_1.z.number())
     })
-});
+}).strip();
 // Schema for updating garment metadata
 exports.UpdateGarmentMetadataSchema = zod_1.z.object({
     metadata: exports.GarmentSchema.shape.metadata,
 });
 // Schema for garment response
-exports.GarmentResponseSchema = exports.GarmentSchema;
+// NOTE: user_id is intentionally omitted from API responses.
+// This promotes API consistency (aligning with getGarment which already omitted it)
+// and adheres to the principle of least data exposure, as user ownership is
+// implicit from the authenticated user context and verified server-side.
+exports.GarmentResponseSchema = exports.GarmentSchema.omit({ user_id: true });
 //# sourceMappingURL=garment.js.map

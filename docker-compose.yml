@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # Main development database
+  postgres:
+    image: postgres:15
+    container_name: koutu-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: koutu
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init-dev.sql:/docker-entrypoint-initdb.d/init-dev.sql
+
+  # Test database (separate instance)
+  postgres-test:
+    image: postgres:15
+    container_name: koutu-postgres-test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: koutu_test
+    ports:
+      - "5433:5432"  # Note: Different port to avoid conflicts
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+      - ./docker/postgres/init-test.sql:/docker-entrypoint-initdb.d/init-test.sql
+
+volumes:
+  postgres-data:
+  postgres-test-data:

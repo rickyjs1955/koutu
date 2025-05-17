@@ -7,7 +7,8 @@
     "build": "rimraf dist && tsc",
     "start": "node dist/app.js",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/app.ts",
-    "migrate": "ts-node scripts/runMigrations.ts",
+    "migrate": "tsx scripts/runMigrations.ts",
+    "migrate:test": "cross-env DATABASE_URL=postgresql://postgres:password@localhost:5433/koutu_test tsx scripts/runMigrations.ts",
     "seed": "ts-node scripts/seedDatabase.ts",
     "setup-db": "npm run migrate && npm run seed",
     "test": "jest --config jest.config.cjs",
@@ -58,6 +59,7 @@
     "supertest": "^6.3.3",
     "ts-jest": "^29.3.2",
     "ts-node": "^10.9.1",
+    "tsx": "^4.19.4",
     "typescript": "^5.1.6"
   }
 }

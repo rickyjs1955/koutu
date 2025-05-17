@@ -1,6 +1,7 @@
 import { z } from 'zod';
 export declare const GarmentSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
+    user_id: z.ZodString;
     original_image_id: z.ZodString;
     file_path: z.ZodString;
     mask_path: z.ZodString;
@@ -30,6 +31,7 @@ export declare const GarmentSchema: z.ZodObject<{
     updated_at: z.ZodOptional<z.ZodDate>;
     data_version: z.ZodOptional<z.ZodNumber>;
 }, "strip", z.ZodTypeAny, {
+    user_id: string;
     original_image_id: string;
     file_path: string;
     mask_path: string;
@@ -46,6 +48,7 @@ export declare const GarmentSchema: z.ZodObject<{
     updated_at?: Date | undefined;
     data_version?: number | undefined;
 }, {
+    user_id: string;
     original_image_id: string;
     file_path: string;
     mask_path: string;
@@ -178,8 +181,9 @@ export declare const UpdateGarmentMetadataSchema: z.ZodObject<{
         tags?: string[] | undefined;
     };
 }>;
-export declare const GarmentResponseSchema: z.ZodObject<{
+export declare const GarmentResponseSchema: z.ZodObject<Omit<{
     id: z.ZodOptional<z.ZodString>;
+    user_id: z.ZodString;
     original_image_id: z.ZodString;
     file_path: z.ZodString;
     mask_path: z.ZodString;
@@ -208,7 +212,7 @@ export declare const GarmentResponseSchema: z.ZodObject<{
     created_at: z.ZodOptional<z.ZodDate>;
     updated_at: z.ZodOptional<z.ZodDate>;
     data_version: z.ZodOptional<z.ZodNumber>;
-}, "strip", z.ZodTypeAny, {
+}, "user_id">, "strip", z.ZodTypeAny, {
     original_image_id: string;
     file_path: string;
     mask_path: string;

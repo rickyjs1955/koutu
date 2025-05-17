@@ -7,14 +7,16 @@ export const pool = new Pool({
   connectionString: config.databaseUrl,
 });
 
-// Test the connection
-pool.query('SELECT NOW()', (err, res) => {
-  if (err) {
-    console.error('Database connection error:', err.message);
-  } else {
-    console.log('Database connected successfully');
-  }
-});
+// Only test connection in non-test environments
+if (config.nodeEnv !== 'test') {
+  pool.query('SELECT NOW()', (err, res) => {
+    if (err) {
+      console.error('Database connection error:', err.message);
+    } else {
+      console.log('Database connected successfully');
+    }
+  });
+}
 
 // Helper functions
 export const query = async (text: string, params?: any[]) => {

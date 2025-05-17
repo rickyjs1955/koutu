@@ -1,0 +1,2 @@
+CREATE DATABASE koutu_test;
+GRANT ALL PRIVILEGES ON DATABASE koutu_test TO postgres;

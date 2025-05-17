@@ -14,7 +14,7 @@ module.exports = {
       '^@koutu/shared/(.*)$': '<rootDir>/../shared/src/$1',
     },
     moduleFileExtensions: ['ts', 'js', 'json', 'node'],
-    setupFiles: ['dotenv/config'],
+    setupFiles: ['dotenv/config', '<rootDir>/jest.setup.ts'],
     testTimeout: 10000,
     collectCoverageFrom: [
       '<rootDir>/src/**/*.ts',

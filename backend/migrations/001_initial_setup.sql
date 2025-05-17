@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP NOT NULL
 );
 
+-- Create indexes separately (after table creation)
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
 -- Original images table
 CREATE TABLE IF NOT EXISTS original_images (
   id UUID PRIMARY KEY,
@@ -19,9 +22,9 @@ CREATE TABLE IF NOT EXISTS original_images (
   file_path VARCHAR(255) NOT NULL,
   original_metadata JSONB NOT NULL DEFAULT '{}',
   upload_date TIMESTAMP NOT NULL,
-  status VARCHAR(20) NOT NULL CHECK (status IN ('new', 'processed', 'labeled')),
-  INDEX idx_original_images_user_id (user_id)
+  status VARCHAR(20) NOT NULL CHECK (status IN ('new', 'processed', 'labeled'))
 );
+CREATE INDEX idx_original_images_user_id ON original_images(user_id);
 
 -- Garment items table
 CREATE TABLE IF NOT EXISTS garment_items (
@@ -33,10 +36,10 @@ CREATE TABLE IF NOT EXISTS garment_items (
   metadata JSONB NOT NULL DEFAULT '{}',
   created_at TIMESTAMP NOT NULL,
   updated_at TIMESTAMP NOT NULL,
-  data_version INTEGER NOT NULL DEFAULT 1,
-  INDEX idx_garment_items_user_id (user_id),
-  INDEX idx_garment_items_original_image_id (original_image_id)
+  data_version INTEGER NOT NULL DEFAULT 1
 );
+CREATE INDEX idx_garment_items_user_id ON garment_items(user_id);
+CREATE INDEX idx_garment_items_original_image_id ON garment_items(original_image_id);
 
 -- Wardrobes table
 CREATE TABLE IF NOT EXISTS wardrobes (
@@ -45,15 +48,15 @@ CREATE TABLE IF NOT EXISTS wardrobes (
   name VARCHAR(255) NOT NULL,
   description TEXT,
   created_at TIMESTAMP NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
-  INDEX idx_wardrobes_user_id (user_id)
+  updated_at TIMESTAMP NOT NULL
 );
+CREATE INDEX idx_wardrobes_user_id ON wardrobes(user_id);
 
 -- Wardrobe items junction table
 CREATE TABLE IF NOT EXISTS wardrobe_items (
   wardrobe_id UUID NOT NULL REFERENCES wardrobes(id) ON DELETE CASCADE,
   garment_item_id UUID NOT NULL REFERENCES garment_items(id) ON DELETE CASCADE,
   position INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (wardrobe_id, garment_item_id),
-  INDEX idx_wardrobe_items_garment_item_id (garment_item_id)
+  PRIMARY KEY (wardrobe_id, garment_item_id)
 );
+CREATE INDEX idx_wardrobe_items_garment_item_id ON wardrobe_items(garment_item_id);

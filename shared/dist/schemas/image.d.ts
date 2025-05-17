@@ -7,15 +7,15 @@ export declare const ImageSchema: z.ZodObject<{
     upload_date: z.ZodOptional<z.ZodDate>;
     status: z.ZodOptional<z.ZodEnum<["new", "processed", "labeled"]>>;
 }, "strip", z.ZodTypeAny, {
-    file_path: string;
     user_id: string;
+    file_path: string;
     status?: "new" | "processed" | "labeled" | undefined;
     id?: string | undefined;
     original_metadata?: Record<string, any> | undefined;
     upload_date?: Date | undefined;
 }, {
-    file_path: string;
     user_id: string;
+    file_path: string;
     status?: "new" | "processed" | "labeled" | undefined;
     id?: string | undefined;
     original_metadata?: Record<string, any> | undefined;
@@ -29,15 +29,15 @@ export declare const ImageResponseSchema: z.ZodObject<{
     upload_date: z.ZodOptional<z.ZodDate>;
     status: z.ZodOptional<z.ZodEnum<["new", "processed", "labeled"]>>;
 }, "strip", z.ZodTypeAny, {
-    file_path: string;
     user_id: string;
+    file_path: string;
     status?: "new" | "processed" | "labeled" | undefined;
     id?: string | undefined;
     original_metadata?: Record<string, any> | undefined;
     upload_date?: Date | undefined;
 }, {
-    file_path: string;
     user_id: string;
+    file_path: string;
     status?: "new" | "processed" | "labeled" | undefined;
     id?: string | undefined;
     original_metadata?: Record<string, any> | undefined;
@@ -51,15 +51,15 @@ export declare const ImageListResponseSchema: z.ZodArray<z.ZodObject<{
     upload_date: z.ZodOptional<z.ZodDate>;
     status: z.ZodOptional<z.ZodEnum<["new", "processed", "labeled"]>>;
 }, "strip", z.ZodTypeAny, {
-    file_path: string;
     user_id: string;
+    file_path: string;
     status?: "new" | "processed" | "labeled" | undefined;
     id?: string | undefined;
     original_metadata?: Record<string, any> | undefined;
     upload_date?: Date | undefined;
 }, {
-    file_path: string;
     user_id: string;
+    file_path: string;
     status?: "new" | "processed" | "labeled" | undefined;
     id?: string | undefined;
     original_metadata?: Record<string, any> | undefined;

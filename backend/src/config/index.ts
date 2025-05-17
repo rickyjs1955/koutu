@@ -10,7 +10,9 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   
   // Database
-  databaseUrl: process.env.DATABASE_URL,
+  databaseUrl: process.env.NODE_ENV === 'test' 
+    ? process.env.TEST_DATABASE_URL || 'postgresql://postgres:password@localhost:5432/koutu_test'
+    : process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/koutu',
   
   // JWT
   jwtSecret: process.env.JWT_SECRET,
