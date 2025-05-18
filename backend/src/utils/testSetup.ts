@@ -1,6 +1,4 @@
 import { Pool } from 'pg';
-import { pool, query } from '../models/db'; // Import the production pool but don't use it
-import { config } from '../config';
 
 // Create a dedicated test pool that we KNOW works
 const testPool = new Pool({
