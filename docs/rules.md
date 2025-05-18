@@ -1,61 +1,53 @@
 /**
  * @role Pioneer (Creator)
- * @summary The first test creator responsible for laying the foundational test suite.
+ * @summary Generates the foundational test suite for the target function or system.
  *
  * @description
- * The Pioneer generates the initial test suite for a given function, class, or behavior. This suite serves as the base for all other roles to build upon.
- * This role applies across unit, integration, security, performance, and stress testing contexts.
+ * The Pioneer is responsible for initiating the test creation process by producing a complete and coherent baseline suite.
+ * They define the initial testing structure, provide comprehensive coverage of core behaviors, and lay the groundwork for all subsequent roles.
+ * The Pioneer uses their own reasoning to determine what types of tests are necessary and how to organize them.
  *
  * @inputs
- * - Function signature or system component
- * - Associated documentation or source logic
+ * - Function or system under test
+ * - Source code, description, or specification
  *
  * @outputs
- * - A structured and complete baseline test suite
+ * - A complete and logically structured test suite
  *
  * @responsibilities
- * - Cover common, expected, and documented behavior
- * - Set structure, naming, and logical flow for the suite
- * - Define initial assumptions and testing scope
- *
- * @coursesOfAction
- * - Analyze the given interface or behavior
- * - Implement a logically grouped set of test cases to verify baseline functionality
- * - Ensure code is clean, extensible, and test descriptions are clear
+ * - Analyze the subject under test and determine what should be verified
+ * - Define the structure, naming conventions, and organization of the test suite
+ * - Establish the foundation for further enhancements, critiques, and refinements
  *
  * @successCriteria
- * - Provides a maintainable base test suite applicable to the testing type
- * - Establishes a framework others can iterate on
+ * - The test suite is clear, maintainable, and provides meaningful coverage
+ * - Sets up a flexible and scalable framework for other roles to build upon
  */
 
 /**
  * @role Assist (Creator)
- * @summary Complements and strengthens the Pioneer’s test suite with broader and deeper coverage.
+ * @summary Enhances and extends the test suite initially created by the Pioneer.
  *
  * @description
- * The Assist builds on the Pioneer’s output by introducing complexity, robustness, and handling of additional scenarios. This may include edge cases, error handling, or multi-component interaction.
- * This role applies to any test type (unit, integration, security, performance, or stress).
+ * The Assist builds upon the Pioneer’s foundation by adding valuable tests that further strengthen the suite.
+ * This includes identifying overlooked behaviors, extending coverage, and introducing additional logic where appropriate.
+ * The Assist relies on independent judgment to determine what additions are necessary to improve the suite’s overall completeness and quality.
  *
  * @inputs
- * - The Pioneer’s test suite
- * - Target system behavior or function
+ * - Pioneer’s test suite
+ * - Subject function, system, or specification
  *
  * @outputs
- * - An extended test suite that complements the base
+ * - Supplemental or extended test cases that enhance the existing suite
  *
  * @responsibilities
- * - Add value through edge conditions, unexpected inputs, or resilience conditions
- * - Cover input variation and robustness paths
- * - Deepen scope without duplication
- *
- * @coursesOfAction
- * - Identify what the Pioneer omitted or under-tested
- * - Add diverse test paths relevant to the testing category
- * - Maintain the existing structure and naming conventions where possible
+ * - Review the Pioneer’s output and identify gaps, variations, or improvements
+ * - Add meaningful tests without duplicating existing logic
+ * - Maintain alignment with the structure and naming conventions established by the Pioneer
  *
  * @successCriteria
- * - Enhances depth and quality without redundancy
- * - Stretches coverage into underexplored behavior or limits
+ * - The enhanced test suite is more robust, expressive, and complete
+ * - Additions are meaningful, well-integrated, and elevate the quality of the foundation
  */
 
 /**
@@ -209,4 +201,37 @@
  * @successCriteria
  * - Identifies real gaps or confirms sufficiency
  * - Avoids unnecessary criticism or over-analysis
+ */
+
+ /**
+ * @role Fortifier
+ * @summary Strengthens the test suite by addressing weaknesses identified by the Challenger.
+ *
+ * @description
+ * The Fortifier is responsible for implementing test improvements based on adversarial feedback from the Challenger.
+ * These improvements may include new test cases, additional validation, or resilience checks that directly address blind spots, brittleness, or unverified assumptions revealed during the challenge phase.
+ * The Fortifier’s focus is on reinforcing the test suite without disrupting its original intent or structure.
+ *
+ * @inputs
+ * - Challenger’s feedback report
+ * - Finalized test suite
+ *
+ * @outputs
+ * - A set of enhanced test cases that neutralize or validate the risks raised
+ *
+ * @responsibilities
+ * - Review each weakness or gap noted by the Challenger
+ * - Implement appropriate tests that directly respond to those points
+ * - Preserve the overall structure, naming, and organization of the existing test suite
+ * - Do not introduce unrelated improvements or suggestions
+ *
+ * @coursesOfAction
+ * - Analyze each issue raised by the Challenger and determine its required coverage
+ * - Create only the tests necessary to validate or protect against that issue
+ * - Integrate the new tests into the existing suite with consistency
+ *
+ * @successCriteria
+ * - All legitimate concerns from the Challenger are covered by targeted, effective tests
+ * - Enhancements are minimal, precise, and logically aligned with the suite
+ * - The suite becomes more resilient without unnecessary bloat
  */

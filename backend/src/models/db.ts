@@ -20,17 +20,36 @@ if (config.nodeEnv !== 'test') {
 
 // Helper functions
 export const query = async (text: string, params?: any[]) => {
-  const start = Date.now();
-  const res = await pool.query(text, params);
-  const duration = Date.now() - start;
-  
-  if (config.nodeEnv === 'development') {
-    console.log('Executed query:', { text, params, duration, rows: res.rowCount });
-  }
-  
-  return res;
+    if (!text || text.trim().length === 0) {
+        throw new Error('Query cannot be empty');
+    }
+
+    const start = Date.now();
+
+    try {
+        const res = await pool.query(text, params);
+        const duration = Date.now() - start;
+
+        if (config.nodeEnv === 'development') {
+            console.log('Executed query:', { text, params, duration, rows: res.rowCount });
+        }
+
+        return res;
+    } catch (error) {
+        console.error(`Query failed: ${text}, Params: ${JSON.stringify(params)}, Error: ${(error as Error).message}`);
+        if (error instanceof Error) {
+            throw error;
+        } else {
+            // Wrap non-Error throwables in an Error object
+            throw new Error(String(error));
+        }
+    }
 };
 
-export const getClient = () => {
-  return pool.connect();
+export const getClient = async () => {
+    try {
+        return await pool.connect();
+    } catch (error) {
+        return Promise.reject(error);
+    }
 };
