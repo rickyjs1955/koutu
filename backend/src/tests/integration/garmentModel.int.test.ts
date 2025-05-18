@@ -1,3 +1,23 @@
+// filepath: /backend/src/tests/int/garmentController.int.test.ts
+
+/**
+ * @file Integration tests for the Garment Model
+ * 
+ * @description This test suite validates the functionality of the Garment Model, 
+ * ensuring correct behavior for CRUD operations, metadata updates, and concurrent operations.
+ * It focuses on:
+ * - Data integrity (timestamps, metadata merging, versioning)
+ * - Handling edge cases (invalid UUIDs, non-existent records)
+ * - Concurrent operation handling (e.g., simultaneous updates and deletions)
+ * - User-specific data isolation
+ * 
+ * The suite uses a dedicated test database (`koutu_test`) and ensures cleanup after each test run.
+ * It provides comprehensive coverage for the garment model's database interactions.
+ * 
+ * @see {@link garmentModel} The model being tested
+ * @see {@link testSetup} Test database configuration and utilities
+ */
+
 import { garmentModel, Garment, CreateGarmentInput } from '../../models/garmentModel';
 import { testQuery } from '../../utils/testSetup'; // Import the test query
 import { v4 as uuidv4 } from 'uuid';
@@ -361,6 +381,53 @@ describe('Garment Model Integration Tests', () => {
       expect(
         metadata.field1 !== 'original' || metadata.field2 !== 'original'
       ).toBe(true);
+    });
+  });
+
+  describe('findById with invalid UUID format', () => {
+    it('should return null when given a malformed UUID', async () => {
+      const found = await garmentModel.findById('not-a-valid-uuid');
+      expect(found).toBeNull();
+    });
+  });
+
+  describe('updateMetadata with undefined metadata', () => {
+    it('should preserve existing metadata if undefined is passed', async () => {
+      // Arrange: create garment with initial metadata
+      const initialMetadata = { key: 'value' };
+      const created = await createTestGarment({ metadata: initialMetadata });
+      
+      // Act: Update using undefined (simulate missing update object)
+      // Casting to any here to simulate the absence—your production code should validate input
+      const updated = await garmentModel.updateMetadata(created.id, { metadata: undefined as any });
+      
+      // Assert: If update logic is defensive, no changes should occur
+      expect(updated).not.toBeNull();
+      expect(updated!.metadata).toEqual(initialMetadata);
+    });
+  });
+
+  describe('Simultaneous deletion and update', () => {
+    it('should handle concurrent deletion and update gracefully', async () => {
+      // Arrange: Create a garment that we will try to update and delete at the same time
+      const created = await createTestGarment({ metadata: { field: 'initial' } });
+
+      // Act: Fire off a deletion and an update concurrently
+      const deletionPromise = garmentModel.delete(created.id);
+      const updatePromise = garmentModel.updateMetadata(created.id, { metadata: { field: 'updated' } });
+      
+      const [deletedResult, updateResult] = await Promise.all([deletionPromise, updatePromise]);
+      
+      // Assert:
+      // Depending on timing, if deletion succeeded then the update should return null.
+      if (deletedResult === true) {
+        expect(updateResult).toBeNull();
+      } else {
+        // If deletion failed because the update happened first,
+        // then deletion result should be false and updateResult should have data.
+        expect(deletedResult).toBe(false);
+        expect(updateResult).not.toBeNull();
+      }
     });
   });
 });
