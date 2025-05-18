@@ -67,6 +67,35 @@
  */
 
 /**
+ * @role Executioner
+ * @summary Implements additional test cases based on Critic’s suggestions.
+ *
+ * @description
+ * The Executioner is selected from Pioneer, Assist, or Critic, and is responsible for
+ * writing additional test cases that address missing scenarios identified during the review process.
+ * This role ensures feedback is acted upon while maintaining independence of the Curator and Architect roles.
+ *
+ * @selectionPool ["Pioneer", "Assist", "Critic"]
+ *
+ * @inputs
+ * - Critic’s review feedback and suggested gaps
+ * - Original test suite
+ *
+ * @outputs
+ * - Supplemental test cases addressing specific feedback
+ *
+ * @responsibilities
+ * - Implement only the tests needed to resolve reviewer feedback
+ * - Maintain consistency with existing test suite style
+ * - Avoid duplication or speculative test expansion
+ *
+ * @successCriteria
+ * - Complements missing coverage precisely
+ * - Aligns with original structure and intent
+ * - Respects Curator and Architect independence
+ */
+
+/**
  * @role Curator (Reviewer)
  * @summary Evaluates the usefulness and quality of test cases and selects the most valuable ones.
  *
