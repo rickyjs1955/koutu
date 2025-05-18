@@ -34,7 +34,7 @@ describe('Garment Model Integration Tests', () => {
   
   const createTestGarment = async (overrides: Partial<CreateGarmentInput> = {}): Promise<Garment> => {
     const input: CreateGarmentInput = {
-      user_id: testUserId,
+      user_id: overrides.user_id || testUserId, // Allow overriding user_id for specific tests
       original_image_id: testImageId,
       file_path: `/test/path/${uuidv4()}.jpg`,
       mask_path: `/test/mask/${uuidv4()}.png`,
@@ -96,6 +96,14 @@ describe('Garment Model Integration Tests', () => {
       // Assert
       expect(garment.metadata).toEqual({});
     });
+
+    it('should set created_at and updated_at timestamps correctly on creation', async () => {
+      const garment = await createTestGarment();
+      expect(garment.created_at).toBeInstanceOf(Date);
+      expect(garment.updated_at).toBeInstanceOf(Date);
+      // Timestamps should be very close, but allow a small delta for processing
+      expect(Math.abs(garment.updated_at.getTime() - garment.created_at.getTime())).toBeLessThan(1000); // Less than 1 second
+    });
   });
   
   describe('findById', () => {
@@ -152,6 +160,23 @@ describe('Garment Model Integration Tests', () => {
       
       // Assert
       expect(garments).toEqual([]);
+    });
+
+    it('should only return garments for the specified user_id', async () => {
+      // Arrange
+      const user1Id = `user-${uuidv4()}`;
+      const user2Id = `user-${uuidv4()}`;
+
+      const garmentUser1 = await createTestGarment({ user_id: user1Id });
+      await createTestGarment({ user_id: user2Id }); // Garment for another user
+
+      // Act
+      const garmentsUser1 = await garmentModel.findByUserId(user1Id);
+
+      // Assert
+      expect(garmentsUser1.length).toBe(1);
+      expect(garmentsUser1[0].id).toBe(garmentUser1.id);
+      expect(garmentsUser1[0].user_id).toBe(user1Id);
     });
   });
   
@@ -227,6 +252,44 @@ describe('Garment Model Integration Tests', () => {
       
       // Assert
       expect(result).toBeNull();
+    });
+
+    it('should update the updated_at timestamp', async () => {
+      // Arrange
+      const created = await createTestGarment();
+      const initialUpdatedAt = created.updated_at;
+
+      // Ensure a small delay so that the new updated_at timestamp is different
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      const updates = { metadata: { new_field: 'new_value' } };
+
+      // Act
+      const updated = await garmentModel.updateMetadata(created.id, updates);
+
+      // Assert
+      expect(updated).not.toBeNull();
+      expect(updated!.updated_at).toBeInstanceOf(Date);
+      expect(updated!.updated_at.getTime()).toBeGreaterThan(initialUpdatedAt.getTime());
+      expect(updated!.created_at.getTime()).toEqual(created.created_at.getTime()); // created_at should not change
+    });
+
+    it('should correctly merge metadata when a key is added and another is modified', async () => {
+      // Arrange
+      const initialMetadata = { type: 'pants', color: 'black' };
+      const created = await createTestGarment({ metadata: initialMetadata });
+      const updates = { metadata: { color: 'navy', material: 'denim' } };
+
+      // Act
+      const updated = await garmentModel.updateMetadata(created.id, updates);
+
+      // Assert
+      expect(updated).not.toBeNull();
+      expect(updated!.metadata).toEqual({
+        type: 'pants',    // preserved
+        color: 'navy',    // updated
+        material: 'denim' // added
+      });
     });
   });
   
