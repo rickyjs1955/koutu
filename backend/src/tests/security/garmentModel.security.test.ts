@@ -1,5 +1,22 @@
 // filepath: /backend/src/tests/unit/garmentModel.security.test.ts
 
+/**
+ * @file garmentModel.security.test.ts
+ * @description This test suite focuses on validating the security aspects of the `garmentModel` module.
+ * It ensures that the model is resilient to common security vulnerabilities such as SQL injection,
+ * prototype pollution, and improper input validation. Additionally, it verifies robust error handling
+ * and data integrity mechanisms to maintain the reliability and security of the system.
+ *
+ * @focus
+ * - Input validation (UUIDs, metadata structure)
+ * - SQL injection prevention
+ * - Metadata security (e.g., prototype pollution, nested objects)
+ * - Error resilience (database errors, edge cases)
+ * - Data integrity (versioning, metadata handling)
+ *
+ * @goal To ensure the `garmentModel` module adheres to security best practices and handles adversarial inputs gracefully.
+ */
+
 // Mock dependencies BEFORE importing anything
 jest.mock('../../utils/modelUtils', () => ({
   getQueryFunction: jest.fn()
@@ -64,7 +81,7 @@ describe('Garment Model Security Tests', () => {
         // CRITICAL: Make getQueryFunction return our mockQuery
         mockGetQueryFunction.mockReturnValue(mockQuery);
     });
-
+    
     describe('UUID Validation', () => {
         it('should reject invalid UUIDs in findById', async () => {
             const result = await garmentModel.findById(invalidUuid);
@@ -369,6 +386,32 @@ describe('Garment Model Security Tests', () => {
             // Restore the original console.error implementation
             consoleErrorSpy.mockRestore();
         });
+
+        it('should handle empty metadata in updateMetadata', async () => {
+            mockUuidValidate.mockReturnValueOnce(true); // Assume validUuid passes validation
+            mockQuery.mockResolvedValueOnce({ rows: [{ ...mockGarment, id: validUuid }] }); // For findById
+            mockQuery.mockResolvedValueOnce({ rows: [{ ...mockGarment, id: validUuid, metadata: {} }] }); // For update
+
+            const result = await garmentModel.updateMetadata(validUuid, { metadata: {} });
+
+            expect(result).not.toBeNull();
+            expect(result?.metadata).toEqual({});
+            expect(mockQuery).toHaveBeenCalledTimes(2);
+        });
+
+        it('should reject update if metadata is an array', async () => {
+            // Suppress console.error for this specific test
+            const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+            mockUuidValidate.mockReturnValueOnce(true); 
+
+            const result = await garmentModel.updateMetadata(validUuid, { metadata: [] as any });
+
+            expect(result).toBeNull();
+            expect(mockQuery).not.toHaveBeenCalled();
+
+            consoleErrorSpy.mockRestore();
+        });
     });
 
     describe('Error Handling', () => {
@@ -440,6 +483,41 @@ describe('Garment Model Security Tests', () => {
 
             await expect(garmentModel.delete(validUuid)).rejects.toThrow('DB DELETE failed');
             expect(mockQuery).toHaveBeenCalledTimes(1);
+        });
+
+        it('should propagate database connection errors during creation', async () => {
+            const dbError = new Error('Database connection failed');
+            mockQuery.mockRejectedValueOnce(dbError);
+            
+            // Generate a unique ID for this test
+            const uniqueId = generateUniqueValidUuid();
+            mockUuidV4.mockReturnValueOnce(uniqueId);
+            
+            await expect(garmentModel.create({
+                user_id: 'user123',
+                original_image_id: 'image123',
+                file_path: '/path/to/file.jpg',
+                mask_path: '/path/to/mask.png'
+            })).rejects.toThrow('Database connection failed');
+        });
+
+        it('should handle database connection errors during updateMetadata', async () => {
+            const dbError = new Error('Database connection failed');
+            mockUuidValidate.mockReturnValueOnce(true); 
+            mockQuery.mockRejectedValueOnce(dbError); // For findById
+
+            await expect(garmentModel.updateMetadata(validUuid, { metadata: { updated: true } })).rejects.toThrow('Database connection failed');
+            expect(mockQuery).toHaveBeenCalledTimes(1);
+        });
+
+        it('should handle query execution errors during updateMetadata', async () => {
+            const dbError = new Error('Query execution failed');
+            mockUuidValidate.mockReturnValueOnce(true); 
+            mockQuery.mockResolvedValueOnce({ rows: [{ ...mockGarment, id: validUuid }] }); // For findById
+            mockQuery.mockRejectedValueOnce(dbError); // For update
+
+            await expect(garmentModel.updateMetadata(validUuid, { metadata: { updated: true } })).rejects.toThrow('Query execution failed');
+            expect(mockQuery).toHaveBeenCalledTimes(2);
         });
     });
 
