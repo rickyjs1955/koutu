@@ -55,7 +55,7 @@ Backend:
 15. /backend/src/models/db.ts
 16. /backend/src/models/wardrobeModel.ts
 17. /backend/src/models/imageModel.ts
-18. /backend/src/models/garmentModel.ts
+18. /backend/src/models/garmentModel.ts (UIS)
 19. /backend/src/models/polygonModel.ts
 20. /backend/src/routes/authRoutes.ts
 21. /backend/src/routes/wardrobeRoutes.ts
