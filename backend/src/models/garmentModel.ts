@@ -74,8 +74,16 @@ export const garmentModel = {
       return null; // Early return for invalid UUID
     }
 
+    // Validate metadata format
+    if (typeof data.metadata !== 'object' || data.metadata === null || Array.isArray(data.metadata)) {
+        console.error('Invalid metadata format for update'); // Or throw new Error('Invalid metadata format');
+        return null; // Or handle error appropriately
+    }
+
     const garment = await this.findById(id);
-    if (!garment) return null;
+    if (!garment) {
+      return null;
+    }
     
     // Merge existing metadata with new metadata
     const updatedMetadata = {
