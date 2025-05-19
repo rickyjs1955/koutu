@@ -1,25 +1,12 @@
 import { Pool } from 'pg';
 
-// Create a pool for the default postgres database to initialize koutu-postgres-test
-const initPool = new Pool({
-  host: 'localhost',
-  port: 5433,
-  user: 'postgres',
-  password: 'password',
-  database: 'postgres',
-  connectionTimeoutMillis: 5000
-});
-
-// Create testPool for test queries
+// Create a dedicated test pool that we KNOW works
 const testPool = new Pool({
   host: 'localhost',
   port: 5433,
   user: 'postgres',
   password: 'password',
-  database: 'koutu-postgres-test',
-  max: 20,
-  connectionTimeoutMillis: 5000,
-  idleTimeoutMillis: 30000
+  database: 'koutu_test'
 });
 
 // Override the query function for tests
@@ -32,22 +19,15 @@ export const testQuery = async (text: string, params?: any[]) => {
  */
 export const setupTestDatabase = async () => {
   try {
-    // Create koutu-postgres-test database if it doesn't exist
-    const dbCheck = await initPool.query('SELECT 1 FROM pg_database WHERE datname = $1', ['koutu-postgres-test']);
-    if (dbCheck.rowCount === 0) {
-      await initPool.query('CREATE DATABASE "koutu-postgres-test"');
-      console.log('Created koutu-postgres-test database');
-    }
-
-    // Verify connection to koutu-postgres-test
+    // IMPORTANT: Use testQuery instead of query 
     const dbResult = await testQuery('SELECT current_database()');
     const dbName = dbResult.rows[0].current_database;
-    console.log(`Connected to database: ${dbName}`);
+    
     if (!dbName.includes('test')) {
       throw new Error('Tests must run against a database with "test" in the name!');
     }
-
-    // Create garment_items table for garmentModel.int.test.ts
+    
+    // Create garment_items table for tests
     await testQuery(`
       CREATE TABLE IF NOT EXISTS garment_items (
         id UUID PRIMARY KEY,
@@ -61,22 +41,11 @@ export const setupTestDatabase = async () => {
         data_version INTEGER NOT NULL DEFAULT 1
       )
     `);
-
-    // Create test_items table for db.int.test.ts
-    await testQuery(`
-      CREATE TABLE IF NOT EXISTS test_items (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      )
-    `);
-
+    
     console.log('Test database initialized successfully');
   } catch (error) {
     console.error('Test database setup failed:', error);
     throw error;
-  } finally {
-    await initPool.end(); // Close initPool
   }
 };
 
@@ -84,9 +53,5 @@ export const setupTestDatabase = async () => {
  * Clean up test database resources
  */
 export const teardownTestDatabase = async () => {
-  try {
-    await testPool.end();
-  } catch (error) {
-    console.error('Failed to close testPool:', error);
-  }
+  await testPool.end();
 };

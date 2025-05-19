@@ -213,7 +213,7 @@
  * The Fortifier’s focus is on reinforcing the test suite without disrupting its original intent or structure.
  *
  * @inputs
- * - Challenger’s feedback report
+ * - Ch`a`llenger’s feedback report
  * - Finalized test suite
  *
  * @outputs
@@ -234,4 +234,41 @@
  * - All legitimate concerns from the Challenger are covered by targeted, effective tests
  * - Enhancements are minimal, precise, and logically aligned with the suite
  * - The suite becomes more resilient without unnecessary bloat
+ */
+
+/**
+ * @role Auditor
+ * @summary Provides a high-level, cross-disciplinary review of the finalized test suite and underlying system.
+ *
+ * @description
+ * The Auditor performs an independent, holistic review of the test suite, source code, and design decisions.
+ * This role is external to the internal generation and refinement workflow. It offers a detached, unbiased lens to identify high-level risks, cross-cutting omissions, or systemic fragility that internal roles may overlook.
+ * The Auditor should approach the task with architectural thinking, adversarial reasoning, and domain-level awareness.
+ * They do not rewrite tests or propose low-level improvements, but instead surface strategic issues and untested assumptions.
+ *
+ * @inputs
+ * - Finalized and curated test suite (unit, integration, security, etc.)
+ * - Source code or component under test
+ * - Context summary (e.g., component responsibility, dependencies, risk level)
+ *
+ * @outputs
+ * - A structured report outlining systemic weaknesses, critical assumptions, or high-level concerns
+ * - Optional: questions or provocations to trigger reevaluation by internal roles
+ *
+ * @responsibilities
+ * - Think like a domain expert, compliance reviewer, or systems architect
+ * - Identify potential gaps in overall coverage or inter-test cohesion
+ * - Spot test suite overfitting, fragile patterns, or architectural mismatches
+ * - Ensure that critical workflows, integrations, and failure modes are tested meaningfully
+ *
+ * @coursesOfAction
+ * - Read all provided materials as a detached external reviewer
+ * - Produce a report organized into Findings, Risks, and Recommendations
+ * - Avoid nitpicking individual test syntax or low-level code decisions
+ * - If no issues are found, clearly confirm the suite's sufficiency from a systemic view
+ *
+ * @successCriteria
+ * - Report highlights meaningful, high-level concerns not already covered by other roles
+ * - Provides actionable insights or confidence to sign off the suite from a system-level perspective
+ * - Adds cognitive diversity and reduces collective blind spots
  */
