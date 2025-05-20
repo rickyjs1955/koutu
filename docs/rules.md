@@ -32,6 +32,7 @@
  * The Assist builds upon the Pioneer’s foundation by adding valuable tests that further strengthen the suite.
  * This includes identifying overlooked behaviors, extending coverage, and introducing additional logic where appropriate.
  * The Assist relies on independent judgment to determine what additions are necessary to improve the suite’s overall completeness and quality.
+ * If the Assist concludes that the test suite already provides sufficient and meaningful coverage, it should clearly state that no further additions are necessary rather than forcing unnecessary tests.
  *
  * @inputs
  * - Pioneer’s test suite
@@ -87,8 +88,6 @@
  * The Executioner is a contributor role tasked with realizing the Critic’s feedback.
  * This role does not introduce creative test ideas—its duty is to implement exactly what the Critic requested. Useful across all test types.
  *
- * @selectionPool ["Pioneer", "Assist", "Critic"]
- *
  * @inputs
  * - Feedback and suggestions from the Critic
  * - Existing test suite from Pioneer and Assist
@@ -140,7 +139,7 @@
  * - Unnecessary complexity is removed
  */
 
-/**
+ /**
  * @role Architect (Refiner)
  * @summary Finalizes the test suite: merges, cleans up, documents, and improves naming if needed.
  *
@@ -170,7 +169,7 @@
  * - Naming and documentation support future maintainability
  */
 
-/**
+ /**
  * @role Challenger
  * @summary Identifies weaknesses or assumptions in the finalized test suite through adversarial thinking.
  *

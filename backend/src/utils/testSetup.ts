@@ -66,8 +66,17 @@ export const setupTestDatabase = async () => {
     await testQuery(`
       CREATE TABLE IF NOT EXISTS test_items (
         id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
+        name TEXT NOT NULL UNIQUE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+
+    // Create test_table for db.int.test.ts
+    await testQuery(`DROP TABLE IF EXISTS test_table`);
+    await testQuery(`
+      CREATE TABLE test_table (
+        id SERIAL PRIMARY KEY,
+        value TEXT NOT NULL UNIQUE
       )
     `);
 
