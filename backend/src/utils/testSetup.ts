@@ -47,6 +47,9 @@ export const setupTestDatabase = async () => {
       throw new Error('Tests must run against a database with "test" in the name!');
     }
 
+    // Enable btree_gist extension for EXCLUDE constraints
+    await testQuery(`CREATE EXTENSION IF NOT EXISTS btree_gist`);
+
     // Create garment_items table for garmentModel.int.test.ts
     await testQuery(`
       CREATE TABLE IF NOT EXISTS garment_items (
@@ -79,6 +82,41 @@ export const setupTestDatabase = async () => {
         value TEXT NOT NULL UNIQUE
       )
     `);
+
+    // Drop and re-create parent_cleanup and child_cleanup
+    await testQuery(`DROP TABLE IF EXISTS child_cleanup`);
+    await testQuery(`DROP TABLE IF EXISTS parent_cleanup`);
+    await testQuery(`
+      CREATE TABLE parent_cleanup (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL
+      )
+    `);
+    await testQuery(`
+      CREATE TABLE child_cleanup (
+        id SERIAL PRIMARY KEY,
+        parent_id INTEGER,
+        description TEXT,
+        CONSTRAINT fk_parent FOREIGN KEY (parent_id) REFERENCES parent_cleanup(id) ON DELETE RESTRICT
+      )
+    `);
+
+    // Drop and re-create exclude_test_table for EXCLUDE constraint tests
+    await testQuery(`DROP TABLE IF EXISTS exclude_test_table`);
+    await testQuery(`
+      CREATE TABLE exclude_test_table (
+        id SERIAL PRIMARY KEY,
+        range INT4RANGE,
+        EXCLUDE USING gist (range WITH &&)
+      )
+    `);
+
+    // Verify table creation
+    const tables = await testQuery(`
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name IN ('parent_cleanup', 'child_cleanup', 'exclude_test_table')
+    `);
+    console.log('Tables created in setup:', tables.rows.map(row => row.table_name));
 
     console.log('Test database initialized successfully');
   } catch (error) {
