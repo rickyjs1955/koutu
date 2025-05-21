@@ -181,7 +181,7 @@ describe('Config Module Integration Tests', () => {
         
         const { config } = require('../../config/index');
         
-        expect(config.databaseUrl).toBe('');
+        expect(config.databaseUrl).toBe("postgresql://postgres:password@localhost:5432/koutu_test");
         expect(config.jwtSecret).toBe('');
         expect(config.firebase.projectId).toBe('');
     });

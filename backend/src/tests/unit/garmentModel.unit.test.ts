@@ -5,7 +5,10 @@ jest.mock('../../models/db', () => ({
 }));
 
 jest.mock('uuid', () => ({
-  v4: jest.fn()
+  v4: jest.fn(),
+  validate: jest.fn((id: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  ),
 }));
 
 import { garmentModel, CreateGarmentInput, UpdateGarmentMetadataInput, Garment } from '../../models/garmentModel';

@@ -96,7 +96,7 @@ describe('Config Module Unit Tests', () => {
         expect(mockDotenvConfig).toHaveBeenCalled();
         expect(freshConfig.port).toBe(3000); // Expecting number due to || 3000 fallback
         expect(freshConfig.nodeEnv).toBe('development');
-        expect(freshConfig.databaseUrl).toBeUndefined();
+        expect(freshConfig.databaseUrl).toBe("postgresql://postgres:password@localhost:5432/koutu");
         expect(freshConfig.jwtSecret).toBeUndefined();
         expect(freshConfig.jwtExpiresIn).toBe('1d');
         expect(freshConfig.maxFileSize).toBe(5242880); // 5MB

@@ -12,7 +12,5 @@ ollama pull nous-hermes2:latest
 ollama pull codegeex4:latest
 
 
-index.unit 1
-index.int 1
+
 garmentModel.unit 21
-garmentModel.int 1
