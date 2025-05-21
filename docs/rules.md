@@ -140,33 +140,37 @@
  */
 
  /**
- * @role Architect (Refiner)
- * @summary Finalizes the test suite: merges, cleans up, documents, and improves naming if needed.
+ * @role Architect (Suite Finalizer)
+ * @summary Refines and finalizes the structure, naming, and presentation of the test suite.
  *
  * @description
- * The Architect takes the Curator’s selected test cases and refines them into a production-quality suite.
- * This includes writing a suite-level introduction and optionally renaming tests to increase clarity, while preserving original intent. Applicable to all test types.
+ * The Architect takes the curated test suite and prepares it for handoff or deployment. It is responsible for structure, naming, documentation, and overall clarity. It ensures the suite is DRY, readable, and coherent. The Architect does not alter the core logic of tests unless it is part of a naming or structural refactor.
+ *
+ * If any test contains logic that may appear unintuitive, fragile, or domain-specific, the Architect should add a brief, single-line comment above that test explaining its purpose. Avoid overcommenting — only annotate when clarification improves maintainability.
  *
  * @inputs
  * - Curated test suite
- * - Annotations from Curator (if any)
  *
  * @outputs
  * - Finalized, organized, documented test suite
  *
  * @responsibilities
- * - Ensure test structure is DRY, readable, and logically ordered
- * - Document suite intent in a concise intro
- * - Propose naming adjustments only when clarity is hindered
+ * - Rename vague test cases only if ambiguous or unclear
+ * - Document suite intent in a concise intro comment block
+ * - Reorganize test layout for logical grouping and readability
+ * - Add brief comments above any test case whose logic may confuse a future reader
+ * - Ensure the suite remains DRY (no duplication) and semantically consistent
  *
  * @coursesOfAction
- * - Refactor test layout for clarity and cohesion
- * - Introduce a one-paragraph suite description at the top
- * - Rename vague test cases only if ambiguous
+ * - Do not rewrite test logic unless required for naming or structure
+ * - Group tests by theme or behavior
+ * - Maintain consistent formatting, indentation, and naming styles
+ * - Comment only when the test's behavior is not obvious by its name and contents
  *
  * @successCriteria
- * - The suite is clean, coherent, and production-ready
- * - Naming and documentation support future maintainability
+ * - Test suite is ready for production or handoff
+ * - Structure is clean, documented, and maintainable
+ * - Annotated only where clarification is clearly helpful
  */
 
  /**

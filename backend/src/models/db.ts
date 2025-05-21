@@ -2,6 +2,8 @@
 import { Pool } from 'pg';
 import { config } from '../config';
 
+let isPoolClosed = false;
+
 // Create database connection pool
 export const pool = new Pool({
   connectionString: config.databaseUrl,
@@ -52,4 +54,20 @@ export const getClient = async () => {
     } catch (error) {
         return Promise.reject(error);
     }
+};
+
+export const closePool = async () => {
+  if (isPoolClosed) {
+    console.log('Database pool already closed.');
+    return;
+  }
+  
+  try {
+    await pool.end();
+    isPoolClosed = true;
+    console.log('Database pool closed successfully.');
+  } catch (error) {
+    console.error('Failed to close database pool:', error);
+    throw error;
+  }
 };
