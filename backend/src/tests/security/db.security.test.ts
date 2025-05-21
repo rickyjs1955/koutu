@@ -238,36 +238,41 @@ describe('Database Utility Security Tests', () => {
         expect(results.some((r) => !isErrorResult(r))).toBe(true);
         });
 
-        it('should prevent connection pool exhaustion', async () => {
-        const limitedPool = new Pool({
-            host: 'localhost',
-            port: 5433,
-            user: 'postgres',
-            password: 'password',
-            database: 'koutu-postgres-test',
-            max: 2,
-            connectionTimeoutMillis: 1000,
-        });
-
-        let clients: PoolClient[] = [];
-        try {
-            clients = await Promise.all([getClient(), getClient()]);
-            const thirdClientPromise = getClient();
-
-            clients[0].release();
-            const thirdClient = await thirdClientPromise;
-            expect(thirdClient).toBeDefined();
-            clients[1].release();
-            thirdClient.release();
-        } catch (error: unknown) {
-            if (isDatabaseError(error) || error instanceof Error) {
-            expect(error.message).not.toContain('password');
-            } else {
-            throw new Error('Expected an Error or DatabaseError');
+        it('should respect statement timeouts if set on a connection', async () => {
+            const client = await getClient();
+            let statementTimeoutError: unknown;
+            try {
+                await client.query('SET statement_timeout = 100'); // 100ms timeout
+                await client.query('SELECT pg_sleep(0.5)'); // Attempt to sleep for 500ms
+            } catch (error) {
+                statementTimeoutError = error;
+            } finally {
+                // Attempt to reset statement_timeout, but don't fail test if client is in bad state
+                try {
+                    // Check if client is still usable before trying to reset
+                    if (!(client as any)._connected || (client as any)._ending) {
+                         // If client is not connected or ending, it might not be possible to send further queries.
+                         // This state can occur if the timeout error itself caused the client to be marked as unusable by the pool.
+                    } else {
+                        await client.query('SET statement_timeout = 0'); // Reset to default
+                    }
+                } catch (resetError) {
+                    // console.warn('Could not reset statement_timeout after test:', resetError);
+                }
+                client.release();
             }
-        } finally {
-            await limitedPool.end();
-        }
+
+            expect(statementTimeoutError).toBeDefined();
+            if (isDatabaseError(statementTimeoutError)) {
+                // PostgreSQL error code for query cancellation due to statement timeout is '57014'
+                expect(statementTimeoutError.code).toBe('57014'); // QueryCanceled
+                expect(statementTimeoutError.message).toMatch(/canceling statement due to statement timeout/i);
+            } else if (statementTimeoutError instanceof Error) {
+                // Fallback for other error types, though DatabaseError is expected
+                expect(statementTimeoutError.message).toMatch(/timeout/i);
+            } else {
+                throw new Error('Expected a DatabaseError or Error for statement timeout');
+            }
         });
     });
 
@@ -437,4 +442,79 @@ describe('Database Utility Security Tests', () => {
         expect(pool && pool.waitingCount).toBe(0);
         });
     });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 });
