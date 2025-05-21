@@ -1,5 +1,11 @@
 // filepath: /backend/src/tests/integration/db.int.test.ts
 
+/**
+ * Integration test suite for PostgreSQL database operations using Node.js and the pg module.
+ * This suite covers various aspects such as basic CRUD operations, transaction handling, partial cleanup failures,
+ * and collation issues.
+ */
+
 import pg, { Pool } from 'pg';
 import { setupTestDatabase, teardownTestDatabase } from '../../utils/testSetup';
 
