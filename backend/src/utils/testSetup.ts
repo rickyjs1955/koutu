@@ -10,7 +10,6 @@ const initPool = new Pool({
   connectionTimeoutMillis: 5000,
   ssl: false, // Disable SSL
 });
-console.log('initPool options:', initPool.options); // Add this line
 
 // Create testPool for test queries
 const testPool = new Pool({
@@ -24,7 +23,6 @@ const testPool = new Pool({
   idleTimeoutMillis: 30000,
   ssl: false, // Disable SSL
 });
-console.log('testPool options:', testPool.options); // Add this line
 
 // Override the query function for tests
 export const testQuery = async (text: string, params?: any[]) => {

@@ -68,7 +68,11 @@ export const garmentModel = {
     return result.rows;
   },
   
-  async updateMetadata(id: string, data: UpdateGarmentMetadataInput): Promise<Garment | null> {
+  async updateMetadata(
+    id: string, 
+    data: UpdateGarmentMetadataInput, 
+    options = { replace: false }
+  ): Promise<Garment | null> {
     // Add UUID validation
     if (!isUuid(id)) {
       return null; // Early return for invalid UUID
@@ -76,8 +80,11 @@ export const garmentModel = {
 
     // Validate metadata format
     if (typeof data.metadata !== 'object' || data.metadata === null || Array.isArray(data.metadata)) {
-        console.error('Invalid metadata format for update'); // Or throw new Error('Invalid metadata format');
-        return null; // Or handle error appropriately
+      // Only log in non-test environments
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Invalid metadata format for update');
+      }
+      return null;
     }
 
     const garment = await this.findById(id);
@@ -85,18 +92,17 @@ export const garmentModel = {
       return null;
     }
     
-    // Merge existing metadata with new metadata
-    const updatedMetadata = {
-      ...garment.metadata,
-      ...data.metadata
-    };
+    // Either merge or replace based on options
+    const updatedMetadata = options.replace 
+      ? { ...data.metadata }
+      : { ...garment.metadata, ...data.metadata };
     
     const db = getQueryFunction();
     const result = await db(
       `UPDATE garment_items 
-       SET metadata = $1, updated_at = NOW(), data_version = data_version + 1 
-       WHERE id = $2 
-       RETURNING *`,
+      SET metadata = $1, updated_at = NOW(), data_version = data_version + 1 
+      WHERE id = $2 
+      RETURNING *`,
       [JSON.stringify(updatedMetadata), id]
     );
     

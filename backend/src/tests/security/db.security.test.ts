@@ -1,5 +1,3 @@
-// filepath: /backend/src/tests/security/db.security.test.ts
-
 /**
  * Security Test Suite for Database Utility (db.ts)
  *
@@ -35,12 +33,7 @@ const isErrorResult = (result: QueryResult<any> | { error: unknown }): result is
 describe('Database Utility Security Tests', () => {
     let testPool: Pool; // This is the pool for direct test setup/assertions, separate from the app's pool
 
-    // Log initial config at the very beginning of the describe block
-    console.log('[TEST SUITE START] Initial appConfig.nodeEnv:', appConfig.nodeEnv);
-    console.log('[TEST SUITE START] Initial appConfig.dbRequireSsl:', appConfig.dbRequireSsl);
-
     beforeAll(async () => {
-        console.log('[BEFORE ALL] Setting up test database. Current appConfig.nodeEnv:', appConfig.nodeEnv);
         await setupTestDatabase();
         testPool = new Pool({ // This pool is managed by testPool.end()
             host: 'localhost',
@@ -50,34 +43,22 @@ describe('Database Utility Security Tests', () => {
             database: 'koutu-postgres-test',
             connectionTimeoutMillis: 5000,
         });
-        console.log('[BEFORE ALL] Test database setup complete.');
     });
 
     afterAll(async () => {
-        console.log('[AFTER ALL] Tearing down test database. Current appConfig.nodeEnv:', appConfig.nodeEnv);
         try {
             await teardownTestDatabase();
             if (testPool && typeof testPool.end === 'function' && !(testPool as any)._ended) { // Check if testPool exists and is not ended
-                console.log('[AFTER ALL] Closing testPool.');
                 await testPool.end();
-            } else if (testPool && (testPool as any)._ended) {
-                console.log('[AFTER ALL] testPool was already ended.');
             }
 
             // Close the main application pool that was imported and used by `query`
-            // Do NOT use jest.resetModules() here if you want to close the original pool
             if (globalAppPool && typeof globalAppPool.end === 'function' && !globalAppPool.ended) {
-                 console.log('[AFTER ALL] Closing main globalAppPool from db.ts');
                  await globalAppClosePool(); // Use the imported closePool for the main app pool
-            } else if (globalAppPool && globalAppPool.ended) {
-                 console.log('[AFTER ALL] Main globalAppPool from db.ts was already ended.');
-            } else {
-                 console.log('[AFTER ALL] Main globalAppPool from db.ts was not available or not initialized.');
             }
         } catch (error) {
             console.error('[AFTER ALL] Failed to clean up test resources:', error);
         }
-        console.log('[AFTER ALL] Test database teardown complete.');
     });
 
     describe('SQL Injection Prevention', () => {
@@ -139,54 +120,38 @@ describe('Database Utility Security Tests', () => {
         });
 
         it('should handle invalid connection strings securely', async () => {
-            console.log('[TEST START] should handle invalid connection strings securely');
-            jest.resetModules(); // Resets module cache, including db.ts and config.ts
+            jest.resetModules();
             let consoleSpy: jest.SpyInstance | undefined;
             let error: unknown;
-            let dbModule;
 
             try {
-                console.log('[TEST - invalid connection] Mocking pg and config');
                 jest.doMock('pg', () => {
-                    console.log('[TEST - invalid connection] pg mock being applied');
                     return {
                         Pool: jest.fn().mockImplementation(() => {
-                            console.log('[TEST - invalid connection] Mocked pg.Pool constructor called');
                             throw new Error('Invalid connection string from mock');
                         }),
                     };
                 });
                 jest.doMock('../../config', () => {
-                    console.log('[TEST - invalid connection] config mock being applied');
                     return {
                         config: {
                             databaseUrl: 'invalid://connection',
-                            nodeEnv: 'test', // Explicitly test
-                            // Add other necessary config properties if db.ts depends on them
+                            nodeEnv: 'test',
                         },
                     };
                 });
 
-                consoleSpy = jest.spyOn(console, 'error').mockImplementation((msg) => {
-                    console.log('[CONSOLE.ERROR SPY - invalid connection]', msg);
-                });
-
-                console.log('[TEST - invalid connection] Requiring db module');
-                dbModule = require('../../models/db'); // This will use the mocked pg and config
-                console.log('[TEST - invalid connection] db module required. Pool:', dbModule.pool);
-
+                consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+                require('../../models/db');
             } catch (e) {
-                console.log('[TEST - invalid connection] Caught error during setup/require:', e);
                 error = e;
             } finally {
-                console.log('[TEST - invalid connection] Finally block. Restoring mocks.');
                 if (consoleSpy) {
                     consoleSpy.mockRestore();
                 }
-                jest.resetAllMocks(); // Resets spies and mock functions
-                jest.unmock('pg');    // Removes the mock for 'pg'
-                jest.unmock('../../config'); // Removes the mock for config
-                console.log('[TEST - invalid connection] Mocks restored.');
+                jest.resetAllMocks();
+                jest.unmock('pg');
+                jest.unmock('../../config');
             }
 
             expect(error).toBeDefined();
@@ -196,70 +161,48 @@ describe('Database Utility Security Tests', () => {
             } else {
                 throw new Error('Expected an Error or DatabaseError');
             }
-            console.log('[TEST END] should handle invalid connection strings securely');
         });
 
         it('should require SSL/TLS in production environment', async () => {
-            console.log('[TEST START] should require SSL/TLS in production environment');
-            jest.resetModules(); // Crucial to get a fresh version of db.ts and config.ts
+            jest.resetModules();
 
             const localConfig = {
                 databaseUrl: 'postgres://postgres:password@localhost:5433/koutu-postgres-test',
                 nodeEnv: 'production',
                 dbRequireSsl: true,
-                // Ensure all other config properties db.ts might need are present
             };
-            console.log('[TEST - SSL] localConfig prepared:', localConfig);
 
             let error: unknown;
             let consoleErrorSpy: jest.SpyInstance | undefined;
             let sslDbModule;
 
             try {
-                console.log('[TEST - SSL] Spying on console.error');
-                consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation((msg) => {
-                    console.log('[CONSOLE.ERROR SPY - SSL test]', msg); // Log what the spy catches
-                });
-
-                console.log('[TEST - SSL] Mocking config with production settings');
+                consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
                 jest.doMock('../../config', () => {
-                    console.log('[TEST - SSL] config mock being applied with:', localConfig);
                     return { config: localConfig };
                 });
-
-                console.log('[TEST - SSL] Requiring db module');
-                // When db.ts is required here, it will use the mocked 'production' config
-                // and its internal console.log('config.nodeEnv:', config.nodeEnv) will run
-                // followed by the pool.query if nodeEnv !== 'test'
                 sslDbModule = require('../../models/db');
-                console.log('[TEST - SSL] db module required. Pool options from db:', sslDbModule.pool.options);
-
-
-                console.log('[TEST - SSL] Attempting query that should fail due to SSL');
-                await sslDbModule.pool.query('SELECT 1'); // This is expected to throw
-                console.log('[TEST - SSL] Query did not throw (UNEXPECTED)');
+                await sslDbModule.pool.query('SELECT 1');
             } catch (e) {
-                console.log('[TEST - SSL] Caught error (expected for SSL test):', e);
                 error = e;
             } finally {
-                console.log('[TEST - SSL] Finally block. Restoring console spy and mocks.');
                 if (consoleErrorSpy) {
                     consoleErrorSpy.mockRestore();
                 }
-                jest.resetModules(); // Reset again to clean up for the next mock
-                console.log('[TEST - SSL] Mocking config back to test defaults for subsequent tests');
+                if (sslDbModule && sslDbModule.pool && typeof sslDbModule.pool.end === 'function' && !sslDbModule.pool.ended) {
+                    await sslDbModule.pool.end().catch(() => {}); // Suppress close error if any
+                }
+                jest.resetModules();
                 jest.mock('../../config', () => {
-                    const defaultConfig = {
-                        databaseUrl: 'postgres://postgres:password@localhost:5433/koutu-postgres-test',
-                        nodeEnv: 'test',
-                        dbRequireSsl: false,
+                    return {
+                        config: {
+                            databaseUrl: 'postgres://postgres:password@localhost:5433/koutu-postgres-test',
+                            nodeEnv: 'test',
+                            dbRequireSsl: false,
+                        },
                     };
-                    console.log('[TEST - SSL] Restoring config mock to:', defaultConfig);
-                    return { config: defaultConfig };
                 });
-                 // Re-require config to ensure the global appConfig variable is also reset if needed by other tests
-                const { config: resetAppConfig } = require('../../config');
-                console.log('[TEST - SSL] appConfig after reset:', resetAppConfig.nodeEnv, resetAppConfig.dbRequireSsl);
+                require('../../config'); // Re-require to apply mock
             }
 
             expect(error).toBeDefined();
@@ -268,7 +211,6 @@ describe('Database Utility Security Tests', () => {
             } else {
                 throw new Error('Expected an Error object for SSL failure.');
             }
-            console.log('[TEST END] should require SSL/TLS in production environment');
         });
     });
 
@@ -315,11 +257,6 @@ describe('Database Utility Security Tests', () => {
                         message: expect.stringContaining('permission denied'),
                     })
                 );
-            } catch (error: unknown) {
-                if (isDatabaseError(error)) {
-                    console.error(`Database error: ${error.message}, code: ${error.code}`);
-                }
-                throw error;
             } finally {
                 await limitedPool.end();
                 await testPool.query(`DROP OWNED BY ${limitedUser} CASCADE`);
@@ -363,16 +300,11 @@ describe('Database Utility Security Tests', () => {
 
     describe('Error Exposure Prevention', () => {
         it('should not leak stack traces in query errors', async () => {
-            console.log('[TEST START] should not leak stack traces');
             const mockActualPoolQuery = jest.spyOn(pool, 'query').mockImplementationOnce(() => {
-                console.log('[TEST - no stack trace] Actual pool.query mocked to throw');
                 throw new Error('Internal database error');
             });
 
-            const consoleSpy = jest.spyOn(console, 'error').mockImplementation((msg) => {
-                console.log('[CONSOLE.ERROR SPY - no stack trace]', msg);
-            });
-            // The query function from db.ts is being tested
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
             await expect(query('SELECT * FROM non_existent_table')).rejects.toThrow('Internal database error');
 
             expect(consoleSpy).toHaveBeenCalled();
@@ -380,12 +312,10 @@ describe('Database Utility Security Tests', () => {
             expect(errorLog).toBeDefined();
             if(errorLog) {
                 expect(errorLog).toContain('Query failed');
-                // The detailed error from db.ts includes the error message, but not the stack of the original error
-                expect(errorLog).not.toContain('stack'); // This checks our custom log format
+                expect(errorLog).not.toContain('stack');
             }
             consoleSpy.mockRestore();
             mockActualPoolQuery.mockRestore();
-            console.log('[TEST END] should not leak stack traces');
         });
 
         it('should log query text in errors but not sensitive credentials', async () => {
@@ -423,19 +353,16 @@ describe('Database Utility Security Tests', () => {
             const client = await getClient();
             let statementTimeoutError: unknown;
             try {
-                await client.query('SET statement_timeout = 100'); // 100ms timeout
-                await client.query('SELECT pg_sleep(0.5)'); // Attempt to sleep for 500ms
+                await client.query('SET statement_timeout = 100');
+                await client.query('SELECT pg_sleep(0.5)');
             } catch (error) {
                 statementTimeoutError = error;
             } finally {
-                // Attempt to reset statement_timeout, but don't fail test if client is in bad state
                 try {
-                    // Check if client is still usable before trying to reset
                     if (!(client as any)._connected || (client as any)._ending) {
-                        // If client is not connected or ending, it might not be possible to send further queries.
-                        // This state can occur if the timeout error itself caused the client to be marked as unusable by the pool.
+                        // Client might be unusable
                     } else {
-                        await client.query('SET statement_timeout = 0'); // Reset to default
+                        await client.query('SET statement_timeout = 0');
                     }
                 } catch (resetError) {
                     // console.warn('Could not reset statement_timeout after test:', resetError);
@@ -445,11 +372,9 @@ describe('Database Utility Security Tests', () => {
 
             expect(statementTimeoutError).toBeDefined();
             if (isDatabaseError(statementTimeoutError)) {
-                // PostgreSQL error code for query cancellation due to statement timeout is '57014'
-                expect(statementTimeoutError.code).toBe('57014'); // QueryCanceled
+                expect(statementTimeoutError.code).toBe('57014');
                 expect(statementTimeoutError.message).toMatch(/canceling statement due to statement timeout/i);
             } else if (statementTimeoutError instanceof Error) {
-                // Fallback for other error types, though DatabaseError is expected
                 expect(statementTimeoutError.message).toMatch(/timeout/i);
             } else {
                 throw new Error('Expected a DatabaseError or Error for statement timeout');
@@ -457,12 +382,10 @@ describe('Database Utility Security Tests', () => {
         });
 
         it('should handle connection pool exhaustion gracefully', async () => {
-            console.log('[TEST START] should handle connection pool exhaustion');
             const maxConnections = 2;
             const acquireTimeout = 200;
 
             jest.resetModules();
-            console.log('[TEST - pool exhaustion] Modules reset.');
 
             const mockConfigForThisTest = {
                 databaseUrl: 'postgres://postgres:password@localhost:5433/koutu-postgres-test',
@@ -471,70 +394,54 @@ describe('Database Utility Security Tests', () => {
                 dbConnectionTimeout: acquireTimeout,
                 dbRequireSsl: false,
             };
-            console.log('[TEST - pool exhaustion] Mock config for this test:', mockConfigForThisTest);
 
             jest.doMock('../../config', () => {
-                console.log('[TEST - pool exhaustion] Applying config mock:', mockConfigForThisTest);
                 return { config: mockConfigForThisTest };
             });
 
-            console.log('[TEST - pool exhaustion] Requiring db module.');
             const { getClient: localGetClient, pool: localTestPool } = require('../../models/db');
-            console.log('[TEST - pool exhaustion] db module required. localTestPool.options:', localTestPool.options);
 
-
-            expect(localTestPool.options.max).toBe(maxConnections); // This was failing before
+            expect(localTestPool.options.max).toBe(maxConnections);
             expect(localTestPool.options.connectionTimeoutMillis).toBe(acquireTimeout);
 
             let client1: PoolClient | undefined, client2: PoolClient | undefined;
             let timeoutError: Error | undefined;
 
             try {
-                console.log('[TEST - pool exhaustion] Acquiring client 1');
                 client1 = await localGetClient();
-                console.log('[TEST - pool exhaustion] Acquiring client 2');
                 client2 = await localGetClient();
-                console.log('[TEST - pool exhaustion] Attempting to acquire client 3 (should timeout)');
                 await localGetClient(); // This should wait and then timeout
             } catch (e: any) {
-                console.log('[TEST - pool exhaustion] Caught error (expected for pool exhaustion):', e);
                 timeoutError = e;
             } finally {
-                console.log('[TEST - pool exhaustion] Finally block. Releasing clients.');
                 if (client1) client1.release();
                 if (client2) client2.release();
 
                 if (localTestPool && typeof localTestPool.end === 'function' && !localTestPool.ended) {
-                    console.log('[TEST - pool exhaustion] Ending localTestPool.');
                     await localTestPool.end();
-                } else if (localTestPool && localTestPool.ended) {
-                    console.log('[TEST - pool exhaustion] localTestPool already ended.');
                 }
 
                 jest.resetModules();
-                console.log('[TEST - pool exhaustion] Restoring global config mock.');
-                jest.mock('../../config', () => ({ // Restore global mock
+                jest.mock('../../config', () => ({
                     config: {
                         databaseUrl: 'postgres://postgres:password@localhost:5433/koutu-postgres-test',
                         nodeEnv: 'test',
                     },
                 }));
-                const { config: resetConfig } = require('../../config');
-                console.log('[TEST - pool exhaustion] Global config restored. nodeEnv:', resetConfig.nodeEnv);
+                require('../../config'); // Re-require to apply mock
             }
 
             expect(timeoutError).toBeDefined();
             expect(timeoutError?.message).toMatch(/timeout|ConnectionAcquireTimeoutError/i);
-            console.log('[TEST END] should handle connection pool exhaustion');
         });
 
         it('should enforce transaction timeouts', async () => {
             const client = await getClient();
             try {
                 await client.query('BEGIN');
-                await client.query('SET LOCAL statement_timeout = 100'); // 100ms timeout
+                await client.query('SET LOCAL statement_timeout = 100');
                 await expect(
-                    client.query('SELECT pg_sleep(0.5)') // Attempt to sleep for 500ms
+                    client.query('SELECT pg_sleep(0.5)')
                 ).rejects.toThrow(/canceling statement due to statement timeout/i);
             } finally {
                 await client.query('ROLLBACK');
@@ -597,10 +504,7 @@ describe('Database Utility Security Tests', () => {
             const client2 = await getClient();
 
             try {
-                // Set a session variable on client1
                 await client1.query("SET app.user_id = 'user1'");
-
-                // Verify client2 doesn't see the same session state
                 const result = await client2.query("SHOW app.user_id");
                 expect(result.rows[0].app_user_id).not.toBe('user1');
             } finally {
@@ -610,16 +514,16 @@ describe('Database Utility Security Tests', () => {
         });
     });
 
-    // Isolated describe block for pool cleanup tests with extensive logging
     describe('Pool Cleanup Security', () => {
-        let pool: Pool | undefined;
-        let closePool: (() => Promise<void>) | undefined;
-        let isPoolClosed = false; // Track pool closure to prevent multiple end calls
+        let currentPool: Pool | undefined;
+        let currentClosePool: (() => Promise<void>) | undefined;
+        let currentGetClient: (() => Promise<PoolClient>) | undefined; // Added
+        let isCurrentPoolClosed = false;
 
-        beforeAll(async () => {
+        beforeEach(async () => {
             jest.resetAllMocks();
             jest.resetModules();
-            jest.unmock('pg'); // Ensure pg is not mocked
+            jest.unmock('pg');
 
             jest.doMock('../../config', () => ({
                 config: {
@@ -628,50 +532,33 @@ describe('Database Utility Security Tests', () => {
                 },
             }));
 
-            try {
-                const dbModule = require('../../models/db');
-                if (dbModule.pool && typeof dbModule.closePool === 'function') {
-                    pool = dbModule.pool;
-                    closePool = dbModule.closePool;
-
-                    Object.assign(module.exports, {
-                        query: dbModule.query,
-                        getClient: dbModule.getClient,
-                        pool: dbModule.pool,
-                        closePool: dbModule.closePool,
-                    });
-                } else {
-                    throw new Error('Invalid db.ts exports: missing pool or closePool');
-                }
-            } catch (error) {
-                throw error;
-            }
+            const dbModule = require('../../models/db');
+            currentPool = dbModule.pool;
+            currentClosePool = dbModule.closePool;
+            currentGetClient = dbModule.getClient; // Get getClient from this module instance
+            isCurrentPoolClosed = false;
         });
 
-        afterAll(async () => {
+        afterEach(async () => {
             try {
-                if (closePool && !isPoolClosed) {
-                    await closePool();
-                    isPoolClosed = true;
+                if (currentClosePool && !isCurrentPoolClosed && currentPool && !currentPool.ended) {
+                    await currentClosePool();
                 }
             } catch (error) {
-                console.error('Failed to close pool:', error); // Keep error logging for debugging
+                // console.error('Failed to close pool in Pool Cleanup afterEach:', error); // Keep if needed for debug
             }
         });
 
         it('should securely close the pool without leaking sensitive information', async () => {
-            if (!pool || !closePool) {
-                throw new Error('Pool or closePool not initialized');
-            }
+            if (!currentPool || !currentClosePool) throw new Error('Pool not initialized for test');
 
-            // Mock the specific pool instance's end method to throw an error
-            const mockEnd = jest.spyOn(pool, 'end').mockImplementationOnce(() => {
+            const mockEnd = jest.spyOn(currentPool, 'end').mockImplementationOnce(() => {
                 return Promise.reject(new Error('Pool termination failed'));
             });
-
             const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
 
-            await expect(closePool()).rejects.toThrow('Pool termination failed');
+            await expect(currentClosePool()).rejects.toThrow('Pool termination failed');
+            isCurrentPoolClosed = true; // Mark as closed because closePool was called
 
             expect(consoleSpy).toHaveBeenCalled();
             const errorLog = consoleSpy.mock.calls[0][0] as string;
@@ -682,67 +569,51 @@ describe('Database Utility Security Tests', () => {
 
             consoleSpy.mockRestore();
             mockEnd.mockRestore();
-            isPoolClosed = false; // Reset this so we can close in the next test
         });
 
         it('should ensure no connections remain after closePool', async () => {
-            if (!pool || !closePool) {
-                throw new Error('Pool or closePool not initialized');
+            if (!currentPool || !currentClosePool || !currentGetClient) { // Check for currentGetClient
+                throw new Error('Pool or getClient not initialized for test');
             }
 
-            // Create a fresh pool for this test to avoid the "already closed" error
-            jest.resetModules();
-            const freshDbModule = require('../../models/db');
-            pool = freshDbModule.pool;
-            closePool = freshDbModule.closePool;
-
-            // Get and release a client to test pool management
-            const client = await freshDbModule.getClient();
+            const client = await currentGetClient(); // Use the getClient associated with currentPool
             client.release();
 
-            // Close the pool
-            if (closePool) {
-                await closePool();
-                isPoolClosed = true; // Mark pool as closed to skip afterAll cleanup
-                console.log('Pool Cleanup Security: closePool completed');
-            } else {
-                throw new Error('closePool is not defined');
-            }
+            await currentClosePool();
+            isCurrentPoolClosed = true;
 
-            // Mock console.error before the query that's expected to fail
             const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
-
             try {
-                // Verify we can't use the pool after closing
-                await expect(freshDbModule.query('SELECT NOW()')).rejects.toThrow(/Cannot use a pool after calling end/);
+                // This require will get the same module instance as in beforeEach
+                // So queryFromClosedPool will use currentPool, which is now closed.
+                const { query: queryFromClosedPool } = require('../../models/db');
+                await expect(queryFromClosedPool('SELECT NOW()')).rejects.toThrow(/Cannot use a pool after calling end/);
             } finally {
-                // Always restore the mock
                 errorSpy.mockRestore();
             }
 
-            // Verify no connections remain
-            expect(pool && pool.totalCount).toBe(0);
-            expect(pool && pool.idleCount).toBe(0);
-            expect(pool && pool.waitingCount).toBe(0);
+            expect(currentPool.totalCount).toBe(0);
+            expect(currentPool.idleCount).toBe(0);
+            expect(currentPool.waitingCount).toBe(0);
         });
 
         it('should handle cleanup with active transactions', async () => {
-            const client = await getClient();
+            if (!currentPool || !currentClosePool || !currentGetClient) { // Check for currentGetClient
+                throw new Error('Pool or getClient not initialized for test');
+            }
+            // const { getClient: localGetClient } = require('../../models/db'); // Not needed if using currentGetClient
+
+            const client = await currentGetClient(); // Use currentGetClient
             await client.query('BEGIN');
 
-            let closePoolPromise: Promise<void> | undefined;
-            if (closePool) {
-                closePoolPromise = closePool();
-            } else {
-                throw new Error('closePool is not defined');
-            }
+            const closePromise = currentClosePool();
+            isCurrentPoolClosed = true;
 
             await client.query('ROLLBACK');
             client.release();
 
-            if (closePoolPromise) {
-                await closePoolPromise;
-            }
+            await closePromise;
+            expect(currentPool.ended).toBe(true);
         });
     });
 });

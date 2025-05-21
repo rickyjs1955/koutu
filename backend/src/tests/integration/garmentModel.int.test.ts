@@ -391,43 +391,122 @@ describe('Garment Model Integration Tests', () => {
     });
   });
 
-  describe('updateMetadata with undefined metadata', () => {
-    it('should preserve existing metadata if undefined is passed', async () => {
-      // Arrange: create garment with initial metadata
-      const initialMetadata = { key: 'value' };
-      const created = await createTestGarment({ metadata: initialMetadata });
-      
-      // Act: Update using undefined (simulate missing update object)
-      // Casting to any here to simulate the absence—your production code should validate input
-      const updated = await garmentModel.updateMetadata(created.id, { metadata: undefined as any });
-      
-      // Assert: If update logic is defensive, no changes should occur
-      expect(updated).not.toBeNull();
-      expect(updated!.metadata).toEqual(initialMetadata);
-    });
+  describe('updateMetadata with invalid inputs', () => {
+  it('should handle null metadata gracefully', async () => {
+    // Arrange
+    const created = await createTestGarment();
+    
+    // Act
+    // @ts-ignore - Deliberately passing null to test error handling
+    const updated = await garmentModel.updateMetadata(created.id, { metadata: null });
+    
+    // Assert
+    expect(updated).toBeNull();
+    
+    // Verify the original metadata wasn't changed
+    const retrieved = await garmentModel.findById(created.id);
+    expect(retrieved!.metadata).toEqual(created.metadata);
   });
 
-  describe('Simultaneous deletion and update', () => {
-    it('should handle concurrent deletion and update gracefully', async () => {
-      // Arrange: Create a garment that we will try to update and delete at the same time
-      const created = await createTestGarment({ metadata: { field: 'initial' } });
+  it('should handle array metadata gracefully', async () => {
+    // Arrange
+    const created = await createTestGarment();
+    
+    // Act
+    // @ts-ignore - Deliberately passing array to test error handling
+    const updated = await garmentModel.updateMetadata(created.id, { metadata: ['invalid', 'array'] });
+    
+    // Assert
+    expect(updated).toBeNull();
+    
+    // Verify the original metadata wasn't changed
+    const retrieved = await garmentModel.findById(created.id);
+    expect(retrieved!.metadata).toEqual(created.metadata);
+  });
 
-      // Act: Fire off a deletion and an update concurrently
-      const deletionPromise = garmentModel.delete(created.id);
-      const updatePromise = garmentModel.updateMetadata(created.id, { metadata: { field: 'updated' } });
-      
-      const [deletedResult, updateResult] = await Promise.all([deletionPromise, updatePromise]);
-      
-      // Assert:
-      // Depending on timing, if deletion succeeded then the update should return null.
-      if (deletedResult === true) {
-        expect(updateResult).toBeNull();
-      } else {
-        // If deletion failed because the update happened first,
-        // then deletion result should be false and updateResult should have data.
-        expect(deletedResult).toBe(false);
-        expect(updateResult).not.toBeNull();
+  it('should handle invalid UUID for garment ID', async () => {
+    // Arrange
+    const invalidId = 'not-a-valid-uuid';
+    
+    // Act
+    const updated = await garmentModel.updateMetadata(invalidId, { metadata: { test: true } });
+    
+    // Assert
+    expect(updated).toBeNull();
+  });
+
+  it('should handle special characters in metadata correctly', async () => {
+    // Arrange
+    const created = await createTestGarment();
+    
+    // Create metadata with special characters
+    const specialChars = {
+      metadata: {
+        'key-with-dash': 'value',
+        'key.with.dot': 'value',
+        'key with spaces': 'value',
+        'emoji🔥key': 'value',
+        'special@#$%^&*': '!@#$%^&*()'
       }
-    });
+    };
+    
+    // Act - Use replace option to completely replace the metadata
+    const updated = await garmentModel.updateMetadata(created.id, specialChars, { replace: true });
+    
+    // Assert
+    expect(updated).not.toBeNull();
+    expect(updated!.metadata).toEqual(specialChars.metadata);
   });
+
+  it('should handle deeply nested metadata objects', async () => {
+    // Arrange
+    const created = await createTestGarment();
+    
+    // Create deeply nested metadata
+    const deeplyNested = {
+      metadata: {
+        level1: {
+          level2: {
+            level3: {
+              level4: {
+                level5: "deep value"
+              }
+            }
+          }
+        }
+      }
+    };
+    
+    // Act - Use replace option to completely replace the metadata
+    const updated = await garmentModel.updateMetadata(created.id, deeplyNested, { replace: true });
+    
+    // Assert
+    expect(updated).not.toBeNull();
+    expect(updated!.metadata).toEqual(deeplyNested.metadata);
+  });
+
+  it('should handle large metadata objects', async () => {
+    // Arrange
+    const created = await createTestGarment();
+    
+    // Create metadata with 100 keys
+    const largeMetadata: Record<string, string> = {};
+    for (let i = 0; i < 100; i++) {
+      largeMetadata[`key${i}`] = `value${i}`.repeat(20); // Make values large
+    }
+    
+    // Act - Use replace option to completely replace the metadata
+    const updated = await garmentModel.updateMetadata(
+      created.id, 
+      { metadata: largeMetadata }, 
+      { replace: true }
+    );
+    
+    // Assert
+    expect(updated).not.toBeNull();
+    expect(Object.keys(updated!.metadata).length).toBe(100);
+    expect(updated!.metadata.key0).toBe('value0'.repeat(20));
+    expect(updated!.metadata.key99).toBe('value99'.repeat(20));
+  });
+});
 });

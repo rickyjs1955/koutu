@@ -15,6 +15,4 @@ ollama pull codegeex4:latest
 index.unit 1
 index.int 1
 garmentModel.unit 21
-garmentModel.int 20
-db.int 44
-db.security 1
+garmentModel.int 1

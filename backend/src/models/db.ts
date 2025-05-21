@@ -39,7 +39,6 @@ if (config.dbRequireSsl) {
 export const pool = new Pool(poolOptions);
 
 // Only test connection in non-test environments
-console.log('config.nodeEnv:', config.nodeEnv);
 if (config.nodeEnv !== 'test') {
   pool.query('SELECT NOW()', (err, res) => {
     if (err) {
