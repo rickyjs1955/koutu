@@ -10,3 +10,11 @@ Ollama Models:
 ollama pull mixtral:latest
 ollama pull nous-hermes2:latest
 ollama pull codegeex4:latest
+
+
+index.unit 1
+index.int 1
+garmentModel.unit 21
+garmentModel.int 20
+db.int 44
+db.security 1

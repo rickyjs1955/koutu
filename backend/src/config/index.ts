@@ -13,6 +13,11 @@ export const config = {
   databaseUrl: process.env.NODE_ENV === 'test' 
     ? process.env.TEST_DATABASE_URL || 'postgresql://postgres:password@localhost:5432/koutu_test'
     : process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/koutu',
+  dbPoolMax: parseInt(process.env.DB_POOL_MAX || (process.env.NODE_ENV === 'test' ? '5' : '10'), 10), // Max connections in pool
+  dbConnectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT || '0', 10), // ms, 0 to disable
+  dbIdleTimeout: parseInt(process.env.DB_IDLE_TIMEOUT || '10000', 10), // ms
+  dbStatementTimeout: parseInt(process.env.DB_STATEMENT_TIMEOUT || '0', 10), // ms, 0 to disable (for client-side statement_timeout)
+  dbRequireSsl: process.env.DB_REQUIRE_SSL === 'true' || false,
   
   // JWT
   jwtSecret: process.env.JWT_SECRET,
