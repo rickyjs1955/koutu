@@ -106,11 +106,17 @@
  * - Insert `// #region` and `// #endregion` to organize tests into logical groups
  * - Write inline comments to clarify logic or intent only where necessary
  * - Do not create new tests, rename anything, or modify test logic
+ * - Organize related tests into describe blocks or logical categories when appropriate
+ * - Suggest section headers that align with use cases (e.g. "happy path", "error handling",   
+ *   "edge cases")
  *
  * @coursesOfAction
  * - Avoid annotating trivial logic
  * - Do not offer test coverage suggestions — only clarify existing tests
  * - Prefer single-line comments directly above relevant logic when needed
+ * - When multiple tests share a common behavior or scenario, group them using describe() or 
+ *   similar test grouping constructs
+ * - Avoid artificial grouping — only categorize when it improves clarity
  *
  * @successCriteria
  * - The test suite is easier to understand and navigate
