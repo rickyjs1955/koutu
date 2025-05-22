@@ -1,4 +1,4 @@
-// backend/src/utils/ApiError.test.ts
+// filepath: /backend/src/tests/unit/ApiError.unit.test.ts
 
 /**
  * ApiError Unit Test Suite
