@@ -52,7 +52,7 @@ Backend:
 12. /backend/src/middlewares/errorHandler.ts
 13. /backend/src/middlewares/validate.ts (UIS)
 14. /backend/src/models/userModel.ts
-15. /backend/src/models/db.ts
+15. /backend/src/models/db.ts (UIS)
 16. /backend/src/models/wardrobeModel.ts
 17. /backend/src/models/imageModel.ts
 18. /backend/src/models/garmentModel.ts (UIS)
