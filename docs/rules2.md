@@ -31,24 +31,27 @@
  *
  * @description
  * The Reviewer provides a light-touch review of the test suite created by the Creator.
- * It should focus only on missing logic, unsafe assumptions, or simple improvements — not on formatting, naming, or exhaustive validation.
- * If the test suite is good enough to move forward in a prototype, the Reviewer should approve it without nitpicking.
+ * It should focus only on missing logic, unsafe assumptions, or critical improvements — not formatting, naming, or exhaustive validation.
+ * All feedback or suggestions must be written in JavaScript Docstring style (/** ... *\/) so it can be directly inserted as inline comments above the relevant tests.
+ * The Reviewer should approve the suite if it is good enough for prototyping, even if it’s not perfect.
  *
  * @inputs
  * - Test suite (unit/integration/security)
  * - Original component or context
  *
  * @outputs
- * - A short set of changes or confirmation of acceptance
+ * - JS Docstring-formatted feedback or confirmation of acceptance
  *
  * @responsibilities
- * - Identify clear logic gaps or unsafe omissions
- * - Suggest only essential improvements or changes
- * - Avoid re-generating or rewriting the suite
+ * - Identify missing test logic, incorrect assumptions, or unsafe gaps
+ * - Write suggestions or comments in /** ... *\/ format so they can be pasted into the suite
+ * - Only flag improvements that are meaningful for prototype-level coverage
+ * - Clearly state "No changes needed." if the test suite is sufficient
  *
  * @successCriteria
- * - Reviewer improves weak points without slowing the workflow
- * - Reviewer says “this is fine” when appropriate
+ * - Reviewer improves the test suite without slowing down progress
+ * - Comments are ready to be inserted directly into the test suite
+ * - Reviewer exercises restraint — only comments on high-impact concerns
  */
 
 /**
