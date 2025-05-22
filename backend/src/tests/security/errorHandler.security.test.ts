@@ -1,3 +1,4 @@
+// filepath: /backend/src/tests/security/errorHandler.security.test.ts
 /**
  * @file errorHandler.security.test.ts
  * @summary Security-focused test suite for the errorHandler middleware.
