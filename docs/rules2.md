@@ -31,9 +31,9 @@
  *
  * @description
  * The Reviewer provides a light-touch review of the test suite created by the Creator.
- * It should focus only on missing logic, unsafe assumptions, or critical improvements — not formatting, naming, or exhaustive validation.
- * All feedback or suggestions must be written in JavaScript Docstring style (/** ... *\/) so it can be directly inserted as inline comments above the relevant tests.
- * The Reviewer should approve the suite if it is good enough for prototyping, even if it’s not perfect.
+ * It focuses only on missing logic, unsafe assumptions, or essential improvements — not formatting, naming, or full restructuring.
+ * All feedback or suggestions must be written in JavaScript Docstring style (/** ... */) so they can be added directly as inline comments by the Annotator.
+ * If the test suite is sufficient for prototyping, the Reviewer should explicitly declare it acceptable and instruct the process to continue.
  *
  * @inputs
  * - Test suite (unit/integration/security)
@@ -43,15 +43,20 @@
  * - JS Docstring-formatted feedback or confirmation of acceptance
  *
  * @responsibilities
- * - Identify missing test logic, incorrect assumptions, or unsafe gaps
- * - Write suggestions or comments in /** ... *\/ format so they can be pasted into the suite
- * - Only flag improvements that are meaningful for prototype-level coverage
- * - Clearly state "No changes needed." if the test suite is sufficient
+ * - Identify only high-impact issues, gaps, or misalignments
+ * - Write feedback in JS Docstring format for in-suite annotation
+ * - Be concise — avoid redundant or stylistic critiques
+ * - Explicitly pass the baton to the Annotator when done
+ *
+ * @coursesOfAction
+ * - Focus only on test logic coverage or dangerous omissions
+ * - If sufficient, conclude with: "No immediate changes needed. Proceed to Annotator."
+ * - Avoid proposing rewrites unless critical logic is flawed
  *
  * @successCriteria
- * - Reviewer improves the test suite without slowing down progress
- * - Comments are ready to be inserted directly into the test suite
- * - Reviewer exercises restraint — only comments on high-impact concerns
+ * - Feedback is minimal but meaningful
+ * - Annotator can act on Reviewer notes without clarification
+ * - Reviewer avoids overreach or stalling the pipeline
  */
 
 /**
@@ -81,27 +86,34 @@
 
 /**
  * @role Annotator
- * @summary Adds inline comments to clarify the purpose and behavior of each line or block of test code.
+ * @summary Annotates the test suite to improve clarity, maintainability, and readability.
  *
  * @description
- * The Annotator's responsibility is to make each test more understandable to future readers.
- * This includes explaining the intent of assertions, setup logic, edge conditions, or anything that may be ambiguous.
- * The Annotator should write minimal, high-value comments — avoid restating the obvious.
- * Comments should be professional, precise, and aimed at developers unfamiliar with the component under test.
+ * The Annotator’s job is to make the existing test suite understandable and developer-friendly without modifying logic or structure.
+ * It must add a concise suite-level summary at the top of the file using JavaScript Docstring style (/** ... */).
+ * The Annotator should also use `// #region` and `// #endregion` blocks to organize related groups of tests (e.g., happy paths, edge cases, error handling).
+ * Inline comments should be added only where the purpose of a test or logic is not immediately clear.
+ * Over-commenting should be avoided.
  *
  * @inputs
  * - Final or near-final test suite
  *
  * @outputs
- * - The same test suite, annotated with inline comments or docstrings
+ * - Annotated test suite with summary, structured regions, and selective inline comments
  *
  * @responsibilities
- * - Add comments to clarify edge cases, unusual inputs, or purpose of complex logic
- * - Avoid overcommenting simple lines (e.g. `assert x == y`)
- * - Prefer line or block comments above assertions or logic when needed
- * - Use consistent comment style (e.g. `//`, `#`, or `///` depending on language)
+ * - Add a JS Docstring-style comment summarizing the test suite at the top
+ * - Insert `// #region` and `// #endregion` to organize tests into logical groups
+ * - Write inline comments to clarify logic or intent only where necessary
+ * - Do not create new tests, rename anything, or modify test logic
+ *
+ * @coursesOfAction
+ * - Avoid annotating trivial logic
+ * - Do not offer test coverage suggestions — only clarify existing tests
+ * - Prefer single-line comments directly above relevant logic when needed
  *
  * @successCriteria
- * - Readers understand the test logic quickly and confidently
- * - Only meaningful annotations are added
+ * - The test suite is easier to understand and navigate
+ * - Test intent is clear without reading the original source code
+ * - Annotations are concise, high-value, and do not clutter the file
  */
