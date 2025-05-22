@@ -19,7 +19,7 @@ declare global {
 
 export const authenticate = async (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) => {
   try {
@@ -34,38 +34,49 @@ export const authenticate = async (
       return next(ApiError.unauthorized('Authentication required'));
     }
 
-    // Verify the token
+    // Verify JWT token
+    let decoded;
+    
+    // Handle JWT verification errors - no try/catch to let outer catch handle it
     try {
-      const decoded = jwt.verify(token, config.jwtSecret as string) as {
+      decoded = jwt.verify(token, config.jwtSecret as string) as {
         id: string;
         email: string;
       };
-
-      // Find the user
-      const user = await userModel.findById(decoded.id);
-      if (!user) {
-        return next(ApiError.unauthorized('Invalid token'));
-      }
-
-      // Attach user to request
-      req.user = {
-        id: user.id,
-        email: user.email
-      };
-
-      next();
     } catch (error: any) {
-      // Only treat JWT errors as unauthorized, otherwise internal
-      if (
-        error.name === 'JsonWebTokenError' ||
-        error.name === 'TokenExpiredError' ||
-        error.message === 'Invalid token'
-      ) {
+      // Differentiate between JWT-specific errors and other unexpected errors
+      if (error.name === 'JsonWebTokenError' || 
+          error.name === 'TokenExpiredError' || 
+          error.name === 'NotBeforeError') {
+        // These are standard JWT validation errors
         return next(ApiError.unauthorized('Invalid token'));
       }
-      return next(ApiError.internal('Authentication error'));
+      // Any other error during token verification is unexpected
+      return next(ApiError.internal('Authentication error')); 
     }
-  } catch (error) {
+
+    // Find the user
+    const user = await userModel.findById(decoded.id);
+    if (!user) {
+      return next(ApiError.unauthorized('Invalid token'));
+    }
+
+    // Attach user to request
+    req.user = {
+      id: user.id,
+      email: user.email
+    };
+
+    next();
+  } catch (error: any) {
+    // This outer catch block handles errors from other parts of the try block,
+    // like userModel.findById or other unexpected issues.
+    // The JWT-specific checks here are a fallback, though errors from jwt.verify
+    // should now be fully handled by the inner try-catch.
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError' || error.name === 'NotBeforeError') {
+      return next(ApiError.unauthorized('Invalid token'));
+    }
+    
     return next(ApiError.internal('Authentication error'));
   }
 };

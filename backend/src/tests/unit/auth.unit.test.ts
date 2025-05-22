@@ -29,82 +29,120 @@ jest.mock('../../models/userModel', () => ({
 }));
 jest.mock('../../utils/ApiError', () => ({
   ApiError: {
-    unauthorized: jest.fn((msg) => ({ type: 'unauthorized', message: msg })),
-    internal: jest.fn((msg) => ({ type: 'internal', message: msg }))
+    unauthorized: jest.fn((msg) => ({ 
+      message: msg, 
+      statusCode: 401, 
+      code: 'UNAUTHORIZED' 
+      // You can also add 'type: "unauthorized"' if other tests rely on it,
+      // or adjust other tests to not expect 'type' if it's not part of the actual ApiError structure.
+    })),
+    internal: jest.fn((msg) => ({ 
+      message: msg, 
+      statusCode: 500, 
+      code: 'INTERNAL_ERROR' 
+    }))
   }
 }));
 
 describe('authenticate middleware', () => {
-  let req: any;
-  let res: any;
-  let next: jest.Mock;
+    let req: any;
+    let res: any;
+    let next: jest.Mock;
 
-  beforeEach(() => {
-    req = { headers: {} };
-    res = {};
-    next = jest.fn();
-    jest.clearAllMocks();
-  });
+    beforeEach(() => {
+        req = { headers: {} };
+        res = {};
+        next = jest.fn();
+        jest.clearAllMocks();
+    });
 
-  // #region Authorization header tests
-  test('should call next with unauthorized if no Authorization header', async () => {
-    await authenticate(req, res, next);
-    expect(ApiError.unauthorized).toHaveBeenCalledWith('Authentication required');
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ type: 'unauthorized' }));
-  });
+    // #region Authorization header tests
+    test('should call next with unauthorized if no Authorization header', async () => {
+        await authenticate(req, res, next);
+        expect(ApiError.unauthorized).toHaveBeenCalledWith('Authentication required');
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ 
+        message: 'Authentication required', 
+        statusCode: 401, 
+        code: 'UNAUTHORIZED' 
+        }));
+    });
 
-  test('should call next with unauthorized if Authorization header does not start with Bearer', async () => {
-    req.headers.authorization = 'Token abcdef';
-    await authenticate(req, res, next);
-    expect(ApiError.unauthorized).toHaveBeenCalledWith('Authentication required');
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ type: 'unauthorized' }));
-  });
+    test('should call next with unauthorized if Authorization header does not start with Bearer', async () => {
+        req.headers.authorization = 'Token abcdef';
+        await authenticate(req, res, next);
+        expect(ApiError.unauthorized).toHaveBeenCalledWith('Authentication required');
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ 
+        message: 'Authentication required', 
+        statusCode: 401, 
+        code: 'UNAUTHORIZED' 
+        }));
+    });
 
-  test('should call next with unauthorized if token is missing after Bearer', async () => {
-    req.headers.authorization = 'Bearer ';
-    await authenticate(req, res, next);
-    expect(ApiError.unauthorized).toHaveBeenCalledWith('Authentication required');
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ type: 'unauthorized' }));
-  });
-  // #endregion
+    test('should call next with unauthorized if token is missing after Bearer', async () => {
+        req.headers.authorization = 'Bearer ';
+        await authenticate(req, res, next);
+        expect(ApiError.unauthorized).toHaveBeenCalledWith('Authentication required');
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ 
+        message: 'Authentication required', 
+        statusCode: 401, 
+        code: 'UNAUTHORIZED' 
+        }));
+    });
+    // #endregion
 
-  // #region Token verification tests
-  test('should call next with unauthorized if jwt.verify throws', async () => {
-    req.headers.authorization = 'Bearer sometoken';
-    (jwt.verify as jest.Mock).mockImplementation(() => { throw new Error('bad token'); });
-    await authenticate(req, res, next);
-    expect(ApiError.unauthorized).toHaveBeenCalledWith('Invalid token');
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ type: 'unauthorized' }));
-  });
+    // #region Token verification tests
+    test('should call next with unauthorized if jwt.verify throws', async () => {
+        req.headers.authorization = 'Bearer sometoken';
+        (jwt.verify as jest.Mock).mockImplementation(() => { 
+        const err = new Error('bad token');
+        err.name = 'JsonWebTokenError'; // Simulate a JWT-specific error
+        throw err; 
+        });
+        await authenticate(req, res, next);
+        expect(ApiError.unauthorized).toHaveBeenCalledWith('Invalid token');
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ 
+        message: 'Invalid token', 
+        statusCode: 401,
+        code: 'UNAUTHORIZED' 
+        }));
+    });
 
-  test('should call next with unauthorized if user not found', async () => {
-    req.headers.authorization = 'Bearer validtoken';
-    (jwt.verify as jest.Mock).mockReturnValue({ id: '123', email: 'a@b.com' });
-    (userModel.findById as jest.Mock).mockResolvedValue(null);
-    await authenticate(req, res, next);
-    expect(ApiError.unauthorized).toHaveBeenCalledWith('Invalid token');
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ type: 'unauthorized' }));
-  });
-  // #endregion
+    test('should call next with unauthorized if user not found', async () => {
+        req.headers.authorization = 'Bearer validtoken';
+        (jwt.verify as jest.Mock).mockReturnValue({ id: '123', email: 'a@b.com' });
+        (userModel.findById as jest.Mock).mockResolvedValue(null);
+        await authenticate(req, res, next);
+        expect(ApiError.unauthorized).toHaveBeenCalledWith('Invalid token');
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ 
+        message: 'Invalid token', 
+        statusCode: 401, 
+        code: 'UNAUTHORIZED' 
+        }));
+    });
+    // #endregion
 
-  // #region Success path
-  test('should attach user to req and call next if token and user are valid', async () => {
-    req.headers.authorization = 'Bearer validtoken';
-    (jwt.verify as jest.Mock).mockReturnValue({ id: '123', email: 'a@b.com' });
-    (userModel.findById as jest.Mock).mockResolvedValue({ id: '123', email: 'a@b.com' });
-    await authenticate(req, res, next);
-    expect(req.user).toEqual({ id: '123', email: 'a@b.com' });
-    expect(next).toHaveBeenCalledWith();
-  });
-  // #endregion
+    // #region Success path
+    test('should attach user to req and call next if token and user are valid', async () => {
+        req.headers.authorization = 'Bearer validtoken';
+        (jwt.verify as jest.Mock).mockReturnValue({ id: '123', email: 'a@b.com' });
+        (userModel.findById as jest.Mock).mockResolvedValue({ id: '123', email: 'a@b.com' });
+        await authenticate(req, res, next);
+        expect(req.user).toEqual({ id: '123', email: 'a@b.com' });
+        expect(next).toHaveBeenCalledWith();
+    });
+    // #endregion
 
-  // #region Error handling
-  test('should call next with internal error if unexpected error occurs', async () => {
-    // Simulate error in outer try/catch
-    req.headers = null as any;
-    await authenticate(req, res, next);
-    expect(ApiError.internal).toHaveBeenCalledWith('Authentication error');
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ type: 'internal' }));
-  });
-  // #endregion
+    // #region Error handling
+    test('should call next with internal error if unexpected error occurs', async () => {
+        // Simulate error in outer try/catch
+        req.headers = null as any;
+        await authenticate(req, res, next);
+        expect(ApiError.internal).toHaveBeenCalledWith('Authentication error');
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ 
+        message: 'Authentication error', 
+        statusCode: 500, 
+        code: 'INTERNAL_ERROR' 
+        }));
+    });
+    // #endregion
 });

@@ -45,7 +45,7 @@ import jwt from 'jsonwebtoken';
 import { authenticate } from '../../middlewares/auth';
 import { userModel } from '../../models/userModel';
 import { ApiError } from '../../utils/ApiError';
-import { errorHandler } from '../../middlewares/errorHandler';
+
 
 const app = express();
 app.use(express.json());
@@ -54,8 +54,6 @@ app.use(authenticate);
 app.get('/protected', (req, res) => {
   res.status(200).json({ message: 'Access granted', user: req.user });
 });
-
-app.use(errorHandler);
 
 describe('Authenticate Middleware Integration Tests', () => {
   beforeEach(() => {
