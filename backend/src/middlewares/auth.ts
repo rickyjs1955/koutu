@@ -54,8 +54,16 @@ export const authenticate = async (
       };
 
       next();
-    } catch (error) {
-      return next(ApiError.unauthorized('Invalid token'));
+    } catch (error: any) {
+      // Only treat JWT errors as unauthorized, otherwise internal
+      if (
+        error.name === 'JsonWebTokenError' ||
+        error.name === 'TokenExpiredError' ||
+        error.message === 'Invalid token'
+      ) {
+        return next(ApiError.unauthorized('Invalid token'));
+      }
+      return next(ApiError.internal('Authentication error'));
     }
   } catch (error) {
     return next(ApiError.internal('Authentication error'));
