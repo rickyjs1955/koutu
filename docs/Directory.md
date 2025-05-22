@@ -48,8 +48,8 @@ Backend:
 8. /backend/src/controllers/wardrobeController.ts
 9. /backend/src/controllers/polygonController.ts
 10. /backend/src/controllers/oauthController.ts
-11. /backend/src/middlewares/auth.ts
-12. /backend/src/middlewares/errorHandler.ts
+11. /backend/src/middlewares/auth.ts (UIS)
+12. /backend/src/middlewares/errorHandler.ts (UIS)
 13. /backend/src/middlewares/validate.ts (UIS)
 14. /backend/src/models/userModel.ts
 15. /backend/src/models/db.ts (UIS)

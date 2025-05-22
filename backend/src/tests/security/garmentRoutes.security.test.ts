@@ -87,7 +87,7 @@ describe('Garment Routes Security Tests', () => {
         app = express();
         app.use(express.json());
         app.use('/api/garments', garmentRoutes);
-        app.use(errorHandler);
+        app.use(errorHandler as express.ErrorRequestHandler);
     });
 
     afterAll(() => {

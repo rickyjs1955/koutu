@@ -165,7 +165,7 @@ describe('Garment Routes Integration Tests', () => {
         app.use('/api/garments', garmentRoutes);
         
         // Add error handler
-        app.use(errorHandler);
+        app.use(errorHandler as express.ErrorRequestHandler);
     });
 
     afterAll(() => {
