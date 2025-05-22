@@ -1,4 +1,4 @@
-
+// filepath: /backend/src/tests/integration/auth.int.test.ts
 /**
  * @file auth.int.test.ts
  * @summary Integration tests for the authenticate middleware.
