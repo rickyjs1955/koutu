@@ -17,6 +17,11 @@ declare global {
   }
 }
 
+/**
+ * Middleware to authenticate users using JWT
+ * This middleware checks for a valid JWT in the Authorization header
+ * and attaches the user information to the request object.
+ */
 export const authenticate = async (
   req: Request,
   _res: Response,
@@ -79,4 +84,19 @@ export const authenticate = async (
     
     return next(ApiError.internal('Authentication error'));
   }
+};
+
+/**
+ * Middleware that requires an authenticated user
+ * This can be used on routes that should only be accessible to authenticated users
+ */
+export const requireAuth = (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+) => {
+  if (!req.user) {
+    return next(ApiError.unauthorized('Authentication required'));
+  }
+  next();
 };

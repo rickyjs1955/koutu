@@ -62,5 +62,57 @@ export const sanitization = {
             this.handleError(error, errorMessage, next);
         }
         };
+    },
+
+    /**
+     * Sanitizes garment metadata to only include allowed fields
+     */
+    sanitizeGarmentMetadata(metadata: Record<string, any>): Record<string, any> {
+        return {
+        type: metadata?.type,
+        color: metadata?.color,
+        pattern: metadata?.pattern,
+        season: metadata?.season,
+        brand: metadata?.brand,
+        tags: Array.isArray(metadata?.tags) ? metadata.tags : []
+        };
+    },
+
+    /**
+     * Creates a sanitized garment response object
+     */
+    sanitizeGarmentForResponse(garment: any): any {
+        const allowedFields = [
+        'id',
+        'original_image_id',
+        'created_at',
+        'updated_at',
+        'data_version'
+        ];
+
+        const pathFields = {
+        file_path: { resourceType: 'garments', pathType: 'image' },
+        mask_path: { resourceType: 'garments', pathType: 'mask' }
+        };
+
+        const sanitized = this.createSanitizedResponse(garment, allowedFields, pathFields);
+        
+        // Add sanitized metadata
+        sanitized.metadata = this.sanitizeGarmentMetadata(garment.metadata || {});
+        
+        return sanitized;
+    },
+
+    /**
+     * Specialized wrapper for garment controller methods
+     */
+    wrapGarmentController(
+        controllerFn: (req: Request, res: Response, next: NextFunction) => Promise<void>,
+        operation: string
+    ) {
+        return this.wrapController(
+        controllerFn, 
+        `An error occurred while ${operation} the garment`
+        );
     }
 };

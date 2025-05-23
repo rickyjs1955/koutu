@@ -2,7 +2,7 @@
 
 import express from 'express';
 import { garmentController } from '../controllers/garmentController';
-import { authenticate } from '../middlewares/auth';
+import { authenticate, requireAuth } from '../middlewares/auth';
 import { validate } from '../middlewares/validate';
 import { 
   CreateGarmentSchema, 
@@ -11,8 +11,9 @@ import {
 
 const router = express.Router();
 
-// All routes require authentication
+// All routes require authentication and authorization
 router.use(authenticate);
+router.use(requireAuth);
 
 // Create a garment - using shared schema validation
 router.post('/create', 
