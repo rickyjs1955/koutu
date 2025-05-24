@@ -55,10 +55,6 @@ jest.mock('../../models/wardrobeModel', () => ({ wardrobeModel: mockWardrobeMode
 // Import test utilities
 import {
   mockUser,
-  mockJwtPayload,
-  validToken,
-  invalidToken,
-  expiredToken,
   createRequestWithValidToken,
   createRequestWithInvalidToken,
   createRequestWithExpiredToken,
@@ -76,13 +72,6 @@ import {
 } from '../__mocks__/auth.mock';
 
 import {
-  setupAuthMocks,
-  createTestScenario,
-  runMiddlewareTest,
-  testAuthenticationScenarios,
-  createAuthorizationScenarios,
-  setupAuthorizationMocks,
-  createRateLimitScenarios,
   cleanupTest,
   generateTestUUID,
   generateInvalidUUID,
