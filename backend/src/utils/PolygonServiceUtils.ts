@@ -1,0 +1,155 @@
+// Create a separate utility class for polygon service helpers
+export class PolygonServiceUtils {
+  /**
+   * Calculate polygon perimeter
+   */
+  static calculatePolygonPerimeter(points: Array<{ x: number; y: number }>): number {
+    if (points.length < 2) return 0;
+
+    let perimeter = 0;
+    for (let i = 0; i < points.length; i++) {
+      const current = points[i];
+      const next = points[(i + 1) % points.length];
+      
+      const dx = next.x - current.x;
+      const dy = next.y - current.y;
+      perimeter += Math.sqrt(dx * dx + dy * dy);
+    }
+
+    return perimeter;
+  }
+
+  /**
+   * Douglas-Peucker polygon simplification algorithm
+   */
+  static douglasPeucker(
+    points: Array<{ x: number; y: number }>, 
+    tolerance: number
+  ): Array<{ x: number; y: number }> {
+    if (points.length <= 2) return points;
+
+    // Find the point with maximum distance from the line between first and last points
+    let maxDistance = 0;
+    let maxIndex = 0;
+    
+    const first = points[0];
+    const last = points[points.length - 1];
+
+    for (let i = 1; i < points.length - 1; i++) {
+      const distance = this.pointToLineDistance(points[i], first, last);
+      if (distance > maxDistance) {
+        maxDistance = distance;
+        maxIndex = i;
+      }
+    }
+
+    // If the maximum distance is greater than tolerance, recursively simplify
+    if (maxDistance > tolerance) {
+      const leftPoints = this.douglasPeucker(points.slice(0, maxIndex + 1), tolerance);
+      const rightPoints = this.douglasPeucker(points.slice(maxIndex), tolerance);
+      
+      // Combine results, avoiding duplicate point at the junction
+      return leftPoints.slice(0, -1).concat(rightPoints);
+    } else {
+      // All points between first and last can be removed
+      return [first, last];
+    }
+  }
+
+  /**
+   * Calculate distance from point to line
+   */
+  static pointToLineDistance(
+    point: { x: number; y: number },
+    lineStart: { x: number; y: number },
+    lineEnd: { x: number; y: number }
+  ): number {
+    const A = point.x - lineStart.x;
+    const B = point.y - lineStart.y;
+    const C = lineEnd.x - lineStart.x;
+    const D = lineEnd.y - lineStart.y;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    
+    if (lenSq === 0) {
+      // Line start and end are the same point
+      return Math.sqrt(A * A + B * B);
+    }
+
+    const param = dot / lenSq;
+    
+    let xx: number, yy: number;
+    
+    if (param < 0) {
+      xx = lineStart.x;
+      yy = lineStart.y;
+    } else if (param > 1) {
+      xx = lineEnd.x;
+      yy = lineEnd.y;
+    } else {
+      xx = lineStart.x + param * C;
+      yy = lineStart.y + param * D;
+    }
+
+    const dx = point.x - xx;
+    const dy = point.y - yy;
+    
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  /**
+   * Save polygon data for AI/ML operations
+   */
+  static async savePolygonDataForML(polygon: any, image: any, storageService: any): Promise<void> {
+    try {
+      const mlData = {
+        polygon: {
+          id: polygon.id,
+          points: polygon.points,
+          label: polygon.label,
+          metadata: polygon.metadata,
+          area: this.calculatePolygonArea(polygon.points),
+          perimeter: this.calculatePolygonPerimeter(polygon.points),
+          created_at: polygon.created_at
+        },
+        image: {
+          id: image.id,
+          file_path: image.file_path,
+          width: image.original_metadata?.width,
+          height: image.original_metadata?.height,
+          format: image.original_metadata?.format
+        },
+        export_metadata: {
+          exported_at: new Date().toISOString(),
+          format_version: '1.0'
+        }
+      };
+
+      const jsonData = JSON.stringify(mlData, null, 2);
+      const buffer = Buffer.from(jsonData, 'utf-8');
+      
+      const filePath = `data/polygons/${polygon.id}.json`;
+      await storageService.saveFile(buffer, filePath);
+    } catch (error) {
+      console.error('Error saving polygon data for ML:', error);
+      // Don't throw - this is a supplementary operation
+    }
+  }
+
+  /**
+   * Calculate polygon area using shoelace formula
+   */
+  static calculatePolygonArea(points: Array<{ x: number; y: number }>): number {
+    if (points.length < 3) return 0;
+
+    let area = 0;
+    for (let i = 0; i < points.length; i++) {
+      const j = (i + 1) % points.length;
+      area += points[i].x * points[j].y;
+      area -= points[j].x * points[i].y;
+    }
+
+    return Math.abs(area / 2);
+  }
+}

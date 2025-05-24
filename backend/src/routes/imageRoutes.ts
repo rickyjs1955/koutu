@@ -1,23 +1,143 @@
 // /backend/src/routes/imageRoutes.ts
 import express from 'express';
 import { imageController } from '../controllers/imageController';
-import { authenticate } from '../middlewares/auth';
+import { 
+  authenticate, 
+  requireAuth, 
+  authorizeImage,
+  rateLimitByUser 
+} from '../middlewares/auth';
+import { 
+  validateQuery, 
+  validateParams,
+  validateFile,
+  ImageQuerySchema,
+  UUIDParamSchema,
+  UpdateImageStatusSchema,
+  validateBody,
+  ImageStatusSchema,
+  UUIDSchema
+} from '../validators/schemas';
+import { requestIdMiddleware } from '../middlewares/errorHandler';
+import { z } from 'zod';
 
 const router = express.Router();
 
-// All routes require authentication
+// Apply request ID middleware to all routes
+router.use(requestIdMiddleware);
+
+// Apply authentication to all routes
 router.use(authenticate);
+router.use(requireAuth);
 
-// Upload image
-router.post('/upload', imageController.uploadMiddleware, imageController.uploadImage);
+// Apply rate limiting to all image operations
+router.use(rateLimitByUser(50, 15 * 60 * 1000)); // 50 requests per 15 minutes
 
-// Get all images
-router.get('/', imageController.getImages);
+/**
+ * @route POST /api/v1/images/upload
+ * @desc Upload a new image
+ * @access Private
+ * @middleware upload, validation, auth
+ */
+router.post('/upload', 
+  imageController.uploadMiddleware,
+  validateFile,
+  imageController.uploadImage
+);
 
-// Get a specific image
-router.get('/:id', imageController.getImage);
+/**
+ * @route GET /api/v1/images
+ * @desc Get all images for the authenticated user
+ * @access Private
+ * @query status, page, limit
+ */
+router.get('/', 
+  validateQuery(ImageQuerySchema),
+  imageController.getImages
+);
 
-// Delete an image
-router.delete('/:id', imageController.deleteImage);
+/**
+ * @route GET /api/v1/images/stats
+ * @desc Get image statistics for the user
+ * @access Private
+ */
+router.get('/stats',
+  imageController.getUserStats
+);
+
+/**
+ * @route GET /api/v1/images/:id
+ * @desc Get a specific image by ID
+ * @access Private
+ * @middleware auth, ownership verification
+ */
+router.get('/:id', 
+  validateParams(UUIDParamSchema),
+  authorizeImage,
+  imageController.getImage
+);
+
+/**
+ * @route PUT /api/v1/images/:id/status
+ * @desc Update image status
+ * @access Private
+ * @middleware auth, ownership verification, validation
+ */
+router.put('/:id/status',
+  validateParams(UUIDParamSchema),
+  validateBody(UpdateImageStatusSchema),
+  authorizeImage,
+  imageController.updateImageStatus
+);
+
+/**
+ * @route POST /api/v1/images/:id/thumbnail
+ * @desc Generate thumbnail for an image
+ * @access Private
+ * @middleware auth, ownership verification
+ */
+router.post('/:id/thumbnail',
+  validateParams(UUIDParamSchema),
+  authorizeImage,
+  imageController.generateThumbnail
+);
+
+/**
+ * @route POST /api/v1/images/:id/optimize
+ * @desc Optimize image for web delivery
+ * @access Private
+ * @middleware auth, ownership verification
+ */
+router.post('/:id/optimize',
+  validateParams(UUIDParamSchema),
+  authorizeImage,
+  imageController.optimizeImage
+);
+
+/**
+ * @route DELETE /api/v1/images/:id
+ * @desc Delete an image
+ * @access Private
+ * @middleware auth, ownership verification
+ */
+router.delete('/:id', 
+  validateParams(UUIDParamSchema),
+  authorizeImage,
+  imageController.deleteImage
+);
+
+/**
+ * @route PUT /api/v1/images/batch/status
+ * @desc Batch update image statuses
+ * @access Private
+ * @middleware auth, validation
+ */
+router.put('/batch/status',
+  validateBody(z.object({
+    imageIds: z.array(UUIDSchema).min(1).max(50),
+    status: ImageStatusSchema
+  })),
+  imageController.batchUpdateStatus
+);
 
 export { router as imageRoutes };

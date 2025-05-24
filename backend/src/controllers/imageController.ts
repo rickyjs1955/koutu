@@ -1,177 +1,259 @@
-// /backend/src/controllers/imageController.ts
+// /backend/src/controllers/imageController.ts - FIXED TypeScript Issues
 import { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import path from 'path';
 import { ApiError } from '../utils/ApiError';
 import { config } from '../config';
-import { imageModel } from '../models/imageModel';
-import { storageService } from '../services/storageService';
-import { imageProcessingService } from '../services/imageProcessingService';
+import { imageService } from '../services/imageService';
+import { sanitization } from '../utils/sanitize';
 
-// Configure multer for memory storage
+// Configure multer for memory storage with comprehensive validation
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: config.maxFileSize // 5MB default
+    fileSize: config.maxFileSize,
+    files: 1
   },
   fileFilter: (req, file, cb) => {
-    // Accept only image files
-    const filetypes = /jpeg|jpg|png|webp/;
-    const mimetype = filetypes.test(file.mimetype);
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const allowedExtensions = /\.(jpeg|jpg|png|webp)$/i;
     
-    if (mimetype && extname) {
-      return cb(null, true);
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      return cb(new Error(`Invalid file type: ${file.mimetype}`));
     }
     
-    cb(new Error('File upload only supports image files'));
+    if (!allowedExtensions.test(file.originalname)) {
+      return cb(new Error('Invalid file extension'));
+    }
+    
+    if (file.originalname.length > 255) {
+      return cb(new Error('Filename too long'));
+    }
+    
+    cb(null, true);
   }
-}).single('image'); // 'image' is the field name in the form
+}).single('image');
 
 export const imageController = {
-  // Middleware to handle file upload
-  uploadMiddleware(req: Request, res: Response, next: NextFunction) {
-    upload(req, res, (err) => {
-      if (err instanceof multer.MulterError) {
-        // A Multer error occurred
-        if (err.code === 'LIMIT_FILE_SIZE') {
-          return next(ApiError.badRequest(`File too large, max size is ${config.maxFileSize / (1024 * 1024)}MB`));
-        }
-        return next(ApiError.badRequest(err.message));
-      } else if (err) {
-        // An unknown error occurred
-        return next(ApiError.badRequest(err.message));
-      }
-      
-      // No error, continue
-      next();
-    });
-  },
-  
-  async uploadImage(req: Request, res: Response, next: NextFunction) {
-    try {
-      if (!req.file) {
-        return next(ApiError.badRequest('No image file uploaded'));
-      }
-      
-      if (!req.user) {
-        return next(ApiError.unauthorized('User not authenticated'));
-      }
-      
-      // Save the file
-      const filePath = await storageService.saveFile(req.file.buffer, req.file.originalname);
-      
-      // Extract metadata
-      const metadata = await imageProcessingService.extractMetadata(filePath);
-      
-      // Save to database
-      const image = await imageModel.create({
-        user_id: req.user.id,
-        file_path: filePath,
-        original_metadata: {
-          filename: req.file.originalname,
-          mimetype: req.file.mimetype,
-          size: req.file.size,
-          width: metadata.width,
-          height: metadata.height,
-          format: metadata.format
-        }
+  // Upload middleware with enhanced error handling - FIXED: Make async
+  uploadMiddleware: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      return new Promise((resolve) => {
+        upload(req, res, (err) => {
+          if (err instanceof multer.MulterError) {
+            switch (err.code) {
+              case 'LIMIT_FILE_SIZE':
+                next(ApiError.badRequest(
+                  `File too large. Maximum size: ${Math.round(config.maxFileSize / (1024 * 1024))}MB`,
+                  'FILE_TOO_LARGE'
+                ));
+                break;
+              case 'LIMIT_FILE_COUNT':
+                next(ApiError.badRequest('Only one file allowed', 'TOO_MANY_FILES'));
+                break;
+              case 'LIMIT_UNEXPECTED_FILE':
+                next(ApiError.badRequest('Use "image" field name', 'UNEXPECTED_FILE_FIELD'));
+                break;
+              default:
+                next(ApiError.badRequest(`Upload error: ${err.message}`, 'UPLOAD_ERROR'));
+            }
+          } else if (err) {
+            next(ApiError.badRequest(err.message, 'INVALID_FILE'));
+          } else {
+            next();
+          }
+          resolve();
+        });
       });
+    },
+    'file upload'
+  ),
+
+  // Upload image - delegate to service
+  uploadImage: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      if (!req.file) {
+        return next(ApiError.badRequest('No image file provided', 'MISSING_FILE'));
+      }
+
+      const userId = req.user!.id;
+      
+      // Delegate to service
+      const image = await imageService.uploadImage({
+        userId,
+        fileBuffer: req.file.buffer,
+        originalFilename: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+      });
+      
+      // Sanitize response
+      const safeImage = sanitization.sanitizeImageForResponse(image);
       
       res.status(201).json({
         status: 'success',
-        data: {
-          image
-        }
+        data: { image: safeImage },
+        message: 'Image uploaded successfully'
       });
-    } catch (error) {
-      next(error);
-    }
-  },
-  
-  async getImages(req: Request, res: Response, next: NextFunction) {
-    try {
-      if (!req.user) {
-        return next(ApiError.unauthorized('User not authenticated'));
-      }
+    },
+    'uploading'
+  ),
+
+  // Get images - delegate to service - FIXED: Proper type casting
+  getImages: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user!.id;
       
-      // Get all images for the user
-      const images = await imageModel.findByUserId(req.user.id);
+      // FIXED: Proper type handling for query parameters
+      const options = {
+        status: req.query.status as 'new' | 'processed' | 'labeled' | undefined,
+        limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+        offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined
+      };
+      
+      const images = await imageService.getUserImages(userId, options);
+      
+      // Sanitize response
+      const safeImages = images.map(image => 
+        sanitization.sanitizeImageForResponse(image)
+      );
       
       res.status(200).json({
         status: 'success',
-        data: {
-          images
+        data: { 
+          images: safeImages,
+          count: safeImages.length,
+          pagination: req.query.limit ? {
+            limit: options.limit,
+            offset: options.offset
+          } : undefined
         }
       });
-    } catch (error) {
-      next(error);
-    }
-  },
-  
-  async getImage(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
+    },
+    'retrieving'
+  ),
+
+  // Get single image - delegate to service
+  getImage: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user!.id;
+      const imageId = req.params.id; // Already validated by middleware
       
-      if (!req.user) {
-        return next(ApiError.unauthorized('User not authenticated'));
-      }
-      
-      // Get the image
-      const image = await imageModel.findById(id);
-      
-      if (!image) {
-        return next(ApiError.notFound('Image not found'));
-      }
-      
-      // Check if the image belongs to the user
-      if (image.user_id !== req.user.id) {
-        return next(ApiError.forbidden('You do not have permission to access this image'));
-      }
+      const image = await imageService.getImageById(imageId, userId);
+      const safeImage = sanitization.sanitizeImageForResponse(image);
       
       res.status(200).json({
         status: 'success',
-        data: {
-          image
-        }
+        data: { image: safeImage }
       });
-    } catch (error) {
-      next(error);
-    }
-  },
-  
-  async deleteImage(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
+    },
+    'retrieving'
+  ),
+
+  // Update image status - delegate to service
+  updateImageStatus: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user!.id;
+      const imageId = req.params.id; // Already validated by middleware
+      const { status } = req.body; // Already validated by middleware
       
-      if (!req.user) {
-        return next(ApiError.unauthorized('User not authenticated'));
-      }
-      
-      // Get the image
-      const image = await imageModel.findById(id);
-      
-      if (!image) {
-        return next(ApiError.notFound('Image not found'));
-      }
-      
-      // Check if the image belongs to the user
-      if (image.user_id !== req.user.id) {
-        return next(ApiError.forbidden('You do not have permission to delete this image'));
-      }
-      
-      // Delete the file
-      await storageService.deleteFile(image.file_path);
-      
-      // Delete from database
-      await imageModel.delete(id);
+      const updatedImage = await imageService.updateImageStatus(imageId, userId, status);
+      const safeImage = sanitization.sanitizeImageForResponse(updatedImage);
       
       res.status(200).json({
         status: 'success',
-        data: null
+        data: { image: safeImage },
+        message: `Image status updated to ${status}`
       });
-    } catch (error) {
-      next(error);
-    }
-  }
+    },
+    'updating status'
+  ),
+
+  // Generate thumbnail - delegate to service
+  generateThumbnail: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user!.id;
+      const imageId = req.params.id; // Already validated by middleware
+      const size = parseInt(req.query.size as string) || 200;
+      
+      // Validate size parameter
+      if (size < 50 || size > 500) {
+        return next(ApiError.badRequest('Thumbnail size must be between 50 and 500 pixels', 'INVALID_SIZE'));
+      }
+      
+      const result = await imageService.generateThumbnail(imageId, userId, size);
+      
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        message: 'Thumbnail generated successfully'
+      });
+    },
+    'generating thumbnail'
+  ),
+
+  // Optimize image - delegate to service
+  optimizeImage: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user!.id;
+      const imageId = req.params.id; // Already validated by middleware
+      
+      const result = await imageService.optimizeForWeb(imageId, userId);
+      
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        message: 'Image optimized successfully'
+      });
+    },
+    'optimizing'
+  ),
+
+  // Delete image - delegate to service
+  deleteImage: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user!.id;
+      const imageId = req.params.id; // Already validated by middleware
+      
+      await imageService.deleteImage(imageId, userId);
+      
+      res.status(200).json({
+        status: 'success',
+        data: null,
+        message: 'Image deleted successfully'
+      });
+    },
+    'deleting'
+  ),
+
+  // Get user stats - delegate to service
+  getUserStats: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user!.id;
+      
+      const stats = await imageService.getUserImageStats(userId);
+      
+      res.status(200).json({
+        status: 'success',
+        data: { stats }
+      });
+    },
+    'retrieving stats'
+  ),
+
+  // Batch update status - delegate to service
+  batchUpdateStatus: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user!.id;
+      const { imageIds, status } = req.body; // Already validated by middleware
+      
+      const result = await imageService.batchUpdateStatus(imageIds, userId, status);
+      
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        message: `Batch updated ${result.updatedCount} of ${result.total} images`
+      });
+    },
+    'batch updating'
+  )
 };

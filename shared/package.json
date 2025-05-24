@@ -1,24 +1,125 @@
 {
   "name": "@koutu/shared",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.0.0",
+  "description": "Shared validation schemas and utilities for Koutu backend and mobile",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist/",
+    "src/"
+  ],
   "scripts": {
     "build": "tsc",
+    "build:watch": "tsc --watch",
     "dev": "tsc --watch",
-    "test": "jest --config jest.config.cjs",
-    "test:watch": "jest --config jest.config.cjs --watch",
-    "test:coverage": "jest --config jest.config.cjs --coverage"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "type-check": "tsc --noEmit",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run clean && npm run build"
   },
+  "keywords": [
+    "validation",
+    "zod",
+    "schemas",
+    "typescript",
+    "react-native",
+    "node"
+  ],
+  "author": "Koutu Team",
+  "license": "MIT",
   "dependencies": {
-    "zod": "^3.21.4"
+    "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.3",
-    "cross-env": "^7.0.3",
-    "jest": "^29.6.1",
+    "@types/jest": "^29.5.5",
+    "@types/node": "^20.8.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.5",
+    "@typescript-eslint/parser": "^6.7.5",
+    "eslint": "^8.51.0",
+    "jest": "^29.7.0",
+    "rimraf": "^5.0.5",
     "ts-jest": "^29.1.1",
-    "typescript": "^5.1.6"
+    "typescript": "^5.2.2"
+  },
+  "peerDependencies": {
+    "react": ">=17.0.0",
+    "react-native": ">=0.70.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-native": {
+      "optional": true
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    },
+    "./schemas/api": {
+      "types": "./dist/schemas/api/index.d.ts",
+      "require": "./dist/schemas/api/index.js",
+      "import": "./dist/schemas/api/index.mjs"
+    },
+    "./schemas/base": {
+      "types": "./dist/schemas/base/common.d.ts",
+      "require": "./dist/schemas/base/common.js",
+      "import": "./dist/schemas/base/common.mjs"
+    },
+    "./validators": {
+      "types": "./dist/validators/index.d.ts",
+      "require": "./dist/validators/index.js",
+      "import": "./dist/validators/index.mjs"
+    },
+    "./validators/platform/backend": {
+      "types": "./dist/validators/platform/backend.d.ts",
+      "require": "./dist/validators/platform/backend.js",
+      "import": "./dist/validators/platform/backend.mjs"
+    },
+    "./validators/platform/mobile": {
+      "types": "./dist/validators/platform/mobile.d.ts",
+      "require": "./dist/validators/platform/mobile.js",
+      "import": "./dist/validators/platform/mobile.mjs"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/koutu/koutu-shared.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": ["<rootDir>/src"],
+    "testMatch": ["**/__tests__/**/*.ts", "**/?(*.)+(spec|test).ts"],
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/*.d.ts",
+      "!src/**/__tests__/**",
+      "!src/**/index.ts"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": ["text", "lcov", "html"]
+  },
+  "eslintConfig": {
+    "parser": "@typescript-eslint/parser",
+    "extends": [
+      "eslint:recommended",
+      "@typescript-eslint/recommended"
+    ],
+    "rules": {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+      "prefer-const": "error",
+      "no-var": "error"
+    }
   }
 }
