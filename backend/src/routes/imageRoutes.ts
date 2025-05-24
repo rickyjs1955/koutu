@@ -15,11 +15,10 @@ import {
   UUIDParamSchema,
   UpdateImageStatusSchema,
   validateBody,
-  ImageStatusSchema,
-  UUIDSchema
 } from '../validators/schemas';
 import { requestIdMiddleware } from '../middlewares/errorHandler';
 import { z } from 'zod';
+import { UUIDSchema, ImageStatusSchema } from '@koutu/shared/schemas/base/common';
 
 const router = express.Router();
 
