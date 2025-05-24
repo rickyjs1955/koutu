@@ -114,7 +114,7 @@ Backend:
 8. /backend/src/controllers/wardrobeController.ts
 9. /backend/src/controllers/polygonController.ts
 10. /backend/src/controllers/oauthController.ts
-11. /backend/src/middlewares/auth.ts ✅Unit 
+11. /backend/src/middlewares/auth.ts ✅Unit ✅Integration ✅Security
 12. /backend/src/middlewares/errorHandler.ts
 13. /backend/src/middlewares/validate.ts
 14. /backend/src/models/userModel.ts
