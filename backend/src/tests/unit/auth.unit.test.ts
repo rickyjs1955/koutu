@@ -296,7 +296,7 @@ describe('Authentication Middleware', () => {
     });
   });
 
-    describe('authorizeResource', () => {
+  describe('authorizeResource', () => {
     const validUUID = generateTestUUID();
     const invalidUUID = generateInvalidUUID();
 
@@ -765,51 +765,51 @@ describe('Authentication Middleware', () => {
   });
 
   describe('edge cases and error handling', () => {
-  it('should handle missing JWT secret', async () => {
-    mockConfig.jwtSecret = undefined;
-    mockJWT.verify.mockImplementation(() => {
-      throw new Error('secret required');
+    it('should handle missing JWT secret', async () => {
+      mockConfig.jwtSecret = undefined;
+      mockJWT.verify.mockImplementation(() => {
+        throw new Error('secret required');
+      });
+
+      const req = createRequestWithValidToken();
+      
+      await authenticate(req as Request, mockRes as Response, mockNext);
+
+      expect(mockApiError.internal).toHaveBeenCalledWith('Authentication error');
     });
 
-    const req = createRequestWithValidToken();
-    
-    await authenticate(req as Request, mockRes as Response, mockNext);
+    it('should handle concurrent rate limit requests', () => {
+      // Explicitly clear rate limit cache and create fresh middleware
+      cleanupRateLimitCache();
+      jest.clearAllMocks();
+      
+      const middleware = rateLimitByUser(1, 1000); // Very strict limit for this test
+      const req = createAuthenticatedRequest();
+      const mockNext1 = jest.fn();
+      const mockNext2 = jest.fn();
 
-    expect(mockApiError.internal).toHaveBeenCalledWith('Authentication error');
+      // First request should succeed
+      middleware(req as Request, mockRes as Response, mockNext1);
+      expect(mockNext1).toHaveBeenCalledWith();
+
+      // Second request should be rate limited
+      middleware(req as Request, mockRes as Response, mockNext2);
+      expect(mockApiError.rateLimited).toHaveBeenCalled();
+      expect(mockNext2).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'rateLimited'
+        })
+      );
+    });
+
+    it('should handle malformed JWT payload', async () => {
+      mockJWT.verify.mockReturnValue({ invalid: 'payload' });
+      const req = createRequestWithValidToken();
+      
+      await authenticate(req as Request, mockRes as Response, mockNext);
+
+      // Should handle missing id/email gracefully
+      expect(mockUserModel.findById).toHaveBeenCalledWith(undefined);
+    });
   });
-
-  it('should handle concurrent rate limit requests', () => {
-    // Explicitly clear rate limit cache and create fresh middleware
-    cleanupRateLimitCache();
-    jest.clearAllMocks();
-    
-    const middleware = rateLimitByUser(1, 1000); // Very strict limit for this test
-    const req = createAuthenticatedRequest();
-    const mockNext1 = jest.fn();
-    const mockNext2 = jest.fn();
-
-    // First request should succeed
-    middleware(req as Request, mockRes as Response, mockNext1);
-    expect(mockNext1).toHaveBeenCalledWith();
-
-    // Second request should be rate limited
-    middleware(req as Request, mockRes as Response, mockNext2);
-    expect(mockApiError.rateLimited).toHaveBeenCalled();
-    expect(mockNext2).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'rateLimited'
-      })
-    );
-  });
-
-  it('should handle malformed JWT payload', async () => {
-    mockJWT.verify.mockReturnValue({ invalid: 'payload' });
-    const req = createRequestWithValidToken();
-    
-    await authenticate(req as Request, mockRes as Response, mockNext);
-
-    // Should handle missing id/email gracefully
-    expect(mockUserModel.findById).toHaveBeenCalledWith(undefined);
-  });
-});
 });
