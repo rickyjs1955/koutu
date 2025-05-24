@@ -88,6 +88,7 @@ import {
   authorizeWardrobe,
   optionalAuth,
   rateLimitByUser,
+  rateLimitCache,
   cleanupRateLimitCache
 } from '../../middlewares/auth';
 
@@ -99,6 +100,9 @@ describe('Authentication Middleware', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setupJWTMocks(mockJWT);
+    
+    // Clear rate limit cache before each test
+    rateLimitCache.clear();
     
     mockReq = { headers: {}, params: {} };
     
@@ -135,15 +139,15 @@ describe('Authentication Middleware', () => {
   afterEach(() => {
     cleanupTest();
     // Clear rate limit cache between tests
-    cleanupRateLimitCache();
+    rateLimitCache.clear();
   });
 
   afterAll(() => {
     // Clear all timers to prevent Jest from hanging
     jest.clearAllTimers();
     jest.useRealTimers();
-    // Clear the interval that's keeping Jest open
-    cleanupRateLimitCache();
+    // Clear the cache
+    rateLimitCache.clear();
   });
 
   describe('authenticate', () => {
@@ -674,15 +678,13 @@ describe('Authentication Middleware', () => {
   });
 
   describe('rateLimitByUser', () => {
-    let middleware: ReturnType<typeof rateLimitByUser>;
-
     beforeEach(() => {
       // Clear rate limit cache before each test
-      cleanupRateLimitCache();
-      middleware = rateLimitByUser(2, 1000); // 2 requests per second for testing
+      rateLimitCache.clear();
     });
 
     it('should allow requests under rate limit', () => {
+      const middleware = rateLimitByUser(2, 1000); // 2 requests per second for testing
       const req = createAuthenticatedRequest();
       
       middleware(req as Request, mockRes as Response, mockNext);
@@ -691,6 +693,7 @@ describe('Authentication Middleware', () => {
     });
 
     it('should skip rate limiting for unauthenticated requests', () => {
+      const middleware = rateLimitByUser(2, 1000);
       const req = createUnauthenticatedRequest();
       
       middleware(req as Request, mockRes as Response, mockNext);
@@ -699,19 +702,21 @@ describe('Authentication Middleware', () => {
     });
 
     it('should reject requests when rate limit exceeded', () => {
+      const middleware = rateLimitByUser(1, 1000); // Very strict limit for this test
       const req = createAuthenticatedRequest();
 
-      // Make requests up to the limit
-      middleware(req as Request, mockRes as Response, mockNext);
-      middleware(req as Request, mockRes as Response, mockNext);
+      // First request should succeed
+      const mockNext1 = jest.fn();
+      middleware(req as Request, mockRes as Response, mockNext1);
+      expect(mockNext1).toHaveBeenCalledWith();
       
-      // This should be rejected
-      const mockNextThird = jest.fn();
-      middleware(req as Request, mockRes as Response, mockNextThird);
+      // Second request should be rejected
+      const mockNext2 = jest.fn();
+      middleware(req as Request, mockRes as Response, mockNext2);
 
       expect(mockApiError.rateLimited).toHaveBeenCalledWith(
         expect.stringContaining('Rate limit exceeded'),
-        2,
+        1,
         1000,
         expect.any(Number)
       );
@@ -738,6 +743,7 @@ describe('Authentication Middleware', () => {
     });
 
     it('should handle different users separately', () => {
+      const middleware = rateLimitByUser(2, 1000);
       const req1 = createAuthenticatedRequest('user1');
       const req2 = createAuthenticatedRequest('user2');
 
@@ -776,30 +782,6 @@ describe('Authentication Middleware', () => {
       await authenticate(req as Request, mockRes as Response, mockNext);
 
       expect(mockApiError.internal).toHaveBeenCalledWith('Authentication error');
-    });
-
-    it('should handle concurrent rate limit requests', () => {
-      // Explicitly clear rate limit cache and create fresh middleware
-      cleanupRateLimitCache();
-      jest.clearAllMocks();
-      
-      const middleware = rateLimitByUser(1, 1000); // Very strict limit for this test
-      const req = createAuthenticatedRequest();
-      const mockNext1 = jest.fn();
-      const mockNext2 = jest.fn();
-
-      // First request should succeed
-      middleware(req as Request, mockRes as Response, mockNext1);
-      expect(mockNext1).toHaveBeenCalledWith();
-
-      // Second request should be rate limited
-      middleware(req as Request, mockRes as Response, mockNext2);
-      expect(mockApiError.rateLimited).toHaveBeenCalled();
-      expect(mockNext2).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'rateLimited'
-        })
-      );
     });
 
     it('should handle malformed JWT payload', async () => {

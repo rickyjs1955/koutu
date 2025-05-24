@@ -11,7 +11,7 @@ import { polygonModel } from '../models/polygonModel';
 import { wardrobeModel } from '../models/wardrobeModel';
 
 // Rate limiting cache
-const rateLimitCache = new Map<string, { count: number; resetTime: number }>();
+export const rateLimitCache = new Map<string, { count: number; resetTime: number }>();
 
 // Store the interval ID for proper cleanup
 let cleanupIntervalId: NodeJS.Timeout | null = null;
@@ -54,7 +54,9 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       } else if (jwtError.name === 'JsonWebTokenError') {
         return next(ApiError.authentication('Invalid authentication token', 'invalid_token'));
       }
-      throw jwtError;
+      // For unexpected JWT errors, log but still throw a generic error
+      console.error('Authentication middleware error:', jwtError);
+      return next(ApiError.internal('Authentication error'));
     }
   } catch (error: any) {
     console.error('Authentication middleware error:', error);
@@ -88,6 +90,11 @@ export const authorizeResource = (
       const resourceId = req.params[paramName];
       if (!resourceId) {
         return next(ApiError.badRequest(`Missing ${paramName} parameter`));
+      }
+
+      // Handle array parameters (parameter pollution)
+      if (Array.isArray(resourceId)) {
+        return next(ApiError.badRequest(`Invalid ${resourceType} ID format`, 'INVALID_UUID'));
       }
 
       // Validate UUID format
@@ -200,14 +207,13 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
       }
     } catch (jwtError: any) {
       // Log the error but continue without authentication
-      console.log('Optional auth failed:', jwtError);
+      console.log('Optional auth failed:', jwtError.message);
     }
     
     next();
   } catch (error: any) {
     // Log the error but continue without authentication
-    console.log('Optional auth failed:', error);
-    console.error('Authentication middleware error:', error);
+    console.log('Optional auth failed:', error.message);
     next();
   }
 };
@@ -259,10 +265,6 @@ export const cleanupRateLimitCache = () => {
       rateLimitCache.delete(userId);
     }
   }
-  // Clear all entries for testing
-  if (process.env.NODE_ENV === 'test') {
-    rateLimitCache.clear();
-  }
 };
 
 /**
@@ -282,13 +284,12 @@ export const stopCleanup = () => {
     clearInterval(cleanupIntervalId);
     cleanupIntervalId = null;
   }
-  rateLimitCache.clear();
+  if (process.env.NODE_ENV === 'test') {
+    rateLimitCache.clear();
+  }
 };
 
 // Initialize cleanup only in non-test environments
 if (process.env.NODE_ENV !== 'test') {
   initializeCleanup();
 }
-
-// Export for testing
-export { rateLimitCache };

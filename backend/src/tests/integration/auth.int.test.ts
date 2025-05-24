@@ -97,7 +97,7 @@ import {
   authorizeResource,
   optionalAuth,
   rateLimitByUser,
-  cleanupRateLimitCache
+  rateLimitCache
 } from '../../middlewares/auth';
 
 // Test data
@@ -174,7 +174,7 @@ describe('Auth Middleware Integration Tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    cleanupRateLimitCache();
+    rateLimitCache.clear();
 
     // Recreate app for each test to ensure clean state
     app = express();
@@ -243,7 +243,7 @@ describe('Auth Middleware Integration Tests', () => {
   });
 
   afterEach(() => {
-    cleanupRateLimitCache();
+    rateLimitCache.clear();
   });
 
   describe('Authentication Flow Integration', () => {
@@ -534,6 +534,9 @@ describe('Auth Middleware Integration Tests', () => {
 
   describe('Rate Limiting Integration', () => {
     beforeEach(() => {
+      // Clear cache before each test
+      rateLimitCache.clear();
+      
       // Setup rate limited route
       app.get('/rate-limited', 
         authenticate, 
@@ -585,6 +588,9 @@ describe('Auth Middleware Integration Tests', () => {
     });
 
     it('should handle different users separately', async () => {
+      // Clear cache again to ensure clean state
+      rateLimitCache.clear();
+      
       // Setup second user
       const secondUser = { ...testUser, id: 'different-user-id', email: 'different@test.com' };
       const secondToken = 'second.user.token';
@@ -618,6 +624,9 @@ describe('Auth Middleware Integration Tests', () => {
 
   describe('Complete Auth Flow Integration', () => {
     beforeEach(() => {
+      // Clear cache before each test
+      rateLimitCache.clear();
+      
       // Setup a complete protected endpoint
       app.get('/protected-images/:id',
         authenticate,           // Step 1: Authenticate user
