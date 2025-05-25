@@ -28,11 +28,20 @@ export const oauthConfig = {
     authUrl: 'https://github.com/login/oauth/authorize',
     tokenUrl: 'https://github.com/login/oauth/access_token',
     userInfoUrl: 'https://api.github.com/user',
+  },
+  instagram: {
+    clientId: config.oauth?.instagramClientId || '',
+    clientSecret: config.oauth?.instagramClientSecret || '',
+    redirectUri: `${config.appUrl}/api/v1/oauth/instagram/callback`,
+    scope: 'user_profile,user_media',
+    authUrl: 'https://api.instagram.com/oauth/authorize',
+    tokenUrl: 'https://api.instagram.com/oauth/access_token',
+    userInfoUrl: 'https://graph.instagram.com/me',
   }
 };
 
 // Generate OAuth provider authorization URLs
-export const getAuthorizationUrl = (provider: 'google' | 'microsoft' | 'github', state: string): string => {
+export const getAuthorizationUrl = (provider: 'google' | 'microsoft' | 'github' | 'instagram', state: string): string => {
   const config = oauthConfig[provider];
   const params = new URLSearchParams({
     client_id: config.clientId,

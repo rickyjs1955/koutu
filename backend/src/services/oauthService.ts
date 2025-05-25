@@ -8,7 +8,7 @@ import { ApiError } from '../utils/ApiError';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { config } from '../config';
 
-type OAuthProvider = 'google' | 'microsoft' | 'github';
+type OAuthProvider = 'google' | 'microsoft' | 'github' | 'instagram';
 
 interface OAuthTokenResponse {
   access_token: string;
@@ -37,6 +37,29 @@ export const oauthService = {
     const providerConfig = oauthConfig[provider];
     
     try {
+      // Instagram uses different token exchange format
+      if (provider === 'instagram') {
+        const formData = new URLSearchParams();
+        formData.append('client_id', providerConfig.clientId);
+        formData.append('client_secret', providerConfig.clientSecret);
+        formData.append('grant_type', 'authorization_code');
+        formData.append('redirect_uri', providerConfig.redirectUri);
+        formData.append('code', code);
+
+        const tokenResponse = await axios.post(
+          providerConfig.tokenUrl,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              Accept: 'application/json'
+            }
+          }
+        );
+
+        return tokenResponse.data;
+      }
+
       const tokenResponse = await axios.post(
         providerConfig.tokenUrl,
         {
@@ -71,7 +94,14 @@ export const oauthService = {
     const providerConfig = oauthConfig[provider];
     
     try {
-      const userInfoResponse = await axios.get(providerConfig.userInfoUrl, {
+      let userInfoUrl = providerConfig.userInfoUrl;
+      
+      // Instagram requires specific fields parameter
+      if (provider === 'instagram') {
+        userInfoUrl = `${providerConfig.userInfoUrl}?fields=id,username,account_type`;
+      }
+
+      const userInfoResponse = await axios.get(userInfoUrl, {
         headers: {
           Authorization: `Bearer ${accessToken}`
         }
@@ -111,6 +141,15 @@ export const oauthService = {
             name: userData.name,
             picture: userData.avatar_url
           };
+        case 'instagram':
+          // Instagram Basic Display API doesn't provide email
+          // You might need to request it separately or use a placeholder
+          return {
+            id: userData.id.toString(),
+            email: `${userData.username}@instagram.local`, // Placeholder email
+            name: userData.username,
+            picture: userData.profile_picture_url || ''
+          };
         default:
           throw new Error(`Unsupported provider: ${provider}`);
       }
@@ -134,13 +173,16 @@ export const oauthService = {
       return existingUser;
     }
     
-    // Check if user exists with the same email
-    const userByEmail = await userModel.findByEmail(userInfo.email);
-    
-    if (userByEmail) {
-      // Link this OAuth account to the existing user
-      await this.linkOAuthProviderToUser(userByEmail.id, provider, userInfo);
-      return userByEmail;
+    // For Instagram, since we don't get real email, check by OAuth ID only
+    if (provider !== 'instagram') {
+      // Check if user exists with the same email
+      const userByEmail = await userModel.findByEmail(userInfo.email);
+      
+      if (userByEmail) {
+        // Link this OAuth account to the existing user
+        await this.linkOAuthProviderToUser(userByEmail.id, provider, userInfo);
+        return userByEmail;
+      }
     }
     
     // Create a new user

@@ -115,7 +115,7 @@ Backend:
 9. /backend/src/controllers/polygonController.ts
 10. /backend/src/controllers/oauthController.ts
 11. /backend/src/middlewares/auth.ts ✅Unit ✅Integration ✅Security
-12. /backend/src/middlewares/errorHandler.ts
+12. /backend/src/middlewares/errorHandler.ts ✅Unit ✅Integration ✅Security
 13. /backend/src/middlewares/validate.ts
 14. /backend/src/models/userModel.ts
 15. /backend/src/models/db.ts
@@ -142,7 +142,7 @@ Backend:
 36. /backend/src/services/garmentService.ts
 37. /backend/src/services/imageService.ts
 38. /backend/src/services/polygonService.ts
-39. /backend/src/utils/ApiError.ts
+39. /backend/src/utils/ApiError.ts ✅Unit ✅Integration ✅Security
 40. /backend/src/utils/sanitize.ts
 41. /backend/src/utils/modelUtils.ts
 42. /backend/src/utils/testSetup.ts

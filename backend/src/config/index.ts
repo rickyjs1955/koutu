@@ -58,6 +58,8 @@ export const config = {
     microsoftClientSecret: process.env.MICROSOFT_CLIENT_SECRET,
     githubClientId: process.env.GITHUB_CLIENT_ID,
     githubClientSecret: process.env.GITHUB_CLIENT_SECRET,
+    instagramClientId: process.env.INSTAGRAM_CLIENT_ID,
+    instagramClientSecret: process.env.INSTAGRAM_CLIENT_SECRET,
   },
 };
 

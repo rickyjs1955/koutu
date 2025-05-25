@@ -5,7 +5,8 @@ import { z } from 'zod';
 export const OAuthProviderSchema = z.enum([
   'google',
   'microsoft',
-  'github'
+  'github',
+  'instagram'
 ]);
 
 // OAuth user info schema

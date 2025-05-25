@@ -29,6 +29,21 @@ const GithubIcon = () => (
   </svg>
 );
 
+const InstagramIcon = () => (
+  <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="instagram-gradient" cx="50%" cy="50%" fx="25%" fy="25%">
+        <stop offset="0%" stopColor="#833ab4"/>
+        <stop offset="50%" stopColor="#fd1d1d"/>
+        <stop offset="100%" stopColor="#fcb045"/>
+      </radialGradient>
+    </defs>
+    <rect x="2" y="2" width="20" height="20" rx="5" ry="5" fill="url(#instagram-gradient)"/>
+    <circle cx="12" cy="12" r="4" fill="none" stroke="white" strokeWidth="2"/>
+    <circle cx="18" cy="6" r="1.5" fill="white"/>
+  </svg>
+);
+
 interface SSOButtonsProps {
   redirectUrl?: string;
 }
@@ -53,27 +68,38 @@ const SSOButtons: React.FC<SSOButtonsProps> = ({ redirectUrl = '' }) => {
         </div>
       </div>
       
-      <div className="grid grid-cols-3 gap-3">
-        <a
-          href={getAuthUrl('google')}
-          className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-        >
-          <GoogleIcon />
-        </a>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2">
+          <a
+            href={getAuthUrl('google')}
+            className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+          >
+            <GoogleIcon />
+          </a>
+          
+          <a
+            href={getAuthUrl('microsoft')}
+            className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+          >
+            <MicrosoftIcon />
+          </a>
+        </div>
         
-        <a
-          href={getAuthUrl('microsoft')}
-          className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-        >
-          <MicrosoftIcon />
-        </a>
-        
-        <a
-          href={getAuthUrl('github')}
-          className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-        >
-          <GithubIcon />
-        </a>
+        <div className="grid grid-cols-2 gap-2">
+          <a
+            href={getAuthUrl('github')}
+            className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+          >
+            <GithubIcon />
+          </a>
+          
+          <a
+            href={getAuthUrl('instagram')}
+            className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+          >
+            <InstagramIcon />
+          </a>
+        </div>
       </div>
     </div>
   );
