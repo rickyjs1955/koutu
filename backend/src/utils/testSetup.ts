@@ -1,3 +1,4 @@
+import { cleanupTestFirebase, initializeTestFirebase, resetFirebaseEmulator } from '@/tests/__helpers__/firebase.helper';
 import { Pool } from 'pg';
 
 // Create a pool for the default postgres database to initialize koutu-postgres-test
@@ -27,6 +28,24 @@ const testPool = new Pool({
 // Override the query function for tests
 export const testQuery = async (text: string, params?: any[]) => {
   return testPool.query(text, params);
+};
+
+/**
+ * Wait for service to be available
+ */
+const waitForService = async (url: string, maxRetries = 30, interval = 1000): Promise<boolean> => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        return true;
+      }
+    } catch (error) {
+      // Service not ready yet
+    }
+    await new Promise(resolve => setTimeout(resolve, interval));
+  }
+  return false;
 };
 
 /**
@@ -130,12 +149,54 @@ export const setupTestDatabase = async () => {
 };
 
 /**
- * Clean up test database resources
+ * Setup Firebase emulator for tests
+ */
+export const setupFirebaseEmulator = async () => {
+  try {
+    console.log('Waiting for Firebase emulators to be ready...');
+    
+    // Wait for all emulators to be available (updated ports)
+    const emulatorChecks = [
+      waitForService('http://localhost:4001'), // UI (updated port)
+      waitForService('http://localhost:9099'), // Auth (updated port)
+      waitForService('http://localhost:9100'), // Firestore (updated port)
+      waitForService('http://localhost:9199')  // Storage (same port)
+    ];
+
+    const results = await Promise.all(emulatorChecks);
+    const allReady = results.every(ready => ready);
+
+    if (!allReady) {
+      throw new Error('Firebase emulators are not ready. Make sure Docker containers are running.');
+    }
+
+    // Initialize Firebase for testing
+    initializeTestFirebase();
+    
+    // Reset emulator data
+    await resetFirebaseEmulator();
+    
+    console.log('Firebase emulators initialized successfully');
+    console.log('Firebase UI available at: http://localhost:4001');
+  } catch (error) {
+    console.error('Firebase emulator setup failed:', error);
+    throw error;
+  }
+};
+
+/**
+ * Clean up test database and Firebase resources
  */
 export const teardownTestDatabase = async () => {
   try {
     await testPool.end();
   } catch (error) {
     console.error('Failed to close testPool:', error);
+  }
+
+  try {
+    await cleanupTestFirebase();
+  } catch (error) {
+    console.error('Failed to cleanup Firebase:', error);
   }
 };

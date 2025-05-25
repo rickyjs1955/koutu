@@ -1,28 +1,41 @@
-// backend/jest.config.cjs
-/** @type {import('jest').Config} */
+// /Koutu/backend/jest.config.cjs - Clean version without global setup
 module.exports = {
-    preset: 'ts-jest',
-    testEnvironment: 'node',
-    roots: ['<rootDir>/src'],
-    testMatch: ['**/__tests__/**/*.ts', '**/?(*.)+(spec|test).ts'],
-    transform: {
-      '^.+\\.tsx?$': ['ts-jest']
-    },
-    setupFilesAfterEnv: ['./src/utils/testSetup.ts'],
-    moduleNameMapper: {
-      '^(\\.{1,2}/.*)\\.js$': '$1',
-      '^@/(.*)$': '<rootDir>/src/$1',
-      '^@koutu/shared/(.*)$': '<rootDir>/../shared/src/$1',
-    },
-    moduleFileExtensions: ['ts', 'js', 'json', 'node'],
-    setupFiles: ['dotenv/config', '<rootDir>/jest.setup.ts'],
-    testTimeout: 10000,
-    collectCoverageFrom: [
-      '<rootDir>/src/**/*.ts',
-      '!<rootDir>/src/**/*.d.ts',
-      '!<rootDir>/src/**/*.test.ts',
-      '!<rootDir>/src/types/**/*.ts',
-    ],
-    // Add verbose option for more detailed test output
-    verbose: true,
-  };
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  roots: ['<rootDir>/src'],
+  testMatch: [
+    '**/tests/**/*.test.ts',
+    '**/?(*.)+(spec|test).ts'
+  ],
+  transform: {
+    '^.+\\.ts$': 'ts-jest',
+  },
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.d.ts',
+    '!src/**/tests/**',
+    '!src/**/__mocks__/**',
+    '!src/**/__helpers__/**'
+  ],
+  setupFilesAfterEnv: [
+    '<rootDir>/src/tests/setup.ts'
+  ],
+  testTimeout: 60000,
+  maxWorkers: 1,
+  verbose: true,
+  forceExit: true,
+  detectOpenHandles: true,
+  
+  // Exclude dist folder to avoid duplicate mock conflicts
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/'
+  ],
+  
+  // Module name mapping
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1'
+  }
+  
+  // Removed global setup/teardown to avoid ES module issues
+};

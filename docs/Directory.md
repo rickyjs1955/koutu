@@ -104,8 +104,8 @@ Backend:
 
 
 Backend:
-1. /backend/src/config/index.ts
-2. /backend/src/config/firebase.ts
+1. /backend/src/config/index.ts ✅Unit ✅Integration ✅Security
+2. /backend/src/config/firebase.ts ✅Unit ❌Integration ❌Security
 3. /backend/src/config/oauth.ts
 4. /backend/src/controllers/garmentController.ts
 5. /backend/src/controllers/imageController.ts
@@ -143,7 +143,7 @@ Backend:
 37. /backend/src/services/imageService.ts
 38. /backend/src/services/polygonService.ts
 39. /backend/src/utils/ApiError.ts ✅Unit ✅Integration ✅Security
-40. /backend/src/utils/sanitize.ts
+40. /backend/src/utils/sanitize.ts ✅Unit ✅Integration ✅Security
 41. /backend/src/utils/modelUtils.ts
 42. /backend/src/utils/testSetup.ts
 43. /backend/src/utils/PolygonServiceUtils.ts

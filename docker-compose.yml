@@ -1,4 +1,4 @@
-version: '3.8'
+# Updated docker-compose.yml - Fix for Alpine/Ubuntu mismatch
 
 services:
   # Main development database
@@ -14,6 +14,8 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./docker/postgres/init-dev.sql:/docker-entrypoint-initdb.d/init-dev.sql
+    networks:
+      - koutu-network
 
   # Test database (separate instance)
   postgres-test:
@@ -24,11 +26,56 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: koutu_test
     ports:
-      - "5433:5432"  # Note: Different port to avoid conflicts
+      - "5433:5432"
     volumes:
       - postgres-test-data:/var/lib/postgresql/data
       - ./docker/postgres/init-test.sql:/docker-entrypoint-initdb.d/init-test.sql
+    networks:
+      - koutu-network
+
+  # Firebase Emulator Suite - FIXED VERSION
+  # Final Fixed Firebase Docker Configuration
+
+firebase-emulator:
+  image: node:18
+  container_name: koutu-firebase-emulator
+  working_dir: /app
+  command: >
+    bash -c "
+      echo 'Starting Firebase emulator setup...' &&
+      apt-get update && apt-get install -y curl default-jre &&
+      npm install -g firebase-tools@12.9.1 &&
+      echo 'Firebase CLI installed successfully' &&
+      echo 'Starting emulators...' &&
+      firebase emulators:start --only auth,firestore,storage --project demo-test-project --host 0.0.0.0
+    "
+  environment:
+    - FIREBASE_PROJECT=demo-test-project
+    - FIRESTORE_EMULATOR_HOST=0.0.0.0:9100
+    - FIREBASE_AUTH_EMULATOR_HOST=0.0.0.0:9099
+    - FIREBASE_STORAGE_EMULATOR_HOST=0.0.0.0:9199
+  ports:
+    - "4001:4000"   # Firebase UI
+    - "9099:9099"   # Auth Emulator
+    - "9100:9100"   # Firestore Emulator
+    - "9199:9199"   # Storage Emulator
+  volumes:
+    - ./docker/firebase:/app
+    - firebase-data:/app/data
+  networks:
+    - koutu-network
+  healthcheck:
+    test: ["CMD", "curl", "--fail", "http://localhost:4000"]
+    interval: 30s
+    timeout: 10s
+    retries: 5
+    start_period: 120s
 
 volumes:
   postgres-data:
   postgres-test-data:
+  firebase-data:
+
+networks:
+  koutu-network:
+    driver: bridge

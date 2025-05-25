@@ -1,373 +1,394 @@
-// /backend/src/tests/integration/firebase.int.test.ts
+// /Koutu/backend/src/__tests__/integration/firebase.int.test.ts
 
 import { jest } from '@jest/globals';
+import * as admin from 'firebase-admin';
+import { initializeTestFirebase, cleanupTestFirebase, resetFirebaseEmulator } from '../__helpers__/firebase.helper';
 
-// Define a reusable mock function for firebase-admin
-const createMockAdmin = () => ({
-    initializeApp: jest.fn(),
-    credential: {
-        cert: jest.fn((arg) => arg), // Return the input to allow inspection
-    },
-    storage: jest.fn(() => ({
-        bucket: jest.fn(() => ({})), // Default mock bucket
-    })),
-    apps: [] as Array<object>, // Start with no apps initialized
-});
+describe('Firebase Integration Tests', () => {
+    let firebaseServices: ReturnType<typeof initializeTestFirebase>;
 
-/**
- * Firebase Configuration Module Integration Test Suite
- * --------------------------------------------------
- * This suite tests the Firebase configuration module's initialization
- * and export logic in an isolated environment with mocked dependencies.
- *
- * Testing Approach:
- * - Isolation: Each test uses `jest.isolateModules` to ensure a fresh module state.
- * - Mocking: `firebase-admin` and `config` modules are mocked to control
- *   dependencies and prevent actual SDK calls.
- *
- * Key Focus Areas:
- * 1. Conditional Initialization:
- *    - Verify Firebase initializes only if no apps exist.
- *    - Confirm correct configuration is passed during initialization.
- * 2. Configuration Handling:
- *    - Test transformation of private keys (newline characters).
- *    - Test behavior with default vs. environment-specific config.
- *    - Test handling of undefined or invalid configuration values.
- * 3. Export Integrity:
- *    - Validate that `firebaseAdmin`, `storage`, and `bucket` are correctly exported
- *      and reflect the (mocked) SDK state.
- */
-describe('Firebase Configuration Module Integration Tests', () => {
-    const originalProcessEnv = { ...process.env };
+    beforeAll(async () => {
+        // Check if emulators are accessible before starting tests
+        const emulatorUrls = [
+        'http://localhost:4001',  // Firebase UI
+        'http://localhost:9099',  // Auth 
+        'http://localhost:9100',  // Firestore
+        'http://localhost:9199'   // Storage
+        ];
 
-    beforeEach(() => {
-        jest.resetModules(); // Ensures a clean slate for modules between tests
-        process.env = { ...originalProcessEnv }; // Reset environment variables
-        jest.clearAllMocks(); // Clear mock call history
+        console.log('🔍 Checking Firebase emulator accessibility...');
+        
+        const checks = await Promise.allSettled(
+        emulatorUrls.map(async (url) => {
+            const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+            return { url, ok: response.ok, status: response.status };
+        })
+        );
+
+        const workingEmulators = checks.filter(
+        (result): result is PromiseFulfilledResult<any> => 
+            result.status === 'fulfilled' && result.value.ok
+        );
+
+        if (workingEmulators.length === 0) {
+        console.error('❌ No Firebase emulators are accessible!');
+        console.error('   Make sure to run: npm run docker:test-up');
+        console.error('   And wait for emulators to start (30-60 seconds)');
+        throw new Error('Firebase emulators not accessible. Integration tests cannot run.');
+        }
+
+        console.log(`✅ Found ${workingEmulators.length}/4 Firebase emulators accessible`);
+        workingEmulators.forEach(result => {
+        console.log(`   - ${result.value.url}: ${result.value.status}`);
+        });
+
+        // Initialize Firebase services
+        firebaseServices = initializeTestFirebase();
     });
 
-    afterAll(() => {
-        process.env = originalProcessEnv; // Restore original environment variables
+    afterAll(async () => {
+        await cleanupTestFirebase();
     });
 
-    test('should initialize Firebase Admin SDK when no app exists', () => {
-        jest.isolateModules(() => {
-            const mockAdmin = createMockAdmin();
-            mockAdmin.apps = []; // Ensure no apps are pre-existing
-            jest.doMock('firebase-admin', () => mockAdmin);
+    beforeEach(async () => {
+        // Reset emulator data before each test
+        try {
+        await resetFirebaseEmulator();
+        } catch (error) {
+        console.warn('Failed to reset Firebase emulator:', error);
+        }
+    });
 
-            jest.doMock('../../config/index', () => ({
-                config: {
-                    firebase: {
-                        projectId: 'test-project-env',
-                        privateKey: 'line1\\nline2-env',
-                        clientEmail: 'test-env@example.com',
-                        storageBucket: 'test-bucket-env',
-                    },
-                },
-            }));
+    describe('Firebase Emulator Connection', () => {
+        it('should connect to Firebase emulators with correct ports', () => {
+        expect(process.env.FIRESTORE_EMULATOR_HOST).toBe('localhost:9100');
+        expect(process.env.FIREBASE_AUTH_EMULATOR_HOST).toBe('localhost:9099');
+        expect(process.env.FIREBASE_STORAGE_EMULATOR_HOST).toBe('localhost:9199');
+        });
 
-            // Require the module under test *after* setting up mocks
-            require('../../config/firebase');
+        it('should initialize Firebase Admin SDK correctly', () => {
+        expect(firebaseServices.firebaseAdmin).toBeDefined();
+        expect(firebaseServices.storage).toBeDefined();
+        expect(firebaseServices.bucket).toBeDefined();
+        });
 
-            expect(mockAdmin.initializeApp).toHaveBeenCalledTimes(1);
-            expect(mockAdmin.initializeApp).toHaveBeenCalledWith({
-                credential: expect.objectContaining({
-                    projectId: 'test-project-env',
-                    privateKey: 'line1\nline2-env', // Transformed private key
-                    clientEmail: 'test-env@example.com',
-                }),
-                storageBucket: 'test-bucket-env',
-            });
+        it('should use test project configuration', () => {
+        expect(firebaseServices.firebaseAdmin.options.projectId).toBe('demo-test-project');
         });
     });
 
-    test('should not initialize Firebase Admin SDK if an app already exists', () => {
-        jest.isolateModules(() => {
-            const mockAdmin = createMockAdmin();
-            mockAdmin.apps = [{}]; // Simulate an existing app
-            jest.doMock('firebase-admin', () => mockAdmin);
+    describe('Firebase Auth Integration', () => {
+        it('should create and retrieve a user', async () => {
+        const auth = admin.auth(firebaseServices.firebaseAdmin);
+        
+        // Create user
+        const userRecord = await auth.createUser({
+            email: 'test@example.com',
+            password: 'testpassword123',
+            displayName: 'Test User'
+        });
 
-            jest.doMock('../../config/index', () => ({ // Mock config to prevent errors
-                config: {
-                    firebase: {
-                        projectId: 'test-project',
-                        privateKey: 'test-key',
-                        clientEmail: 'test@example.com',
-                        storageBucket: 'test-bucket',
-                    },
-                },
-            }));
+        expect(userRecord.uid).toBeDefined();
+        expect(userRecord.email).toBe('test@example.com');
+        expect(userRecord.displayName).toBe('Test User');
 
-            require('../../config/firebase');
+        // Retrieve user
+        const retrievedUser = await auth.getUser(userRecord.uid);
+        expect(retrievedUser.email).toBe('test@example.com');
+        expect(retrievedUser.displayName).toBe('Test User');
 
-            expect(mockAdmin.initializeApp).not.toHaveBeenCalled();
+        // Cleanup
+        await auth.deleteUser(userRecord.uid);
+        });
+
+        it('should handle user not found error', async () => {
+        const auth = admin.auth(firebaseServices.firebaseAdmin);
+        
+        await expect(auth.getUser('non-existent-uid')).rejects.toThrow();
+        });
+
+        it('should create custom tokens', async () => {
+        const auth = admin.auth(firebaseServices.firebaseAdmin);
+        
+        // Create user first
+        const userRecord = await auth.createUser({
+            email: 'token-test@example.com'
+        });
+
+        // Create custom token
+        const customToken = await auth.createCustomToken(userRecord.uid, {
+            role: 'admin',
+            permissions: ['read', 'write']
+        });
+
+        expect(customToken).toBeDefined();
+        expect(typeof customToken).toBe('string');
+
+        // Cleanup
+        await auth.deleteUser(userRecord.uid);
         });
     });
 
-    test('should correctly handle private keys with multiple newlines', () => {
-        jest.isolateModules(() => {
-            const mockAdmin = createMockAdmin();
-            mockAdmin.apps = [];
-            jest.doMock('firebase-admin', () => mockAdmin);
+    describe('Firebase Storage Integration', () => {
+        it('should upload and download files', async () => {
+        const fileName = 'test-file.txt';
+        const fileContent = 'Hello, Firebase Storage!';
+        const file = firebaseServices.bucket.file(fileName);
 
-            jest.doMock('../../config/index', () => ({
-                config: {
-                    firebase: {
-                        projectId: 'test-project',
-                        privateKey: 'line1\\nline2\\nline3\\nline4',
-                        clientEmail: 'test@example.com',
-                        storageBucket: 'test-bucket',
-                    },
-                },
-            }));
+        // Upload file
+        await file.save(fileContent, {
+            metadata: {
+            contentType: 'text/plain'
+            }
+        });
 
-            require('../../config/firebase');
+        // Verify file exists
+        const [exists] = await file.exists();
+        expect(exists).toBe(true);
 
-            expect(mockAdmin.credential.cert).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    privateKey: 'line1\nline2\nline3\nline4',
-                })
-            );
+        // Download file
+        const [downloadedContent] = await file.download();
+        expect(downloadedContent.toString()).toBe(fileContent);
+
+        // Cleanup
+        await file.delete();
+        });
+
+        it('should handle file metadata', async () => {
+        const fileName = 'metadata-test.jpg';
+        const fileContent = Buffer.from('fake-image-data');
+        const file = firebaseServices.bucket.file(fileName);
+
+        const customMetadata = {
+            uploadedBy: 'test-user',
+            purpose: 'integration-test'
+        };
+
+        // Upload with metadata
+        await file.save(fileContent, {
+            metadata: {
+            contentType: 'image/jpeg',
+            metadata: customMetadata
+            }
+        });
+
+        // Get metadata
+        const [metadata] = await file.getMetadata();
+        expect(metadata.contentType).toBe('image/jpeg');
+        expect(metadata.metadata?.uploadedBy).toBe('test-user');
+        expect(metadata.metadata?.purpose).toBe('integration-test');
+
+        // Cleanup
+        await file.delete();
+        });
+
+        it('should list files in bucket', async () => {
+        const fileNames = ['list-test-1.txt', 'list-test-2.txt', 'list-test-3.txt'];
+        
+        // Upload multiple files
+        for (const fileName of fileNames) {
+            await firebaseServices.bucket.file(fileName).save(`Content of ${fileName}`);
+        }
+
+        // List files
+        const [files] = await firebaseServices.bucket.getFiles();
+        const uploadedFileNames = files.map(file => file.name);
+
+        for (const fileName of fileNames) {
+            expect(uploadedFileNames).toContain(fileName);
+        }
+
+        // Cleanup
+        for (const fileName of fileNames) {
+            await firebaseServices.bucket.file(fileName).delete();
+        }
+        });
+
+        it('should handle file deletion', async () => {
+        const fileName = 'delete-test.txt';
+        const file = firebaseServices.bucket.file(fileName);
+
+        // Upload file
+        await file.save('Content to be deleted');
+
+        // Verify file exists
+        let [exists] = await file.exists();
+        expect(exists).toBe(true);
+
+        // Delete file
+        await file.delete();
+
+        // Verify file is deleted
+        [exists] = await file.exists();
+        expect(exists).toBe(false);
         });
     });
 
-    test('should use values from config module when environment variables are not set', () => {
-        jest.isolateModules(() => {
-            const mockAdmin = createMockAdmin();
-            mockAdmin.apps = [];
-            jest.doMock('firebase-admin', () => mockAdmin);
+    describe('Firebase Firestore Integration', () => {
+        it('should create and retrieve documents', async () => {
+        const firestore = admin.firestore(firebaseServices.firebaseAdmin);
+        
+        const testData = {
+            name: 'Test Document',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            active: true
+        };
 
-            jest.doMock('../../config/index', () => ({
-                config: {
-                    firebase: {
-                        projectId: 'default-project',
-                        privateKey: 'default-key\\nwith-newlines',
-                        clientEmail: 'default@example.com',
-                        storageBucket: 'default-bucket',
-                    },
-                },
-            }));
+        // Create document
+        const docRef = await firestore.collection('test').add(testData);
+        expect(docRef.id).toBeDefined();
 
-            require('../../config/firebase');
+        // Retrieve document
+        const doc = await docRef.get();
+        expect(doc.exists).toBe(true);
+        expect(doc.data()?.name).toBe('Test Document');
+        expect(doc.data()?.active).toBe(true);
 
-            expect(mockAdmin.credential.cert).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    projectId: 'default-project',
-                    privateKey: 'default-key\nwith-newlines',
-                    clientEmail: 'default@example.com',
-                })
-            );
+        // Cleanup
+        await docRef.delete();
+        });
+
+        it('should handle document updates', async () => {
+        const firestore = admin.firestore(firebaseServices.firebaseAdmin);
+        
+        // Create initial document
+        const docRef = await firestore.collection('test').add({
+            value: 1,
+            status: 'initial'
+        });
+
+        // Update document
+        await docRef.update({
+            value: 2,
+            status: 'updated',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Verify update
+        const updatedDoc = await docRef.get();
+        expect(updatedDoc.data()?.value).toBe(2);
+        expect(updatedDoc.data()?.status).toBe('updated');
+        expect(updatedDoc.data()?.updatedAt).toBeDefined();
+
+        // Cleanup
+        await docRef.delete();
+        });
+
+        it('should perform queries', async () => {
+        const firestore = admin.firestore(firebaseServices.firebaseAdmin);
+        
+        // Create test documents
+        const testDocs = [
+            { name: 'Doc 1', category: 'A', priority: 1 },
+            { name: 'Doc 2', category: 'B', priority: 2 },
+            { name: 'Doc 3', category: 'A', priority: 3 }
+        ];
+
+        const createdRefs = [];
+        for (const doc of testDocs) {
+            const ref = await firestore.collection('items').add(doc);
+            createdRefs.push(ref);
+        }
+
+        // Query by category
+        const categoryADocs = await firestore
+            .collection('items')
+            .where('category', '==', 'A')
+            .get();
+
+        expect(categoryADocs.size).toBe(2);
+
+        // Query with ordering
+        const orderedDocs = await firestore
+            .collection('items')
+            .orderBy('priority', 'desc')
+            .limit(2)
+            .get();
+
+        expect(orderedDocs.size).toBe(2);
+        const priorities = orderedDocs.docs.map(doc => doc.data().priority);
+        expect(priorities).toEqual([3, 2]);
+
+        // Cleanup
+        for (const ref of createdRefs) {
+            await ref.delete();
+        }
         });
     });
 
-    test('should properly expose the Firebase storage and bucket objects', () => {
-        jest.isolateModules(() => {
-            const mockBucketInstance = { name: 'test-bucket-instance', upload: jest.fn() };
-            const mockAdmin = createMockAdmin();
-            mockAdmin.apps = []; // Ensure initialization runs if needed
-            mockAdmin.storage.mockImplementation(() => ({
-                bucket: jest.fn(() => mockBucketInstance),
-            }));
-            jest.doMock('firebase-admin', () => mockAdmin);
+    describe('Error Handling', () => {
+        it('should handle Firebase Auth errors gracefully', async () => {
+        const auth = admin.auth(firebaseServices.firebaseAdmin);
+        
+        // Test invalid email format
+        await expect(auth.createUser({
+            email: 'invalid-email-format'
+        })).rejects.toThrow();
 
-            jest.doMock('../../config/index', () => ({ // Provide necessary config
-                config: {
-                    firebase: {
-                        projectId: 'test-project',
-                        privateKey: 'test-key',
-                        clientEmail: 'test@example.com',
-                        storageBucket: 'test-bucket',
-                    },
-                },
-            }));
+        // Test duplicate email
+        const user1 = await auth.createUser({
+            email: 'duplicate@example.com'
+        });
 
-            // Import *here* to get the exports from the mocked environment
-            const { storage, bucket, firebaseAdmin } = require('../../config/firebase');
+        await expect(auth.createUser({
+            email: 'duplicate@example.com'
+        })).rejects.toThrow();
 
-            expect(firebaseAdmin.default).toBe(mockAdmin); // Exported admin's default property should be our mock
-            expect(storage).toBeDefined();
-            expect(mockAdmin.storage).toHaveBeenCalled(); // storage getter was called
-            expect(storage.bucket).toBeDefined(); // Check if the mocked storage object has bucket method
+        // Cleanup
+        await auth.deleteUser(user1.uid);
+        });
 
-            const retrievedBucket = storage.bucket(); // Call the method on the mocked storage
-            expect(retrievedBucket).toBe(mockBucketInstance);
+        it('should handle Firebase Storage errors gracefully', async () => {
+        const file = firebaseServices.bucket.file('error-test.txt');
 
-            expect(bucket).toBe(mockBucketInstance); // Exported bucket should be the instance from mock
-            expect(bucket.name).toBe('test-bucket-instance');
-            expect(typeof bucket.upload).toBe('function');
+        // Test downloading non-existent file
+        await expect(file.download()).rejects.toThrow();
+
+        // Test getting metadata for non-existent file
+        await expect(file.getMetadata()).rejects.toThrow();
+        });
+
+        it('should handle Firestore errors gracefully', async () => {
+        const firestore = admin.firestore(firebaseServices.firebaseAdmin);
+        
+        // Test getting non-existent document
+        const nonExistentDoc = await firestore.collection('test').doc('non-existent').get();
+        expect(nonExistentDoc.exists).toBe(false);
+
+        // Test updating non-existent document
+        await expect(
+            firestore.collection('test').doc('non-existent').update({ field: 'value' })
+        ).rejects.toThrow();
         });
     });
 
-    test('should handle empty private key gracefully', () => {
-        jest.isolateModules(() => {
-            const mockAdmin = createMockAdmin();
-            mockAdmin.apps = [];
-            jest.doMock('firebase-admin', () => mockAdmin);
-
-            jest.doMock('../../config/index', () => ({
-                config: {
-                    firebase: {
-                        projectId: 'test-project',
-                        privateKey: '', // Empty private key
-                        clientEmail: 'test@example.com',
-                        storageBucket: 'test-bucket',
-                    },
-                },
-            }));
-
-            require('../../config/firebase');
-
-            expect(mockAdmin.credential.cert).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    privateKey: '',
-                })
-            );
+    describe('Data Persistence and Reset', () => {
+        it('should clear data between tests', async () => {
+        const auth = admin.auth(firebaseServices.firebaseAdmin);
+        const firestore = admin.firestore(firebaseServices.firebaseAdmin);
+        
+        // Create some data
+        const userRecord = await auth.createUser({
+            email: 'reset-test@example.com'
         });
-    });
-
-    test('should throw TypeError if config.firebase is undefined', () => {
-        jest.isolateModules(() => {
-            const mockAdmin = createMockAdmin(); // Mock admin to prevent other errors
-            jest.doMock('firebase-admin', () => mockAdmin);
-            jest.doMock('../../config/index', () => ({
-                config: {}, // config.firebase will be undefined
-            }));
-
-            expect(() => {
-                require('../../config/firebase');
-            }).toThrow(TypeError); // e.g., Cannot read properties of undefined (reading 'privateKey')
+        
+        await firestore.collection('reset-test').add({
+            message: 'This should be cleared'
         });
-    });
+        
+        await firebaseServices.bucket.file('reset-test.txt').save('This should be cleared');
 
-    test('should throw TypeError if config.firebase.privateKey is undefined', () => {
-        jest.isolateModules(() => {
-            const mockAdmin = createMockAdmin();
-            jest.doMock('firebase-admin', () => mockAdmin);
-            jest.doMock('../../config/index', () => ({
-                config: {
-                    firebase: {
-                        projectId: 'test-project',
-                        privateKey: undefined, // privateKey is undefined
-                        clientEmail: 'test@example.com',
-                        storageBucket: 'test-bucket',
-                    },
-                },
-            }));
+        // Reset emulator
+        await resetFirebaseEmulator();
 
-            expect(() => {
-                require('../../config/firebase');
-            }).toThrow(TypeError); // e.g., Cannot read properties of undefined (reading 'replace')
-        });
-    });
-
-    test('should throw TypeError if config.firebase.privateKey is not a string', () => {
-        jest.isolateModules(() => {
-            const mockAdmin = createMockAdmin();
-            jest.doMock('firebase-admin', () => mockAdmin);
-            jest.doMock('../../config/index', () => ({
-                config: {
-                    firebase: {
-                        projectId: 'test-project',
-                        privateKey: 12345, // privateKey is a number
-                        clientEmail: 'test@example.com',
-                        storageBucket: 'test-bucket',
-                    },
-                },
-            }));
-            expect(() => {
-                require('../../config/firebase');
-            }).toThrow(TypeError); // privateKey.replace is not a function
-        });
-    });
-
-    test('should pass undefined to SDK if projectId is undefined in config', () => {
-        jest.isolateModules(() => {
-            const mockAdmin = createMockAdmin();
-            mockAdmin.apps = [];
-            jest.doMock('firebase-admin', () => mockAdmin);
-            jest.doMock('../../config/index', () => ({
-                config: {
-                    firebase: {
-                        projectId: undefined,
-                        privateKey: 'test-key\\nmore-lines',
-                        clientEmail: 'test@example.com',
-                        storageBucket: 'test-bucket',
-                    },
-                },
-            }));
-
-            require('../../config/firebase');
-
-            expect(mockAdmin.initializeApp).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    credential: expect.objectContaining({ projectId: undefined }),
-                })
-            );
-        });
-    });
-
-    test('should pass undefined to SDK if clientEmail is undefined in config', () => {
-        jest.isolateModules(() => {
-            const mockAdmin = createMockAdmin();
-            mockAdmin.apps = [];
-            jest.doMock('firebase-admin', () => mockAdmin);
-            jest.doMock('../../config/index', () => ({
-                config: {
-                    firebase: {
-                        projectId: 'test-project',
-                        privateKey: 'test-key\\nmore-lines',
-                        clientEmail: undefined,
-                        storageBucket: 'test-bucket',
-                    },
-                },
-            }));
-
-            require('../../config/firebase');
-
-            expect(mockAdmin.initializeApp).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    credential: expect.objectContaining({ clientEmail: undefined }),
-                })
-            );
-        });
-    });
-
-    test('should pass undefined to SDK if storageBucket is undefined in config and exports are correct', () => {
-        jest.isolateModules(() => {
-            const mockAdmin = createMockAdmin();
-            mockAdmin.apps = []; // Ensure initializeApp is called
-            // storage().bucket() will return {} by default from createMockAdmin
-            jest.doMock('firebase-admin', () => mockAdmin);
-
-            jest.doMock('../../config/index', () => ({
-                config: {
-                    firebase: {
-                        projectId: 'test-project',
-                        privateKey: 'test-key\\nmore-lines',
-                        clientEmail: 'test@example.com',
-                        storageBucket: undefined, // storageBucket is undefined
-                    },
-                },
-            }));
-
-            // Import here to get the exports after initialization
-            const { storage, bucket } = require('../../config/firebase');
-
-            expect(mockAdmin.initializeApp).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    storageBucket: undefined,
-                })
-            );
-            
-            // Verify that storage and bucket are still exported and reflect the mock
-            expect(storage).toBeDefined(); // storage is mockAdmin.storage()
-            expect(mockAdmin.storage).toHaveBeenCalled();
-            
-            const bucketFromStorageCall = storage.bucket(); // Calls mockAdmin.storage().bucket()
-            expect(bucketFromStorageCall).toEqual({}); // Default mock from createMockAdmin
-
-            expect(bucket).toEqual({}); // Exported bucket is mockAdmin.storage().bucket()
+        // Verify data is cleared
+        await expect(auth.getUser(userRecord.uid)).rejects.toThrow();
+        
+        const docs = await firestore.collection('reset-test').get();
+        expect(docs.empty).toBe(true);
+        
+        const [fileExists] = await firebaseServices.bucket.file('reset-test.txt').exists();
+        expect(fileExists).toBe(false);
         });
     });
 });

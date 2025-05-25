@@ -64,7 +64,7 @@ describe('Error Handler Security Tests', () => {
             errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
           }).not.toThrow();
 
-          const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+          const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
           const responseBody = jsonCall[0];
           
           // Should return a response without throwing errors
@@ -81,7 +81,7 @@ describe('Error Handler Security Tests', () => {
         
         errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-        const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+        const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
         const responseBody = jsonCall[0];
         
         // At minimum, should not execute scripts or cause errors
@@ -95,7 +95,7 @@ describe('Error Handler Security Tests', () => {
         
         errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-        const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+        const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
         const responseBody = jsonCall[0];
         
         // Should process without throwing errors
@@ -111,7 +111,7 @@ describe('Error Handler Security Tests', () => {
         
         errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-        const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+        const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
         const responseBody = jsonCall[0];
         
         expect(responseBody.message).toContain('🚀');
@@ -152,7 +152,7 @@ describe('Error Handler Security Tests', () => {
         // Should complete within reasonable time
         expect(processingTime).toBeLessThan(5000); // 5 seconds max
         
-        const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+        const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
         const responseBody = jsonCall[0];
         
         expect(responseBody).toBeDefined();
@@ -248,7 +248,7 @@ describe('Error Handler Security Tests', () => {
           
           errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-          const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+          const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
           const responseBody = jsonCall[0];
           
           expect(responseBody.stack).toBeUndefined();
@@ -270,7 +270,7 @@ describe('Error Handler Security Tests', () => {
           
           errorHandler(error, req as Request, mockRes as Response, mockNext);
 
-          const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+          const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
           const responseBody = jsonCall[0];
           
           expect(responseBody.debug).toBeUndefined();
@@ -287,7 +287,7 @@ describe('Error Handler Security Tests', () => {
         
         errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-        const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+        const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
         const responseBody = jsonCall[0];
         
         // Should still return an error message
@@ -301,7 +301,7 @@ describe('Error Handler Security Tests', () => {
         
         errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-        const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+        const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
         const responseBody = jsonCall[0];
         
         expect(responseBody.message).toBeDefined();
@@ -357,7 +357,7 @@ describe('Error Handler Security Tests', () => {
       
       errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-      const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+      const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
       const responseBody = jsonCall[0];
       
       expect(responseBody.code).toBeDefined();
@@ -370,7 +370,7 @@ describe('Error Handler Security Tests', () => {
       
       errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-      const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+      const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
       const responseBody = jsonCall[0];
       
       expect(responseBody.code).toBeDefined();
@@ -382,7 +382,7 @@ describe('Error Handler Security Tests', () => {
       
       errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-      const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+      const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
       const responseBody = jsonCall[0];
       
       expect(responseBody.code).toBeDefined();
@@ -439,9 +439,12 @@ describe('Error Handler Security Tests', () => {
     it('should handle malicious user agent strings safely', () => {
       const maliciousUA = '<script>alert("ua")</script>';
       const req = createMockRequest({
-        get: jest.fn().mockImplementation((header: string) => 
-          header === 'User-Agent' ? maliciousUA : undefined
-        )
+        get: jest.fn<(name: string) => string | string[] | undefined>((header: string) => {
+          if (header === 'set-cookie') {
+            return undefined; // Return string[] | undefined for set-cookie
+          }
+          return header === 'User-Agent' ? maliciousUA : undefined;
+        }) as any
       });
       
       const error = createMockError('UA test', 400, 'UA_TEST');
@@ -454,9 +457,12 @@ describe('Error Handler Security Tests', () => {
     it('should handle extremely long request IDs', () => {
       const longRequestId = 'req_' + 'x'.repeat(10000);
       const req = createMockRequest({
-        get: jest.fn().mockImplementation((header: string) => 
-          header === 'X-Request-ID' ? longRequestId : undefined
-        )
+        get: jest.fn<(name: string) => string | string[] | undefined>((header: string) => {
+          if (header === 'set-cookie') {
+            return undefined; // Return string[] | undefined for set-cookie
+          }
+          return header === 'X-Request-ID' ? longRequestId : undefined;
+        }) as any
       });
       
       const error = createMockError('Long request ID test', 400, 'LONG_ID_TEST');
@@ -465,7 +471,7 @@ describe('Error Handler Security Tests', () => {
         errorHandler(error, req as Request, mockRes as Response, mockNext);
       }).not.toThrow();
       
-      const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+      const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
       const responseBody = jsonCall[0];
       
       expect(responseBody.requestId).toBeDefined();
@@ -474,9 +480,12 @@ describe('Error Handler Security Tests', () => {
     it('should handle request ID injection attempts', () => {
       const injectedId = 'valid-id<script>alert("id")</script>';
       const req = createMockRequest({
-        get: jest.fn().mockImplementation((header: string) => 
-          header === 'X-Request-ID' ? injectedId : undefined
-        )
+        get: jest.fn<(name: string) => string | string[] | undefined>((header: string) => {
+          if (header === 'set-cookie') {
+            return undefined; // Return string[] | undefined for set-cookie
+          }
+          return header === 'X-Request-ID' ? injectedId : undefined;
+        }) as any
       });
       
       const error = createMockError('ID injection test', 400, 'ID_INJECTION_TEST');
@@ -511,10 +520,10 @@ describe('Error Handler Security Tests', () => {
       const errorTypes = [
         () => createMockError('Simple error', 400, 'SIMPLE'),
         () => new Error('Basic error'),
-        () => 'String error',
-        () => ({ message: 'Object error', statusCode: 500 }),
-        () => null,
-        () => undefined
+        () => 'String error' as any,
+        () => ({ message: 'Object error', statusCode: 500 }) as any,
+        () => null as any,
+        () => undefined as any
       ];
 
       const times: number[] = [];
@@ -573,12 +582,13 @@ describe('Error Handler Security Tests', () => {
   describe('Edge Case Security Testing', () => {
     it('should handle prototype pollution attempts', () => {
       const pollutionAttempt = {
+        name: 'PollutionError',
         message: 'Pollution test',
         statusCode: 400,
         code: 'POLLUTION_TEST',
         '__proto__': { polluted: true },
         'constructor': { prototype: { polluted: true } }
-      };
+      } as any;
       
       expect(() => {
         errorHandler(pollutionAttempt, mockReq as Request, mockRes as Response, mockNext);
@@ -590,12 +600,13 @@ describe('Error Handler Security Tests', () => {
 
     it('should handle function injection in error objects', () => {
       const functionError = {
+        name: 'FunctionError',
         message: 'Function test',
         statusCode: 400,
         code: 'FUNCTION_TEST',
         maliciousFunction: () => { throw new Error('Injected function'); },
         toString: () => { throw new Error('Malicious toString'); }
-      };
+      } as any;
       
       expect(() => {
         errorHandler(functionError, mockReq as Request, mockRes as Response, mockNext);
@@ -605,11 +616,12 @@ describe('Error Handler Security Tests', () => {
     it('should handle symbol properties safely', () => {
       const symbolKey = Symbol('malicious');
       const symbolError = {
+        name: 'SymbolError',
         message: 'Symbol test',
         statusCode: 400,
         code: 'SYMBOL_TEST',
         [symbolKey]: 'malicious value'
-      };
+      } as any;
       
       expect(() => {
         errorHandler(symbolError, mockReq as Request, mockRes as Response, mockNext);
@@ -618,13 +630,14 @@ describe('Error Handler Security Tests', () => {
 
     it('should handle getter/setter properties', () => {
       const getterError = {
+        name: 'GetterError',
         message: 'Getter test',
         statusCode: 400,
         code: 'GETTER_TEST',
         get maliciousGetter() {
           throw new Error('Malicious getter accessed');
         }
-      };
+      } as any;
       
       expect(() => {
         errorHandler(getterError, mockReq as Request, mockRes as Response, mockNext);
@@ -634,7 +647,7 @@ describe('Error Handler Security Tests', () => {
 
   describe('Security Compliance Verification', () => {
     it('should maintain security headers across all error scenarios', () => {
-      const scenarios = [
+      const scenarios: any[] = [
         createMockError('Normal error', 400, 'NORMAL'),
         new Error('Basic error'),
         'String error',
@@ -663,7 +676,7 @@ describe('Error Handler Security Tests', () => {
       try {
         errorHandler(systemError, mockReq as Request, mockRes as Response, mockNext);
 
-        const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+        const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
         const responseBody = jsonCall[0];
         
         // Should not expose stack trace in production
@@ -681,7 +694,7 @@ describe('Error Handler Security Tests', () => {
         errorHandler(i18nError, mockReq as Request, mockRes as Response, mockNext);
       }).not.toThrow();
       
-      const jsonCall = (mockRes.json as jest.MockedFunction<(body?: any) => Response>).mock.calls[0];
+      const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
       const responseBody = jsonCall[0];
       
       expect(responseBody.message).toContain('àáâãäåæçèéêë');
@@ -690,7 +703,7 @@ describe('Error Handler Security Tests', () => {
 
   describe('Input Validation Security', () => {
     it('should handle all primitive types safely', () => {
-      const primitives = [
+      const primitives: any[] = [
         true,
         false,
         42,
@@ -714,6 +727,7 @@ describe('Error Handler Security Tests', () => {
 
     it('should handle complex nested structures', () => {
       const complexError = {
+        name: 'ComplexError',
         message: 'Complex error',
         statusCode: 400,
         code: 'COMPLEX_TEST',
@@ -728,7 +742,7 @@ describe('Error Handler Security Tests', () => {
             }
           }
         }
-      };
+      } as any;
       
       expect(() => {
         errorHandler(complexError, mockReq as Request, mockRes as Response, mockNext);
@@ -737,12 +751,13 @@ describe('Error Handler Security Tests', () => {
 
     it('should handle date objects safely', () => {
       const dateError = {
+        name: 'DateError',
         message: 'Date error',
         statusCode: 400,
         code: 'DATE_TEST',
         timestamp: new Date(),
         invalidDate: new Date('invalid')
-      };
+      } as any;
       
       expect(() => {
         errorHandler(dateError, mockReq as Request, mockRes as Response, mockNext);
@@ -751,12 +766,13 @@ describe('Error Handler Security Tests', () => {
 
     it('should handle regex objects safely', () => {
       const regexError = {
+        name: 'RegexError',
         message: 'Regex error',
         statusCode: 400,
         code: 'REGEX_TEST',
         pattern: /malicious.*pattern/gi,
         maliciousRegex: new RegExp('(?:(?:(?:(?:(?:.*)*)*)*)*)*')
-      };
+      } as any;
       
       expect(() => {
         errorHandler(regexError, mockReq as Request, mockRes as Response, mockNext);

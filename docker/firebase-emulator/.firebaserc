@@ -1,0 +1,7 @@
+@'
+{
+  "projects": {
+    "default": "demo-test-project"
+  }
+}
+'@ | Out-File -FilePath ".firebaserc" -Encoding UTF8

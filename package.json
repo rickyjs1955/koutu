@@ -26,7 +26,10 @@
     "postinstall": "chmod +x scripts/run-tests.js",
     "test:backend-only": "cd backend && npx jest --config jest.config.cjs --runInBand",
     "test:frontend-only": "cd frontend && npx jest --config jest.config.cjs",
-    "test:shared-only": "cd shared && npx jest --config jest.config.cjs"
+    "test:shared-only": "cd shared && npx jest --config jest.config.cjs",
+    "docker:test-up": "docker-compose up -d postgres-test firebase-emulator",
+    "docker:test-down": "docker-compose down",
+    "setup:test": "npm run docker:test-up && sleep 30"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.1.0",
