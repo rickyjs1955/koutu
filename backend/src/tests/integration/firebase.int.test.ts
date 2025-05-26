@@ -1,394 +1,381 @@
-// /Koutu/backend/src/__tests__/integration/firebase.int.test.ts
+// Performance-optimized Firebase Integration Tests
+// Should run in under 30 seconds total
 
-import { jest } from '@jest/globals';
+import { jest, describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import * as admin from 'firebase-admin';
-import { initializeTestFirebase, cleanupTestFirebase, resetFirebaseEmulator } from '../__helpers__/firebase.helper';
+import { setupTestDatabase, teardownTestDatabase } from '../../utils/testSetup';
+import { Bucket } from '@google-cloud/storage';
+
+// Test configuration for Firebase emulators
+const EMULATOR_CONFIG = {
+  projectId: 'demo-test-project',
+  storageBucket: 'demo-test-project.appspot.com',
+  authEmulator: 'localhost:9099',
+  storageEmulator: 'localhost:9199',
+  firestoreEmulator: 'localhost:9100'
+};
+
+// Set environment variables ONCE at the top
+process.env.FIRESTORE_EMULATOR_HOST = EMULATOR_CONFIG.firestoreEmulator;
+process.env.FIREBASE_AUTH_EMULATOR_HOST = EMULATOR_CONFIG.authEmulator;
+process.env.FIREBASE_STORAGE_EMULATOR_HOST = EMULATOR_CONFIG.storageEmulator;
+process.env.STORAGE_EMULATOR_HOST = EMULATOR_CONFIG.storageEmulator;
+process.env.GOOGLE_CLOUD_PROJECT = EMULATOR_CONFIG.projectId;
+process.env.NODE_ENV = 'test';
+process.env.FIREBASE_EMULATOR_HUB = 'localhost:4400';
+
+// Mock config
+const mockTestConfig = {
+  firebase: {
+    projectId: EMULATOR_CONFIG.projectId,
+    privateKey: '',
+    clientEmail: 'test@demo-test-project.iam.gserviceaccount.com',
+    storageBucket: EMULATOR_CONFIG.storageBucket
+  }
+};
 
 describe('Firebase Integration Tests', () => {
-    let firebaseServices: ReturnType<typeof initializeTestFirebase>;
+  let firebaseApp: admin.app.App | null = null;
+  let auth: admin.auth.Auth;
+  let storage: admin.storage.Storage;
+  let bucket:Bucket;
+  
+  // Track created resources for cleanup
+  const createdUserIds: string[] = [];
+  const createdFileNames: string[] = [];
 
-    beforeAll(async () => {
-        // Check if emulators are accessible before starting tests
-        const emulatorUrls = [
-        'http://localhost:4001',  // Firebase UI
-        'http://localhost:9099',  // Auth 
-        'http://localhost:9100',  // Firestore
-        'http://localhost:9199'   // Storage
-        ];
+  beforeAll(async () => {
+    console.time('Setup');
+    
+    // SIMPLIFIED emulator check - just ping once quickly
+    console.log('🔄 Quick emulator check...');
+    try {
+      const authCheck = await fetch(`http://${EMULATOR_CONFIG.authEmulator}`, { 
+        method: 'GET',
+        signal: AbortSignal.timeout(2000) // 2 second timeout
+      });
+      const storageCheck = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}`, { 
+        method: 'GET',
+        signal: AbortSignal.timeout(2000)
+      });
+      
+      if (!authCheck.ok && authCheck.status !== 404) {
+        throw new Error('Auth emulator not ready');
+      }
+      if (!storageCheck.ok && storageCheck.status !== 501) {
+        throw new Error('Storage emulator not ready');
+      }
+      
+      console.log('✅ Emulators ready');
+    } catch (error) {
+      throw new Error(`Emulators not ready: ${error instanceof Error ? error.message : String(error)}`);
+    }
 
-        console.log('🔍 Checking Firebase emulator accessibility...');
-        
-        const checks = await Promise.allSettled(
-        emulatorUrls.map(async (url) => {
-            const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
-            return { url, ok: response.ok, status: response.status };
-        })
-        );
+    // Skip database setup if not needed for Firebase tests
+    // await setupTestDatabase(); // Comment this out if not needed
 
-        const workingEmulators = checks.filter(
-        (result): result is PromiseFulfilledResult<any> => 
-            result.status === 'fulfilled' && result.value.ok
-        );
+    // Mock config
+    jest.doMock('../../config/index', () => ({
+      config: mockTestConfig
+    }));
 
-        if (workingEmulators.length === 0) {
-        console.error('❌ No Firebase emulators are accessible!');
-        console.error('   Make sure to run: npm run docker:test-up');
-        console.error('   And wait for emulators to start (30-60 seconds)');
-        throw new Error('Firebase emulators not accessible. Integration tests cannot run.');
-        }
+    // Initialize Firebase app - SIMPLE
+    if (admin.apps.length === 0) {
+      firebaseApp = admin.initializeApp({
+        projectId: EMULATOR_CONFIG.projectId,
+        storageBucket: EMULATOR_CONFIG.storageBucket
+      }, 'integration-test-app');
+    } else {
+      firebaseApp = admin.apps[0];
+    }
 
-        console.log(`✅ Found ${workingEmulators.length}/4 Firebase emulators accessible`);
-        workingEmulators.forEach(result => {
-        console.log(`   - ${result.value.url}: ${result.value.status}`);
-        });
+    // Add null check before using firebaseApp
+    if (!firebaseApp) {
+      throw new Error('Failed to initialize Firebase app');
+    }
 
-        // Initialize Firebase services
-        firebaseServices = initializeTestFirebase();
+    auth = admin.auth(firebaseApp);
+    storage = admin.storage(firebaseApp);
+    bucket = storage.bucket();
+
+    console.timeEnd('Setup');
+    console.log('✅ Setup complete');
+  }, 10000);
+
+  afterAll(async () => {
+    console.time('Cleanup');
+    
+    // BATCH cleanup instead of individual operations
+    const cleanupPromises = [];
+    
+    // Cleanup users in batches
+    if (createdUserIds.length > 0) {
+      console.log(`Cleaning up ${createdUserIds.length} users...`);
+      cleanupPromises.push(
+        Promise.allSettled(
+          createdUserIds.map(uid => auth.deleteUser(uid).catch(() => {}))
+        )
+      );
+    }
+
+    // Cleanup files via REST API (faster)
+    if (createdFileNames.length > 0) {
+      console.log(`Cleaning up ${createdFileNames.length} files...`);
+      cleanupPromises.push(
+        Promise.allSettled(
+          createdFileNames.map(fileName => 
+            fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}`, {
+              method: 'DELETE'
+            }).catch(() => {})
+          )
+        )
+      );
+    }
+
+    await Promise.all(cleanupPromises);
+
+    // Clean up Firebase app
+    if (firebaseApp) {
+      await firebaseApp.delete();
+      firebaseApp = null;
+    }
+
+    // await teardownTestDatabase(); // Comment out if not needed
+
+    jest.resetModules();
+    console.timeEnd('Cleanup');
+  }, 10000); // Reduced timeout
+
+  // REMOVE beforeEach data clearing - it's too slow
+  // beforeEach(async () => {
+  //   await clearFirebaseEmulatorData(); // REMOVE THIS
+  // });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // FAST helper functions
+  async function createTestUser(overrides: Partial<admin.auth.CreateRequest> = {}): Promise<admin.auth.UserRecord> {
+    const userData: admin.auth.CreateRequest = {
+      email: `test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@example.com`,
+      emailVerified: false,
+      displayName: 'Test User',
+      disabled: false,
+      ...overrides
+    };
+
+    const user = await auth.createUser(userData);
+    createdUserIds.push(user.uid);
+    return user;
+  }
+
+  // FAST file creation using REST API
+  async function createTestFile(fileName?: string, content?: string): Promise<string> {
+    const testFileName = fileName || `test-file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.txt`;
+    const fileContent = content || `Test content ${Date.now()}`;
+    
+    try {
+      const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(testFileName)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: fileContent,
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status}`);
+      }
+
+      createdFileNames.push(testFileName);
+      return testFileName;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create file: ${message}`);
+    }
+  }
+
+  describe('Firebase Configuration', () => {
+    it('should connect to emulators', () => {
+      expect(firebaseApp).not.toBeNull();
+      expect(firebaseApp!.options.projectId).toBe(EMULATOR_CONFIG.projectId);
     });
 
-    afterAll(async () => {
-        await cleanupTestFirebase();
+    it('should initialize services', () => {
+      expect(auth).toBeDefined();
+      expect(storage).toBeDefined();
+      expect(bucket).toBeDefined();
+    });
+  });
+
+  describe('Authentication Core Features', () => {
+    it('should create and retrieve user', async () => {
+      const email = `auth-test-${Date.now()}@example.com`;
+      const user = await createTestUser({ email, displayName: 'Auth Test' });
+
+      expect(user.uid).toBeDefined();
+      expect(user.email).toBe(email);
+
+      // Retrieve to verify
+      const retrieved = await auth.getUser(user.uid);
+      expect(retrieved.email).toBe(email);
     });
 
-    beforeEach(async () => {
-        // Reset emulator data before each test
-        try {
-        await resetFirebaseEmulator();
-        } catch (error) {
-        console.warn('Failed to reset Firebase emulator:', error);
-        }
+    it('should update user properties', async () => {
+      const user = await createTestUser({ displayName: 'Original' });
+      
+      const updated = await auth.updateUser(user.uid, { displayName: 'Updated' });
+      expect(updated.displayName).toBe('Updated');
     });
 
-    describe('Firebase Emulator Connection', () => {
-        it('should connect to Firebase emulators with correct ports', () => {
-        expect(process.env.FIRESTORE_EMULATOR_HOST).toBe('localhost:9100');
-        expect(process.env.FIREBASE_AUTH_EMULATOR_HOST).toBe('localhost:9099');
-        expect(process.env.FIREBASE_STORAGE_EMULATOR_HOST).toBe('localhost:9199');
-        });
+    it('should handle user deletion', async () => {
+      const user = await createTestUser();
+      await auth.deleteUser(user.uid);
+      
+      // Remove from cleanup since already deleted
+      const index = createdUserIds.indexOf(user.uid);
+      if (index > -1) createdUserIds.splice(index, 1);
 
-        it('should initialize Firebase Admin SDK correctly', () => {
-        expect(firebaseServices.firebaseAdmin).toBeDefined();
-        expect(firebaseServices.storage).toBeDefined();
-        expect(firebaseServices.bucket).toBeDefined();
-        });
-
-        it('should use test project configuration', () => {
-        expect(firebaseServices.firebaseAdmin.options.projectId).toBe('demo-test-project');
-        });
+      await expect(auth.getUser(user.uid)).rejects.toThrow();
     });
 
-    describe('Firebase Auth Integration', () => {
-        it('should create and retrieve a user', async () => {
-        const auth = admin.auth(firebaseServices.firebaseAdmin);
-        
-        // Create user
-        const userRecord = await auth.createUser({
-            email: 'test@example.com',
-            password: 'testpassword123',
-            displayName: 'Test User'
-        });
-
-        expect(userRecord.uid).toBeDefined();
-        expect(userRecord.email).toBe('test@example.com');
-        expect(userRecord.displayName).toBe('Test User');
-
-        // Retrieve user
-        const retrievedUser = await auth.getUser(userRecord.uid);
-        expect(retrievedUser.email).toBe('test@example.com');
-        expect(retrievedUser.displayName).toBe('Test User');
-
-        // Cleanup
-        await auth.deleteUser(userRecord.uid);
-        });
-
-        it('should handle user not found error', async () => {
-        const auth = admin.auth(firebaseServices.firebaseAdmin);
-        
-        await expect(auth.getUser('non-existent-uid')).rejects.toThrow();
-        });
-
-        it('should create custom tokens', async () => {
-        const auth = admin.auth(firebaseServices.firebaseAdmin);
-        
-        // Create user first
-        const userRecord = await auth.createUser({
-            email: 'token-test@example.com'
-        });
-
-        // Create custom token
-        const customToken = await auth.createCustomToken(userRecord.uid, {
-            role: 'admin',
-            permissions: ['read', 'write']
-        });
-
-        expect(customToken).toBeDefined();
-        expect(typeof customToken).toBe('string');
-
-        // Cleanup
-        await auth.deleteUser(userRecord.uid);
-        });
+    it('should create custom tokens', async () => {
+      const user = await createTestUser();
+      const token = await auth.createCustomToken(user.uid);
+      
+      expect(token).toBeDefined();
+      expect(typeof token).toBe('string');
     });
 
-    describe('Firebase Storage Integration', () => {
-        it('should upload and download files', async () => {
-        const fileName = 'test-file.txt';
-        const fileContent = 'Hello, Firebase Storage!';
-        const file = firebaseServices.bucket.file(fileName);
+    it('should handle auth errors', async () => {
+      await expect(auth.getUser('invalid-uid')).rejects.toThrow();
+      
+      // Test duplicate email
+      const email = `duplicate-${Date.now()}@example.com`;
+      await createTestUser({ email });
+      await expect(createTestUser({ email })).rejects.toThrow();
+    });
+  });
 
-        // Upload file
-        await file.save(fileContent, {
-            metadata: {
-            contentType: 'text/plain'
-            }
-        });
+  describe('Storage Core Features', () => {
+    it('should upload and download files', async () => {
+      const fileName = `upload-test-${Date.now()}.txt`;
+      const content = 'Test file content';
 
-        // Verify file exists
-        const [exists] = await file.exists();
-        expect(exists).toBe(true);
+      // Upload
+      const uploadResponse = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(fileName)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: content,
+        signal: AbortSignal.timeout(5000)
+      });
+      expect(uploadResponse.ok).toBe(true);
+      createdFileNames.push(fileName);
 
-        // Download file
-        const [downloadedContent] = await file.download();
-        expect(downloadedContent.toString()).toBe(fileContent);
-
-        // Cleanup
-        await file.delete();
-        });
-
-        it('should handle file metadata', async () => {
-        const fileName = 'metadata-test.jpg';
-        const fileContent = Buffer.from('fake-image-data');
-        const file = firebaseServices.bucket.file(fileName);
-
-        const customMetadata = {
-            uploadedBy: 'test-user',
-            purpose: 'integration-test'
-        };
-
-        // Upload with metadata
-        await file.save(fileContent, {
-            metadata: {
-            contentType: 'image/jpeg',
-            metadata: customMetadata
-            }
-        });
-
-        // Get metadata
-        const [metadata] = await file.getMetadata();
-        expect(metadata.contentType).toBe('image/jpeg');
-        expect(metadata.metadata?.uploadedBy).toBe('test-user');
-        expect(metadata.metadata?.purpose).toBe('integration-test');
-
-        // Cleanup
-        await file.delete();
-        });
-
-        it('should list files in bucket', async () => {
-        const fileNames = ['list-test-1.txt', 'list-test-2.txt', 'list-test-3.txt'];
-        
-        // Upload multiple files
-        for (const fileName of fileNames) {
-            await firebaseServices.bucket.file(fileName).save(`Content of ${fileName}`);
-        }
-
-        // List files
-        const [files] = await firebaseServices.bucket.getFiles();
-        const uploadedFileNames = files.map(file => file.name);
-
-        for (const fileName of fileNames) {
-            expect(uploadedFileNames).toContain(fileName);
-        }
-
-        // Cleanup
-        for (const fileName of fileNames) {
-            await firebaseServices.bucket.file(fileName).delete();
-        }
-        });
-
-        it('should handle file deletion', async () => {
-        const fileName = 'delete-test.txt';
-        const file = firebaseServices.bucket.file(fileName);
-
-        // Upload file
-        await file.save('Content to be deleted');
-
-        // Verify file exists
-        let [exists] = await file.exists();
-        expect(exists).toBe(true);
-
-        // Delete file
-        await file.delete();
-
-        // Verify file is deleted
-        [exists] = await file.exists();
-        expect(exists).toBe(false);
-        });
+      // Download
+      const downloadResponse = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/download/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}?alt=media`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      expect(downloadResponse.ok).toBe(true);
+      
+      const downloaded = await downloadResponse.text();
+      expect(downloaded).toBe(content);
     });
 
-    describe('Firebase Firestore Integration', () => {
-        it('should create and retrieve documents', async () => {
-        const firestore = admin.firestore(firebaseServices.firebaseAdmin);
-        
-        const testData = {
-            name: 'Test Document',
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            active: true
-        };
-
-        // Create document
-        const docRef = await firestore.collection('test').add(testData);
-        expect(docRef.id).toBeDefined();
-
-        // Retrieve document
-        const doc = await docRef.get();
-        expect(doc.exists).toBe(true);
-        expect(doc.data()?.name).toBe('Test Document');
-        expect(doc.data()?.active).toBe(true);
-
-        // Cleanup
-        await docRef.delete();
+    it('should list files', async () => {
+      // Create test files
+      const files = [`list-1-${Date.now()}.txt`, `list-2-${Date.now()}.txt`];
+      
+      await Promise.all(files.map(async (fileName) => {
+        const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(fileName)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: `content for ${fileName}`,
+          signal: AbortSignal.timeout(5000)
         });
+        expect(response.ok).toBe(true);
+        createdFileNames.push(fileName);
+      }));
 
-        it('should handle document updates', async () => {
-        const firestore = admin.firestore(firebaseServices.firebaseAdmin);
-        
-        // Create initial document
-        const docRef = await firestore.collection('test').add({
-            value: 1,
-            status: 'initial'
-        });
-
-        // Update document
-        await docRef.update({
-            value: 2,
-            status: 'updated',
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-
-        // Verify update
-        const updatedDoc = await docRef.get();
-        expect(updatedDoc.data()?.value).toBe(2);
-        expect(updatedDoc.data()?.status).toBe('updated');
-        expect(updatedDoc.data()?.updatedAt).toBeDefined();
-
-        // Cleanup
-        await docRef.delete();
-        });
-
-        it('should perform queries', async () => {
-        const firestore = admin.firestore(firebaseServices.firebaseAdmin);
-        
-        // Create test documents
-        const testDocs = [
-            { name: 'Doc 1', category: 'A', priority: 1 },
-            { name: 'Doc 2', category: 'B', priority: 2 },
-            { name: 'Doc 3', category: 'A', priority: 3 }
-        ];
-
-        const createdRefs = [];
-        for (const doc of testDocs) {
-            const ref = await firestore.collection('items').add(doc);
-            createdRefs.push(ref);
-        }
-
-        // Query by category
-        const categoryADocs = await firestore
-            .collection('items')
-            .where('category', '==', 'A')
-            .get();
-
-        expect(categoryADocs.size).toBe(2);
-
-        // Query with ordering
-        const orderedDocs = await firestore
-            .collection('items')
-            .orderBy('priority', 'desc')
-            .limit(2)
-            .get();
-
-        expect(orderedDocs.size).toBe(2);
-        const priorities = orderedDocs.docs.map(doc => doc.data().priority);
-        expect(priorities).toEqual([3, 2]);
-
-        // Cleanup
-        for (const ref of createdRefs) {
-            await ref.delete();
-        }
-        });
+      // List files
+      const listResponse = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      expect(listResponse.ok).toBe(true);
+      
+      const listData = await listResponse.json();
+      const fileNames = (listData.items || []).map((item: any) => item.name);
+      
+      files.forEach(fileName => {
+        expect(fileNames).toContain(fileName);
+      });
     });
 
-    describe('Error Handling', () => {
-        it('should handle Firebase Auth errors gracefully', async () => {
-        const auth = admin.auth(firebaseServices.firebaseAdmin);
-        
-        // Test invalid email format
-        await expect(auth.createUser({
-            email: 'invalid-email-format'
-        })).rejects.toThrow();
+    it('should delete files', async () => {
+      const fileName = await createTestFile();
+      
+      // Delete
+      const deleteResponse = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}`, {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(5000)
+      });
+      expect(deleteResponse.ok).toBe(true);
 
-        // Test duplicate email
-        const user1 = await auth.createUser({
-            email: 'duplicate@example.com'
-        });
-
-        await expect(auth.createUser({
-            email: 'duplicate@example.com'
-        })).rejects.toThrow();
-
-        // Cleanup
-        await auth.deleteUser(user1.uid);
-        });
-
-        it('should handle Firebase Storage errors gracefully', async () => {
-        const file = firebaseServices.bucket.file('error-test.txt');
-
-        // Test downloading non-existent file
-        await expect(file.download()).rejects.toThrow();
-
-        // Test getting metadata for non-existent file
-        await expect(file.getMetadata()).rejects.toThrow();
-        });
-
-        it('should handle Firestore errors gracefully', async () => {
-        const firestore = admin.firestore(firebaseServices.firebaseAdmin);
-        
-        // Test getting non-existent document
-        const nonExistentDoc = await firestore.collection('test').doc('non-existent').get();
-        expect(nonExistentDoc.exists).toBe(false);
-
-        // Test updating non-existent document
-        await expect(
-            firestore.collection('test').doc('non-existent').update({ field: 'value' })
-        ).rejects.toThrow();
-        });
+      // Verify deleted
+      const checkResponse = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      expect(checkResponse.status).toBe(404);
     });
 
-    describe('Data Persistence and Reset', () => {
-        it('should clear data between tests', async () => {
-        const auth = admin.auth(firebaseServices.firebaseAdmin);
-        const firestore = admin.firestore(firebaseServices.firebaseAdmin);
-        
-        // Create some data
-        const userRecord = await auth.createUser({
-            email: 'reset-test@example.com'
-        });
-        
-        await firestore.collection('reset-test').add({
-            message: 'This should be cleared'
-        });
-        
-        await firebaseServices.bucket.file('reset-test.txt').save('This should be cleared');
-
-        // Reset emulator
-        await resetFirebaseEmulator();
-
-        // Verify data is cleared
-        await expect(auth.getUser(userRecord.uid)).rejects.toThrow();
-        
-        const docs = await firestore.collection('reset-test').get();
-        expect(docs.empty).toBe(true);
-        
-        const [fileExists] = await firebaseServices.bucket.file('reset-test.txt').exists();
-        expect(fileExists).toBe(false);
-        });
+    it('should handle storage errors', async () => {
+      // Test non-existent file
+      const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/non-existent.txt`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      expect(response.status).toBe(404);
     });
+  });
+
+  describe('Performance Check', () => {
+    it('should handle concurrent auth operations', async () => {
+      const start = Date.now();
+      
+      const users = await Promise.all(
+        Array.from({ length: 5 }, (_, i) =>
+          createTestUser({ email: `concurrent-${i}-${Date.now()}@example.com` })
+        )
+      );
+      
+      const duration = Date.now() - start;
+      console.log(`Created 5 users in ${duration}ms`);
+      
+      expect(users.length).toBe(5);
+      expect(duration).toBeLessThan(5000); // Should take less than 5 seconds
+    });
+
+    it('should handle concurrent storage operations', async () => {
+      const start = Date.now();
+      
+      const fileNames = await Promise.all(
+        Array.from({ length: 3 }, (_, i) =>
+          createTestFile(`concurrent-${i}-${Date.now()}.txt`, `Content ${i}`)
+        )
+      );
+      
+      const duration = Date.now() - start;
+      console.log(`Created 3 files in ${duration}ms`);
+      
+      expect(fileNames.length).toBe(3);
+      expect(duration).toBeLessThan(3000); // Should take less than 3 seconds
+    });
+  });
 });
+
+// Export optimized Jest configuration
+module.exports = {
+  testTimeout: 15000, // 15 second max per test
+  maxWorkers: 1, // Single worker for emulator tests
+  detectOpenHandles: false, // Don't wait for handles in test environment
+  forceExit: true, // Force exit after tests complete
+};

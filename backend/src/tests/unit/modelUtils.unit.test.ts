@@ -1,79 +1,92 @@
-import { getQueryFunction } from '../../utils/modelUtils';
+
 import { query } from '../../models/db';
+import { getQueryFunction } from '../../utils/modelUtils';
 import { testQuery } from '../../utils/testSetup';
 
-// Mock both the regular query and test query functions
+// Mock the dependencies
 jest.mock('../../models/db', () => ({
-  query: jest.fn().mockImplementation(() => Promise.resolve({ rows: [] }))
+  query: jest.fn()
 }));
 
 jest.mock('../../utils/testSetup', () => ({
-  testQuery: jest.fn().mockImplementation(() => Promise.resolve({ rows: [] }))
+  testQuery: jest.fn()
 }));
 
-describe('Model Utilities', () => {
-  // Save original NODE_ENV
-  const originalNodeEnv = process.env.NODE_ENV;
+describe('modelUtils', () => {
+  const originalEnv = process.env.NODE_ENV;
 
   afterEach(() => {
     // Restore original NODE_ENV after each test
-    process.env.NODE_ENV = originalNodeEnv;
+    process.env.NODE_ENV = originalEnv;
     jest.clearAllMocks();
   });
 
   describe('getQueryFunction', () => {
-    test('should return testQuery when NODE_ENV is "test"', () => {
-      // Set environment to test
+    it('should return testQuery when NODE_ENV is test', () => {
       process.env.NODE_ENV = 'test';
       
-      // Get query function
-      const queryFn = getQueryFunction();
+      const result = getQueryFunction();
       
-      // Verify it's the test query function
-      expect(queryFn).toBe(testQuery);
+      expect(result).toBe(testQuery);
+      expect(result).not.toBe(query);
     });
 
-    test('should return regular query when NODE_ENV is not "test"', () => {
-      // Set environment to something other than test
+    it('should return query when NODE_ENV is development', () => {
       process.env.NODE_ENV = 'development';
       
-      // Get query function
-      const queryFn = getQueryFunction();
+      const result = getQueryFunction();
       
-      // Verify it's the regular query function
-      expect(queryFn).toBe(query);
+      expect(result).toBe(query);
+      expect(result).not.toBe(testQuery);
     });
 
-    test('should return regular query when NODE_ENV is undefined', () => {
-      // Set environment to undefined
+    it('should return query when NODE_ENV is production', () => {
+      process.env.NODE_ENV = 'production';
+      
+      const result = getQueryFunction();
+      
+      expect(result).toBe(query);
+      expect(result).not.toBe(testQuery);
+    });
+
+    it('should return query when NODE_ENV is undefined', () => {
       delete process.env.NODE_ENV;
       
-      // Get query function
-      const queryFn = getQueryFunction();
+      const result = getQueryFunction();
       
-      // Verify it's the regular query function
-      expect(queryFn).toBe(query);
+      expect(result).toBe(query);
+      expect(result).not.toBe(testQuery);
     });
-  });
 
-  describe('query function usage', () => {
-    test('should execute the correct query function based on environment', async () => {
-      // Test in test environment
-      process.env.NODE_ENV = 'test';
-      let queryFn = getQueryFunction();
-      await queryFn('SELECT 1');
-      expect(testQuery).toHaveBeenCalledWith('SELECT 1');
-      expect(query).not.toHaveBeenCalled();
+    it('should return query when NODE_ENV is empty string', () => {
+      process.env.NODE_ENV = '';
       
-      // Reset mocks
-      jest.clearAllMocks();
+      const result = getQueryFunction();
       
-      // Test in non-test environment
-      process.env.NODE_ENV = 'production';
-      queryFn = getQueryFunction();
-      await queryFn('SELECT 2');
-      expect(query).toHaveBeenCalledWith('SELECT 2');
-      expect(testQuery).not.toHaveBeenCalled();
+      expect(result).toBe(query);
+      expect(result).not.toBe(testQuery);
+    });
+
+    it('should return query for any non-test environment', () => {
+      const nonTestEnvs = ['staging', 'local', 'dev', 'prod', 'testing', 'TEST'];
+      
+      nonTestEnvs.forEach(env => {
+        process.env.NODE_ENV = env;
+        
+        const result = getQueryFunction();
+        
+        expect(result).toBe(query);
+        expect(result).not.toBe(testQuery);
+      });
+    });
+
+    it('should be case sensitive for test environment', () => {
+      process.env.NODE_ENV = 'TEST';
+      
+      const result = getQueryFunction();
+      
+      expect(result).toBe(query);
+      expect(result).not.toBe(testQuery);
     });
   });
 });

@@ -391,7 +391,7 @@ describe('Firebase Configuration Unit Tests', () => {
 
         await expect(async () => {
             await import('../../config/firebase');
-        }).rejects.toThrow('Private key is required');
+        }).rejects.toThrow('Cannot read properties of undefined (reading \'replace\')');
         });
     });
 

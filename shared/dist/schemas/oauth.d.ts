@@ -1,5 +1,5 @@
 import { z } from 'zod';
-export declare const OAuthProviderSchema: z.ZodEnum<["google", "microsoft", "github"]>;
+export declare const OAuthProviderSchema: z.ZodEnum<["google", "microsoft", "github", "instagram"]>;
 export declare const OAuthUserInfoSchema: z.ZodObject<{
     id: z.ZodString;
     email: z.ZodString;
@@ -16,7 +16,7 @@ export declare const OAuthUserInfoSchema: z.ZodObject<{
     name?: string | undefined;
     picture?: string | undefined;
 }>;
-export declare const LinkedProvidersSchema: z.ZodArray<z.ZodEnum<["google", "microsoft", "github"]>, "many">;
+export declare const LinkedProvidersSchema: z.ZodArray<z.ZodEnum<["google", "microsoft", "github", "instagram"]>, "many">;
 export type OAuthProvider = z.infer<typeof OAuthProviderSchema>;
 export type OAuthUserInfo = z.infer<typeof OAuthUserInfoSchema>;
 export type LinkedProviders = z.infer<typeof LinkedProvidersSchema>;

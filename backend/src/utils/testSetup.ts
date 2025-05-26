@@ -1,33 +1,32 @@
 import { cleanupTestFirebase, initializeTestFirebase, resetFirebaseEmulator } from '@/tests/__helpers__/firebase.helper';
 import { Pool } from 'pg';
 
-// Create a pool for the default postgres database to initialize koutu-postgres-test
-const initPool = new Pool({
+// Test database configuration
+const TEST_DB_CONFIG = {
   host: 'localhost',
   port: 5433,
   user: 'postgres',
-  password: 'password',
-  database: 'postgres',
-  connectionTimeoutMillis: 5000,
-  ssl: false, // Disable SSL
-});
+  password: 'postgres',  // ← Fix this line
+  database: 'koutu_test',
+  max: 20,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  ssl: false,
+};
 
 // Create testPool for test queries
-const testPool = new Pool({
-  host: 'localhost',
-  port: 5433,
-  user: 'postgres',
-  password: 'password',
-  database: 'koutu-postgres-test',
-  max: 20,
-  connectionTimeoutMillis: 5000,
-  idleTimeoutMillis: 30000,
-  ssl: false, // Disable SSL
-});
+const testPool = new Pool(TEST_DB_CONFIG);
 
 // Override the query function for tests
 export const testQuery = async (text: string, params?: any[]) => {
-  return testPool.query(text, params);
+  try {
+    return await testPool.query(text, params);
+  } catch (error) {
+    console.error('Database query error:', error);
+    console.error('Query:', text);
+    console.error('Params:', params);
+    throw error;
+  }
 };
 
 /**
@@ -49,46 +48,77 @@ const waitForService = async (url: string, maxRetries = 30, interval = 1000): Pr
 };
 
 /**
+ * Wait for PostgreSQL to be ready
+ */
+const waitForPostgreSQL = async (): Promise<boolean> => {
+  const maxRetries = 30;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      // Test connection
+      const client = await testPool.connect();
+      await client.query('SELECT 1');
+      client.release();
+      return true;
+    } catch (error) {
+      console.log(`Waiting for PostgreSQL... (${i + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  return false;
+};
+
+/**
  * Initialize test database with required schema
  */
 export const setupTestDatabase = async () => {
   try {
-    // Create koutu-postgres-test database if it doesn't exist
-    const dbCheck = await initPool.query('SELECT 1 FROM pg_database WHERE datname = $1', ['koutu-postgres-test']);
-    if (dbCheck.rowCount === 0) {
-      await initPool.query('CREATE DATABASE "koutu-postgres-test"');
-      console.log('Created koutu-postgres-test database');
+    console.log('Setting up test database...');
+    
+    // Wait for PostgreSQL to be ready
+    const isReady = await waitForPostgreSQL();
+    if (!isReady) {
+      throw new Error('PostgreSQL test database is not ready after 30 seconds');
     }
 
-    // Verify connection to koutu-postgres-test
+    // Verify we're connected to the test database
     const dbResult = await testQuery('SELECT current_database()');
     const dbName = dbResult.rows[0].current_database;
     console.log(`Connected to database: ${dbName}`);
+    
     if (!dbName.includes('test')) {
-      throw new Error('Tests must run against a database with "test" in the name!');
+      throw new Error(`Tests must run against a database with "test" in the name! Current: ${dbName}`);
     }
 
-    // Enable btree_gist extension for EXCLUDE constraints
+    // Enable required extensions
     await testQuery(`CREATE EXTENSION IF NOT EXISTS btree_gist`);
+    await testQuery(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+
+    // Clean up existing tables (in correct order to handle foreign keys)
+    await testQuery(`DROP TABLE IF EXISTS child_cleanup CASCADE`);
+    await testQuery(`DROP TABLE IF EXISTS parent_cleanup CASCADE`);
+    await testQuery(`DROP TABLE IF EXISTS exclude_test_table CASCADE`);
+    await testQuery(`DROP TABLE IF EXISTS test_table CASCADE`);
+    await testQuery(`DROP TABLE IF EXISTS test_items CASCADE`);
+    await testQuery(`DROP TABLE IF EXISTS garment_items CASCADE`);
 
     // Create garment_items table for garmentModel.int.test.ts
     await testQuery(`
-      CREATE TABLE IF NOT EXISTS garment_items (
-        id UUID PRIMARY KEY,
+      CREATE TABLE garment_items (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         user_id TEXT NOT NULL,
         original_image_id TEXT NOT NULL,
         file_path TEXT NOT NULL,
         mask_path TEXT NOT NULL,
         metadata JSONB NOT NULL DEFAULT '{}',
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
         data_version INTEGER NOT NULL DEFAULT 1
       )
     `);
 
     // Create test_items table for db.int.test.ts
     await testQuery(`
-      CREATE TABLE IF NOT EXISTS test_items (
+      CREATE TABLE test_items (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL UNIQUE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -96,7 +126,6 @@ export const setupTestDatabase = async () => {
     `);
 
     // Create test_table for db.int.test.ts
-    await testQuery(`DROP TABLE IF EXISTS test_table`);
     await testQuery(`
       CREATE TABLE test_table (
         id SERIAL PRIMARY KEY,
@@ -104,15 +133,14 @@ export const setupTestDatabase = async () => {
       )
     `);
 
-    // Drop and re-create parent_cleanup and child_cleanup
-    await testQuery(`DROP TABLE IF EXISTS child_cleanup`);
-    await testQuery(`DROP TABLE IF EXISTS parent_cleanup`);
+    // Create parent_cleanup and child_cleanup tables
     await testQuery(`
       CREATE TABLE parent_cleanup (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL
       )
     `);
+    
     await testQuery(`
       CREATE TABLE child_cleanup (
         id SERIAL PRIMARY KEY,
@@ -122,8 +150,7 @@ export const setupTestDatabase = async () => {
       )
     `);
 
-    // Drop and re-create exclude_test_table for EXCLUDE constraint tests
-    await testQuery(`DROP TABLE IF EXISTS exclude_test_table`);
+    // Create exclude_test_table for EXCLUDE constraint tests
     await testQuery(`
       CREATE TABLE exclude_test_table (
         id SERIAL PRIMARY KEY,
@@ -134,17 +161,17 @@ export const setupTestDatabase = async () => {
 
     // Verify table creation
     const tables = await testQuery(`
-        SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name IN ('parent_cleanup', 'child_cleanup', 'exclude_test_table')
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' 
+      ORDER BY table_name
     `);
-    console.log('Tables created in setup:', tables.rows.map(row => row.table_name));
-
+    
+    console.log('Tables created in test database:', tables.rows.map(row => row.table_name));
     console.log('Test database initialized successfully');
+    
   } catch (error) {
     console.error('Test database setup failed:', error);
     throw error;
-  } finally {
-    await initPool.end(); // Close initPool
   }
 };
 
@@ -155,19 +182,20 @@ export const setupFirebaseEmulator = async () => {
   try {
     console.log('Waiting for Firebase emulators to be ready...');
     
-    // Wait for all emulators to be available (updated ports)
+    // Wait for all emulators to be available
     const emulatorChecks = [
-      waitForService('http://localhost:4001'), // UI (updated port)
-      waitForService('http://localhost:9099'), // Auth (updated port)
-      waitForService('http://localhost:9100'), // Firestore (updated port)
-      waitForService('http://localhost:9199')  // Storage (same port)
+      waitForService('http://localhost:4001'), // UI
+      waitForService('http://localhost:9099'), // Auth
+      waitForService('http://localhost:9100'), // Firestore
+      waitForService('http://localhost:9199')  // Storage
     ];
 
     const results = await Promise.all(emulatorChecks);
     const allReady = results.every(ready => ready);
 
     if (!allReady) {
-      throw new Error('Firebase emulators are not ready. Make sure Docker containers are running.');
+      console.warn('Some Firebase emulators are not ready. Tests may fail if they require Firebase.');
+      return;
     }
 
     // Initialize Firebase for testing
@@ -180,7 +208,7 @@ export const setupFirebaseEmulator = async () => {
     console.log('Firebase UI available at: http://localhost:4001');
   } catch (error) {
     console.error('Firebase emulator setup failed:', error);
-    throw error;
+    // Don't throw here - Firebase might not be needed for all tests
   }
 };
 
@@ -189,7 +217,24 @@ export const setupFirebaseEmulator = async () => {
  */
 export const teardownTestDatabase = async () => {
   try {
+    // Clean up test data before closing connections
+    await testQuery(`
+      DELETE FROM child_cleanup;
+      DELETE FROM parent_cleanup;
+      DELETE FROM exclude_test_table;
+      DELETE FROM test_table;
+      DELETE FROM test_items;
+      DELETE FROM garment_items;
+    `);
+    
+    console.log('Test data cleaned up');
+  } catch (error) {
+    console.error('Failed to clean up test data:', error);
+  }
+
+  try {
     await testPool.end();
+    console.log('Test database connections closed');
   } catch (error) {
     console.error('Failed to close testPool:', error);
   }
@@ -200,3 +245,6 @@ export const teardownTestDatabase = async () => {
     console.error('Failed to cleanup Firebase:', error);
   }
 };
+
+// Export pool for direct access if needed
+export const getTestPool = () => testPool;

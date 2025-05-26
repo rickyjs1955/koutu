@@ -1,131 +1,219 @@
-// /backend/src/validators/schemas.ts (UPDATED - Using Shared Schemas)
-import { 
-  // Import from shared API schemas
-  CreateGarmentSchema,
-  UpdateGarmentMetadataSchema,
-  CreatePolygonSchema,
-  UpdatePolygonSchema,
-  ImageQuerySchema,
-  UUIDParamSchema,
-  ImageIdParamSchema,
-  JobIdParamSchema,
-  WardrobeItemParamSchema,
-  CreateWardrobeSchema,
-  UpdateWardrobeSchema,
-  AddGarmentToWardrobeSchema,
-  MLExportOptionsSchema,
-  CreateMLExportSchema,
-  BatchUpdateImageStatusSchema,
-  UpdateImageStatusSchema
-} from '@koutu/shared/schemas/api';
-
-import { 
-  // Import validation utilities
-  BackendValidator,
-  createValidationMiddleware
-} from '../../../shared/src/schemas/validator';
-
+// backend/src/validators/schemas.ts - Fixed version
 import { z } from 'zod';
+import { Request, Response, NextFunction } from 'express';
 
-// ==================== RE-EXPORT SHARED SCHEMAS ====================
-// These are the main schemas used in routes - directly from shared
-export {
-  CreateGarmentSchema,
-  UpdateGarmentMetadataSchema,
-  CreatePolygonSchema,
-  UpdatePolygonSchema,
-  ImageQuerySchema,
-  UUIDParamSchema,
-  ImageIdParamSchema,
-  JobIdParamSchema,
-  WardrobeItemParamSchema,
-  CreateWardrobeSchema,
-  UpdateWardrobeSchema,
-  AddGarmentToWardrobeSchema,
-  MLExportOptionsSchema,
-  CreateMLExportSchema,
-  BatchUpdateImageStatusSchema,
-  UpdateImageStatusSchema
-};
+// ==================== CORE SCHEMAS ====================
 
-// ==================== BACKEND-SPECIFIC EXTENSIONS ====================
+// Base garment schema
+const BaseGarmentSchema = z.object({
+  mask_data: z.object({
+    width: z.number().positive('Width must be positive'),
+    height: z.number().positive('Height must be positive'),
+    data: z.array(z.number()).min(1, 'Mask data must be an array of numbers')
+  }),
+  metadata: z.object({
+    type: z.string().min(1, 'Type is required'),
+    color: z.string().min(1, 'Color is required'),
+    brand: z.string().min(1, 'Brand is required'),
+    tags: z.array(z.string()).optional(),
+    season: z.string().optional(),
+    size: z.string().optional(),
+    material: z.string().optional()
+  }).optional(),
+  original_image_id: z.string().optional(),
+  processing_notes: z.string().optional(),
+  source_polygon_id: z.string().optional(),
+  created_by: z.string().optional()
+});
 
-// Extended garment schema with backend-specific business rules
-export const CreateGarmentWithBusinessRulesSchema = CreateGarmentSchema.extend({
-  // Add server-side validations
-  mask_data: CreateGarmentSchema.shape.mask_data.refine(
-    (data) => {
-      // Ensure mask data is properly formatted for processing
-      const expectedLength = data.width * data.height;
-      if (data.data.length !== expectedLength) {
-        return false;
-      }
-      
-      // Ensure mask has some actual content (not all zeros)
-      const nonZeroCount = data.data.filter(val => val > 0).length;
-      return nonZeroCount > 0;
-    },
-    'Mask must contain actual selection data'
-  )
+// Extended garment schema with business rules
+export const CreateGarmentWithBusinessRulesSchema = BaseGarmentSchema.refine(
+  (data) => {
+    // Ensure mask data length matches dimensions
+    const expectedLength = data.mask_data.width * data.mask_data.height;
+    return data.mask_data.data.length === expectedLength;
+  },
+  {
+    message: 'Mask data length must match width * height',
+    path: ['mask_data', 'data']
+  }
+).refine(
+  (data) => {
+    // Ensure mask has actual content (not all zeros)
+    const nonZeroCount = data.mask_data.data.filter(val => val > 0).length;
+    return nonZeroCount > 0;
+  },
+  {
+    message: 'Mask must contain actual selection data (cannot be all zeros)',
+    path: ['mask_data', 'data']
+  }
+);
+
+// Base polygon schema
+const BasePolygonSchema = z.object({
+  points: z.array(z.object({
+    x: z.number(),
+    y: z.number()
+  })).min(3, 'Polygon must have at least 3 points'),
+  metadata: z.object({
+    label: z.string().min(1, 'Label is required'),
+    confidence: z.number().min(0).max(1).optional(),
+    source: z.string().optional(),
+    notes: z.string().optional(),
+    annotator_id: z.string().optional()
+  }).optional(),
+  original_image_id: z.string().optional(),
+  created_by: z.string().optional()
 });
 
 // Extended polygon schema with geometry validation
-export const CreatePolygonWithGeometryValidationSchema = CreatePolygonSchema.extend({
-  points: CreatePolygonSchema.shape.points.refine(
-    (points) => {
-      // Validate polygon area is sufficient
-      const area = calculatePolygonArea(points);
-      return area >= 100; // minimum 100 square pixels
-    },
-    'Polygon area too small for processing'
-  ).refine(
-    (points) => {
-      // Check for self-intersection (simplified check)
-      return !hasSelfIntersection(points);
-    },
-    'Polygon cannot have self-intersecting edges'
-  )
-});
+export const CreatePolygonWithGeometryValidationSchema = BasePolygonSchema.refine(
+  (data) => {
+    // Validate polygon area is sufficient (minimum 100 square pixels)
+    const area = calculatePolygonArea(data.points);
+    return area >= 100;
+  },
+  {
+    message: 'Polygon area too small for processing (minimum 100 square pixels)',
+    path: ['points']
+  }
+).refine(
+  (data) => {
+    // Check for self-intersection (simplified check)
+    return !hasSelfIntersection(data.points);
+  },
+  {
+    message: 'Polygon cannot have self-intersecting edges',
+    path: ['points']
+  }
+);
 
-// File upload validation schema (backend-specific)
+// File upload schema
 export const FileUploadSchema = z.object({
   fieldname: z.string(),
-  originalname: z.string().max(255, 'Filename too long'),
+  originalname: z.string().max(255, 'Filename too long (max 255 characters)'),
   encoding: z.string(),
-  mimetype: z.string().regex(/^image\/(jpeg|png|webp)$/, 'Invalid image type'),
+  mimetype: z.string().regex(
+    /^image\/(jpeg|jpg|png|webp)$/i, 
+    'Invalid image type. Only JPEG, PNG, and WebP are allowed'
+  ),
   size: z.number().max(5242880, 'File too large (max 5MB)'),
   buffer: z.instanceof(Buffer)
 });
 
-// ==================== VALIDATION MIDDLEWARE FACTORIES ====================
+// UUID parameter schema
+export const UUIDParamSchema = z.object({
+  id: z.string().uuid('Invalid UUID format')
+});
 
-export const validateBody = createValidationMiddleware.forExpress;
-export const validateQuery = createValidationMiddleware.forExpress;
-export const validateParams = createValidationMiddleware.forExpress;
+// Image query schema
+export const ImageQuerySchema = z.object({
+  limit: z.string().optional().transform(val => val ? parseInt(val, 10) : undefined),
+  offset: z.string().optional().transform(val => val ? parseInt(val, 10) : undefined),
+  sort: z.enum(['created_at', 'updated_at', 'name']).optional(),
+  order: z.enum(['asc', 'desc']).optional(),
+  search: z.string().optional()
+});
 
-// Specific validation middleware for common use cases
-export const validateUUIDParam = validateParams(UUIDParamSchema, 'params');
-export const validateImageQuery = validateQuery(ImageQuerySchema, 'query');
+// ==================== ADDITIONAL SCHEMAS ====================
+
+// Update garment metadata schema
+export const UpdateGarmentMetadataSchema = z.object({
+  metadata: z.object({
+    type: z.string().optional(),
+    color: z.string().optional(),
+    brand: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    season: z.string().optional(),
+    size: z.string().optional(),
+    material: z.string().optional()
+  }),
+  processing_notes: z.string().optional()
+});
+
+// Create polygon schema (alias for consistency)
+export const CreatePolygonSchema = BasePolygonSchema;
+
+// Update polygon schema
+export const UpdatePolygonSchema = z.object({
+  points: z.array(z.object({
+    x: z.number(),
+    y: z.number()
+  })).min(3).optional(),
+  metadata: z.object({
+    label: z.string().optional(),
+    confidence: z.number().min(0).max(1).optional(),
+    source: z.string().optional(),
+    notes: z.string().optional()
+  }).optional()
+});
+
+// ==================== MIDDLEWARE FUNCTIONS ====================
+
+// Generic validation middleware factory
+export const createValidationMiddleware = (schema: z.ZodSchema, field: 'body' | 'query' | 'params' | 'file') => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const dataToValidate = req[field];
+      const result = schema.safeParse(dataToValidate);
+      
+      if (result.success) {
+        // Replace the original data with the validated/transformed data
+        (req as any)[field] = result.data;
+        next();
+      } else {
+        const error = new Error('Validation failed');
+        (error as any).statusCode = 400;
+        (error as any).code = 'VALIDATION_ERROR';
+        (error as any).details = result.error.issues;
+        next(error);
+      }
+    } catch (err) {
+      const error = new Error('Validation middleware error');
+      (error as any).statusCode = 500;
+      (error as any).code = 'MIDDLEWARE_ERROR';
+      (error as any).originalError = err;
+      next(error);
+    }
+  };
+};
+
+// Specific validation middleware
+export const validateBody = (schema: z.ZodSchema) => createValidationMiddleware(schema, 'body');
+export const validateQuery = (schema: z.ZodSchema) => createValidationMiddleware(schema, 'query');
+export const validateParams = (schema: z.ZodSchema) => createValidationMiddleware(schema, 'params');
+
+// Pre-configured validation middleware
+export const validateUUIDParam = createValidationMiddleware(UUIDParamSchema, 'params');
+export const validateImageQuery = createValidationMiddleware(ImageQuerySchema, 'query');
 
 // File validation middleware
-export const validateFile = (req: any, res: any, next: any) => {
-  const result = BackendValidator.validateWithContext(
-    FileUploadSchema,
-    req.file,
-    {
-      operation: 'file_upload',
-      userId: req.user?.id
+export const validateFile = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) {
+      const error = new Error('No file provided');
+      (error as any).statusCode = 400;
+      (error as any).code = 'NO_FILE';
+      return next(error);
     }
-  );
 
-  if (result.success) {
-    req.file = result.data;
-    next();
-  } else {
-    const error = new Error('Invalid file upload');
-    (error as any).statusCode = 400;
-    (error as any).code = 'INVALID_FILE';
-    (error as any).details = result.errors;
+    const result = FileUploadSchema.safeParse(req.file);
+    
+    if (result.success) {
+      req.file = result.data as Express.Multer.File;
+      next();
+    } else {
+      const error = new Error('Invalid file upload');
+      (error as any).statusCode = 400;
+      (error as any).code = 'INVALID_FILE';
+      (error as any).details = result.error.issues;
+      next(error);
+    }
+  } catch (err) {
+    const error = new Error('File validation error');
+    (error as any).statusCode = 500;
+    (error as any).code = 'FILE_VALIDATION_ERROR';
+    (error as any).originalError = err;
     next(error);
   }
 };
@@ -151,6 +239,7 @@ function hasSelfIntersection(points: Array<{ x: number; y: number }>): boolean {
   
   for (let i = 0; i < points.length; i++) {
     for (let j = i + 2; j < points.length; j++) {
+      // Skip adjacent segments and last-to-first segment
       if (j === points.length - 1 && i === 0) continue;
       
       const line1 = {
@@ -179,10 +268,21 @@ function linesIntersect(
   p4: { x: number; y: number }
 ): boolean {
   const det = (p2.x - p1.x) * (p4.y - p3.y) - (p4.x - p3.x) * (p2.y - p1.y);
-  if (det === 0) return false;
+  if (det === 0) return false; // Lines are parallel
   
   const lambda = ((p4.y - p3.y) * (p4.x - p1.x) + (p3.x - p4.x) * (p4.y - p1.y)) / det;
   const gamma = ((p1.y - p2.y) * (p4.x - p1.x) + (p2.x - p1.x) * (p4.y - p1.y)) / det;
   
   return (0 < lambda && lambda < 1) && (0 < gamma && gamma < 1);
 }
+
+// ==================== EXPORTS ====================
+
+// Re-export core schemas for compatibility
+export const CreateGarmentSchema = BaseGarmentSchema;
+
+// Export all schemas and validators
+export {
+  BaseGarmentSchema,
+  BasePolygonSchema
+};

@@ -11,16 +11,28 @@
     "migrate:test": "cross-env DATABASE_URL=postgresql://postgres:password@localhost:5433/koutu_test tsx scripts/runMigrations.ts",
     "seed": "ts-node scripts/seedDatabase.ts",
     "setup-db": "npm run migrate && npm run seed",
+    
     "test": "jest --config jest.config.cjs",
     "test:watch": "jest --config jest.config.cjs --watch",
     "test:coverage": "jest --config jest.config.cjs --coverage",
-    "test:int": "cross-env NODE_ENV=test jest --testMatch='**/*.int.test.ts'",
+    "test:int": "cross-env NODE_ENV=test jest --testMatch='**/*.int.test.ts' --runInBand",
     "test:firebase": "jest --testPathPattern='firebase.*\\.test\\.(js|ts)$' --no-cache",
     "test:clean": "rimraf dist && jest --no-cache",
-    "docker:test-up": "docker-compose up -d postgres-test firebase-emulator",
-    "docker:test-down": "docker-compose down",
-    "docker:test-clean": "docker-compose down -v",
-    "docker:logs": "docker-compose logs firebase-emulator"
+    
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:test-up": "docker-compose up -d postgres-test",
+    "docker:test-down": "docker-compose stop postgres-test",
+    "docker:test-clean": "docker-compose down -v postgres-test",
+    "docker:logs": "docker-compose logs",
+    "docker:logs:postgres": "docker-compose logs postgres-test",
+    "docker:logs:firebase": "docker-compose logs firebase-emulator",
+    
+    "test:setup": "npm run docker:test-up && sleep 5 && npm run migrate:test",
+    "test:full": "npm run test:setup && npm run test:int",
+    
+    "db:connect": "docker exec -it koutu-postgres-test psql -U postgres -d koutu_test",
+    "db:reset": "docker-compose restart postgres-test"
   },
   "dependencies": {
     "@koutu/shared": "*",
@@ -30,7 +42,8 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-session": "^1.17.3",
-    "firebase-admin": "^13.3.0",
+    "firebase-admin": "^12.0.0",
+    "@google-cloud/storage": "^7.7.0",
     "helmet": "^7.0.0",
     "jsonwebtoken": "^9.0.1",
     "multer": "^1.4.5-lts.1",
@@ -69,6 +82,7 @@
     "ts-jest": "^29.3.2",
     "ts-node": "^10.9.1",
     "tsx": "^4.19.4",
-    "typescript": "^5.1.6"
+    "typescript": "^5.1.6",
+    "@firebase/rules-unit-testing": "^3.0.0"
   }
 }

@@ -99,24 +99,24 @@ Backend:
 
 
 
-
-
-
+✅ Test Passed
+❌ Test Not Available
+🔔 Test Not Applicable
 
 Backend:
-1. /backend/src/config/index.ts ✅Unit ✅Integration ✅Security
-2. /backend/src/config/firebase.ts ✅Unit ❌Integration ❌Security
-3. /backend/src/config/oauth.ts
-4. /backend/src/controllers/garmentController.ts
-5. /backend/src/controllers/imageController.ts
-6. /backend/src/controllers/exportController.ts
-7. /backend/src/controllers/authController.ts
-8. /backend/src/controllers/wardrobeController.ts
-9. /backend/src/controllers/polygonController.ts
-10. /backend/src/controllers/oauthController.ts
-11. /backend/src/middlewares/auth.ts ✅Unit ✅Integration ✅Security
-12. /backend/src/middlewares/errorHandler.ts ✅Unit ✅Integration ✅Security
-13. /backend/src/middlewares/validate.ts
+1. /backend/src/config/index.ts                         ✅Unit ✅Integration ✅Security
+2. /backend/src/config/firebase.ts                      ✅Unit ✅Integration ✅Security
+3. /backend/src/config/oauth.ts                         
+4. /backend/src/controllers/garmentController.ts        
+5. /backend/src/controllers/imageController.ts          
+6. /backend/src/controllers/exportController.ts         
+7. /backend/src/controllers/authController.ts          
+8. /backend/src/controllers/wardrobeController.ts       
+9. /backend/src/controllers/polygonController.ts        
+10. /backend/src/controllers/oauthController.ts         
+11. /backend/src/middlewares/auth.ts                    ✅Unit ✅Integration ✅Security
+12. /backend/src/middlewares/errorHandler.ts            ✅Unit ✅Integration ✅Security
+13. /backend/src/middlewares/validate.ts                🔔Unit 🔔Integration 🔔Security
 14. /backend/src/models/userModel.ts
 15. /backend/src/models/db.ts
 16. /backend/src/models/wardrobeModel.ts
@@ -142,10 +142,11 @@ Backend:
 36. /backend/src/services/garmentService.ts
 37. /backend/src/services/imageService.ts
 38. /backend/src/services/polygonService.ts
-39. /backend/src/utils/ApiError.ts ✅Unit ✅Integration ✅Security
-40. /backend/src/utils/sanitize.ts ✅Unit ✅Integration ✅Security
-41. /backend/src/utils/modelUtils.ts
-42. /backend/src/utils/testSetup.ts
-43. /backend/src/utils/PolygonServiceUtils.ts
-44. /backend/src/validators/index.ts
+39. /backend/src/utils/ApiError.ts                        ✅Unit ✅Integration ✅Security
+40. /backend/src/utils/sanitize.ts                        ✅Unit ✅Integration ✅Security
+41. /backend/src/utils/modelUtils.ts                      ✅Unit 🔔Integration 🔔Security
+42. /backend/src/utils/testSetup.ts                       🔔Unit ✅Integration 🔔Security
+43. /backend/src/utils/PolygonServiceUtils.ts             ✅Unit ✅Integration 🔔Security
+44. /backend/src/validators/index.ts                      🔔Unit 🔔Integration 🔔Security
+45. /backend/src/validators/schemas.ts                    ✅Unit ✅Integration ❌Security
 45. /backend/src/app.ts

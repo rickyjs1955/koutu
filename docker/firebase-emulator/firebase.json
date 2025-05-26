@@ -1,13 +1,7 @@
-@'
 {
   "emulators": {
     "auth": {
-      "port": 9099,
-      "host": "0.0.0.0"
-    },
-    "firestore": {
-      "port": 9100,
-      "host": "0.0.0.0"
+      "port": 9099
     },
     "storage": {
       "port": 9199,
@@ -15,15 +9,10 @@
     },
     "ui": {
       "enabled": true,
-      "port": 4000,
-      "host": "0.0.0.0"
+      "port": 4001
     }
   },
   "storage": {
     "rules": "storage.rules"
-  },
-  "firestore": {
-    "rules": "firestore.rules"
   }
 }
-'@ | Out-File -FilePath "firebase.json" -Encoding UTF8

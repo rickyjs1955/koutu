@@ -7,7 +7,8 @@ const zod_1 = require("zod");
 exports.OAuthProviderSchema = zod_1.z.enum([
     'google',
     'microsoft',
-    'github'
+    'github',
+    'instagram'
 ]);
 // OAuth user info schema
 exports.OAuthUserInfoSchema = zod_1.z.object({

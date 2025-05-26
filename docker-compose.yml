@@ -1,81 +1,80 @@
-# Updated docker-compose.yml - Fix for Alpine/Ubuntu mismatch
-
+# docker-compose.yml - Fixed configuration
 services:
-  # Main development database
-  postgres:
-    image: postgres:15
-    container_name: koutu-postgres
+  # PostgreSQL Development Database
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: koutu-postgres-dev
     environment:
+      POSTGRES_DB: postgres
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: koutu
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./docker/postgres/init-dev.sql:/docker-entrypoint-initdb.d/init-dev.sql
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-dev.sql:/docker-entrypoint-initdb.d/01-init-dev.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
-      - koutu-network
+      - koutu-test-network
 
-  # Test database (separate instance)
+  # PostgreSQL Test Database (SEPARATE from dev)
   postgres-test:
-    image: postgres:15
+    image: postgres:15-alpine
     container_name: koutu-postgres-test
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: koutu_test
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres  
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "5433:5432"
+      - "5433:5432"  # Different external port
     volumes:
-      - postgres-test-data:/var/lib/postgresql/data
-      - ./docker/postgres/init-test.sql:/docker-entrypoint-initdb.d/init-test.sql
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-test.sql:/docker-entrypoint-initdb.d/01-init-test.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
-      - koutu-network
+      - koutu-test-network
 
-  # Firebase Emulator Suite - FIXED VERSION
-  # Final Fixed Firebase Docker Configuration
-
-firebase-emulator:
-  image: node:18
-  container_name: koutu-firebase-emulator
-  working_dir: /app
-  command: >
-    bash -c "
-      echo 'Starting Firebase emulator setup...' &&
-      apt-get update && apt-get install -y curl default-jre &&
-      npm install -g firebase-tools@12.9.1 &&
-      echo 'Firebase CLI installed successfully' &&
-      echo 'Starting emulators...' &&
-      firebase emulators:start --only auth,firestore,storage --project demo-test-project --host 0.0.0.0
-    "
-  environment:
-    - FIREBASE_PROJECT=demo-test-project
-    - FIRESTORE_EMULATOR_HOST=0.0.0.0:9100
-    - FIREBASE_AUTH_EMULATOR_HOST=0.0.0.0:9099
-    - FIREBASE_STORAGE_EMULATOR_HOST=0.0.0.0:9199
-  ports:
-    - "4001:4000"   # Firebase UI
-    - "9099:9099"   # Auth Emulator
-    - "9100:9100"   # Firestore Emulator
-    - "9199:9199"   # Storage Emulator
-  volumes:
-    - ./docker/firebase:/app
-    - firebase-data:/app/data
-  networks:
-    - koutu-network
-  healthcheck:
-    test: ["CMD", "curl", "--fail", "http://localhost:4000"]
-    interval: 30s
-    timeout: 10s
-    retries: 5
-    start_period: 120s
+  # Firebase Emulator Suite
+  firebase-emulator:
+    build:
+      context: ./docker/firebase-emulator
+      dockerfile: Dockerfile
+    container_name: koutu-firebase-emulator
+    environment:
+      - NODE_ENV=test
+      - FIREBASE_PROJECT_ID=demo-test-project
+    ports:
+      - "4000:4000"   # Firebase UI
+      - "9099:9099"   # Auth Emulator
+      - "9100:9100"   # Firestore Emulator
+      - "9199:9199"   # Storage Emulator
+    volumes:
+      - firebase_emulator_data:/firebase/data
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9099"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - koutu-test-network
 
 volumes:
-  postgres-data:
-  postgres-test-data:
-  firebase-data:
+  postgres_dev_data:
+  postgres_test_data:
+  firebase_emulator_data:
 
 networks:
-  koutu-network:
+  koutu-test-network:
     driver: bridge
