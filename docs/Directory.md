@@ -148,5 +148,5 @@ Backend:
 42. /backend/src/utils/testSetup.ts                       🔔Unit ✅Integration 🔔Security
 43. /backend/src/utils/PolygonServiceUtils.ts             ✅Unit ✅Integration 🔔Security
 44. /backend/src/validators/index.ts                      🔔Unit 🔔Integration 🔔Security
-45. /backend/src/validators/schemas.ts                    ✅Unit ✅Integration ❌Security
+45. /backend/src/validators/schemas.ts                    ✅Unit ✅Integration ✅Security
 45. /backend/src/app.ts

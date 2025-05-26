@@ -101,6 +101,29 @@ export const FileUploadSchema = z.object({
   buffer: z.instanceof(Buffer)
 });
 
+// Enhanced file upload schema with additional business rules
+export const EnhancedFileUploadSchema = FileUploadSchema.refine(
+  (data) => {
+    // Prevent path traversal
+    return !data.originalname.includes('..') && 
+           !data.originalname.includes('\\') &&
+           !data.originalname.includes('/');
+  },
+  {
+    message: 'Filename cannot contain path traversal characters',
+    path: ['originalname']
+  }
+).refine(
+  (data) => {
+    // Prevent empty files
+    return data.size > 0;
+  },
+  {
+    message: 'File cannot be empty',
+    path: ['size']
+  }
+);
+
 // UUID parameter schema
 export const UUIDParamSchema = z.object({
   id: z.string().uuid('Invalid UUID format')
@@ -197,7 +220,7 @@ export const validateFile = (req: Request, res: Response, next: NextFunction) =>
       return next(error);
     }
 
-    const result = FileUploadSchema.safeParse(req.file);
+    const result = EnhancedFileUploadSchema.safeParse(req.file);
     
     if (result.success) {
       req.file = result.data as Express.Multer.File;
