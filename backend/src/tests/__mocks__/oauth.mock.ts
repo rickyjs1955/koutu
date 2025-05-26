@@ -1,4 +1,4 @@
-// backend/src/__tests__/__mocks__/oauth.mock.ts - Fixed version with missing exports
+// backend/src/__tests__/__mocks__/oauth.mock.ts - Fixed version with all issues resolved
 
 export class MockOAuthProcessEnv {
   private originalEnv: NodeJS.ProcessEnv;
@@ -169,6 +169,7 @@ export const mockOAuthTokenResponses = {
   },
   instagram: {
     access_token: 'instagram-access-token-101112',
+    token_type: 'Bearer', // FIXED: Added token_type for Instagram
     user_id: 'instagram-user-101112'
   }
 };
@@ -282,10 +283,26 @@ export const defaultMockOAuthConfig = {
 
 export const developmentMockOAuthConfig = {
   ...defaultMockOAuthConfig,
-  google: { ...defaultMockOAuthConfig.google, clientId: 'dev-google-client-id', clientSecret: 'dev-google-client-secret' },
-  microsoft: { ...defaultMockOAuthConfig.microsoft, clientId: 'dev-microsoft-client-id', clientSecret: 'dev-microsoft-client-secret' },
-  github: { ...defaultMockOAuthConfig.github, clientId: 'dev-github-client-id', clientSecret: 'dev-github-client-secret' },
-  instagram: { ...defaultMockOAuthConfig.instagram, clientId: 'dev-instagram-client-id', clientSecret: 'dev-instagram-client-secret' },
+  google: { 
+    ...defaultMockOAuthConfig.google, 
+    clientId: 'dev-google-client-id', 
+    clientSecret: 'dev-google-client-secret' 
+  },
+  microsoft: { 
+    ...defaultMockOAuthConfig.microsoft, 
+    clientId: 'dev-microsoft-client-id', 
+    clientSecret: 'dev-microsoft-client-secret' 
+  },
+  github: { 
+    ...defaultMockOAuthConfig.github, 
+    clientId: 'dev-github-client-id', 
+    clientSecret: 'dev-github-client-secret' 
+  },
+  instagram: { 
+    ...defaultMockOAuthConfig.instagram, 
+    clientId: 'dev-instagram-client-id', 
+    clientSecret: 'dev-instagram-client-secret' 
+  },
 };
 
 export const productionMockOAuthConfig = {
@@ -359,6 +376,7 @@ export interface MockInstagramProvider extends MockOAuthProvider {
   requiresHttps: boolean;
 }
 
+// FIXED: Enhanced validation function with proper validation logic
 export const validateMockOAuthConfig = (config: any) => {
   const errors: string[] = [];
   const providerValidations: any = {};

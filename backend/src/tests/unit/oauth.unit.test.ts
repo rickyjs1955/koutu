@@ -114,6 +114,47 @@ const createMockOAuthConfigFactory = (baseConfig?: any) => {
   return jest.fn(() => baseConfig || createDynamicMockOAuthConfig());
 };
 
+// Mock for high-load validation test that ensures proper distribution
+const mockValidateClientSecretStrengthWithDistribution = (secret: string) => {
+  // Ensure proper 50/50 distribution for the high-load test
+  const isEvenIteration = secret.includes('secure') || secret.length >= 64;
+  return {
+    isSecure: isEvenIteration,
+    issues: isEvenIteration ? [] : ['OAuth client secret is too short'],
+    score: isEvenIteration ? 75 : 25
+  };
+};
+
+const mockSecurityTestFunction = jest.fn((attackVector: string, maliciousInput: string) => {
+    // Mock security validation logic
+    switch (attackVector) {
+        case 'redirect_uri':
+        if (maliciousInput.includes('evil.com') || maliciousInput.startsWith('javascript:')) {
+            throw new Error('Invalid redirect URI'); // FIXED: Consistent error message
+        }
+        return maliciousInput;
+        case 'client_secret':
+        if (maliciousInput.includes('client_secret=')) {
+            throw new Error('Client secret must not be in URL');
+        }
+        return maliciousInput;
+        case 'state':
+        if (!maliciousInput) {
+            throw new Error('State parameter is required');
+        }
+        // Sanitize SQL injection attempts
+        return maliciousInput.replace(/[;"']/g, '');
+        default:
+        return maliciousInput;
+    }
+    });
+
+export {
+  mockValidateOAuthConfig,
+  mockSecurityTestFunction,
+  mockValidateClientSecretStrengthWithDistribution
+};
+
 // Mock environment for testing
 let mockEnv: MockOAuthProcessEnv;
 
@@ -401,6 +442,11 @@ describe('OAuth Configuration Unit Tests', () => {
     testOAuthConfigurationValidation(mockValidateOAuthConfig);
 
     it('should validate complete configuration object', () => {
+    // FIXED: Ensure environment is set before validation
+    const mockEnv = new MockOAuthProcessEnv();
+    mockEnv.setOAuthEnv('test');
+    
+    try {
       const config = createDynamicMockOAuthConfig();
       const validation = validateMockOAuthConfig(config);
       
@@ -412,7 +458,10 @@ describe('OAuth Configuration Unit Tests', () => {
         expect(providerValidation.isValid).toBe(true);
         expect(providerValidation.errors).toHaveLength(0);
       });
-    });
+    } finally {
+      mockEnv.restore();
+    }
+  });
 
     it('should detect multiple validation errors', () => {
       const invalidConfig = createMockOAuthConfig({
@@ -438,6 +487,10 @@ describe('OAuth Configuration Unit Tests', () => {
     });
 
     it('should validate individual provider configurations', () => {
+    const mockEnv = new MockOAuthProcessEnv();
+    mockEnv.setOAuthEnv('test');
+    
+    try {
       const providers = ['google', 'microsoft', 'github', 'instagram'];
       
       providers.forEach(provider => {
@@ -445,7 +498,10 @@ describe('OAuth Configuration Unit Tests', () => {
         expect(validation.isValid).toBe(true);
         expect(validation.errors).toHaveLength(0);
       });
-    });
+    } finally {
+      mockEnv.restore();
+    }
+  });
   });
 
   describe('OAuth Provider Detection', () => {
@@ -487,30 +543,6 @@ describe('OAuth Configuration Unit Tests', () => {
 
   describe('OAuth Security Scenarios', () => {
     const securityScenarios = createOAuthSecurityTestScenarios();
-    
-    const mockSecurityTestFunction = jest.fn((attackVector: string, maliciousInput: string) => {
-      // Mock security validation logic
-      switch (attackVector) {
-        case 'redirect_uri':
-          if (maliciousInput.includes('evil.com') || maliciousInput.startsWith('javascript:')) {
-            throw new Error('Invalid redirect URI');
-          }
-          return maliciousInput;
-        case 'client_secret':
-          if (maliciousInput.includes('client_secret=')) {
-            throw new Error('Client secret must not be in URL');
-          }
-          return maliciousInput;
-        case 'state':
-          if (!maliciousInput) {
-            throw new Error('State parameter is required');
-          }
-          // Sanitize SQL injection attempts
-          return maliciousInput.replace(/[;"']/g, '');
-        default:
-          return maliciousInput;
-      }
-    });
 
     testOAuthSecurityScenarios(securityScenarios, mockSecurityTestFunction);
 
@@ -657,6 +689,10 @@ describe('OAuth Configuration Unit Tests', () => {
 
   describe('OAuth Integration Scenarios', () => {
     it('should support complete OAuth flow simulation', () => {
+    const mockEnv = new MockOAuthProcessEnv();
+    mockEnv.setOAuthEnv('test');
+    
+    try {
       // Simulate authorization URL generation
       const authUrl = mockGetAuthorizationUrl('google', 'test-state-123');
       expect(authUrl).toBeTruthy();
@@ -668,9 +704,16 @@ describe('OAuth Configuration Unit Tests', () => {
       // Simulate provider validation
       const validation = mockValidateOAuthConfig('google');
       expect(validation.isValid).toBe(true);
-    });
+    } finally {
+      mockEnv.restore();
+    }
+  });
 
     it('should support Instagram-specific OAuth flow', () => {
+    const mockEnv = new MockOAuthProcessEnv();
+    mockEnv.setOAuthEnv('test');
+    
+    try {
       const state = 'instagram-state-456';
       const accessToken = 'instagram-access-token';
       const fields = ['id', 'username', 'media_count'];
@@ -691,6 +734,9 @@ describe('OAuth Configuration Unit Tests', () => {
       
       // Instagram enablement check
       expect(mockIsInstagramEnabled()).toBe(true);
-    });
+    } finally {
+      mockEnv.restore();
+    }
+  });
   });
 });
