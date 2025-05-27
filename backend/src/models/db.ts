@@ -1,5 +1,5 @@
 // /backend/src/models/db.ts
-import { Pool, PoolConfig } from 'pg'; // Import PoolConfig
+import { Pool, PoolConfig } from 'pg';
 import { config } from '../config';
 
 let isPoolClosed = false;
@@ -12,34 +12,30 @@ const poolOptions: PoolConfig = {
 if (config.dbPoolMax !== undefined) {
   poolOptions.max = config.dbPoolMax;
 }
-if (config.dbConnectionTimeout !== undefined && config.dbConnectionTimeout > 0) { // pg uses 0 for no timeout
+if (config.dbConnectionTimeout !== undefined && config.dbConnectionTimeout > 0) {
   poolOptions.connectionTimeoutMillis = config.dbConnectionTimeout;
 }
 if (config.dbIdleTimeout !== undefined) {
   poolOptions.idleTimeoutMillis = config.dbIdleTimeout;
 }
-if (config.dbStatementTimeout !== undefined && config.dbStatementTimeout > 0) { // For client default statement_timeout
+if (config.dbStatementTimeout !== undefined && config.dbStatementTimeout > 0) {
   poolOptions.statement_timeout = config.dbStatementTimeout;
 }
 
 // SSL Configuration
 if (config.dbRequireSsl) {
   if (config.nodeEnv === 'production') {
-    poolOptions.ssl = { rejectUnauthorized: true }; // Enforce verified SSL in prod
+    poolOptions.ssl = { rejectUnauthorized: true };
   } else {
-    // For dev/test, you might allow self-signed or skip rejectUnauthorized
-    // depending on your setup. For simplicity, if dbRequireSsl is true
-    // but not prod, we'll assume a basic SSL requirement.
-    poolOptions.ssl = { rejectUnauthorized: false }; // Example: allow self-signed for non-prod
+    poolOptions.ssl = { rejectUnauthorized: false };
   }
 }
-
 
 // Create database connection pool
 export const pool = new Pool(poolOptions);
 
-// Only test connection in non-test environments
-if (config.nodeEnv !== 'test') {
+// Only test connection in non-test environments and when not explicitly skipped
+if (config.nodeEnv !== 'test' && process.env.SKIP_DB_CONNECTION_TEST !== 'true') {
   pool.query('SELECT NOW()', (err, res) => {
     if (err) {
       console.error('Database connection error:', err.message);
@@ -71,7 +67,6 @@ export const query = async (text: string, params?: any[]) => {
         if (error instanceof Error) {
             throw error;
         } else {
-            // Wrap non-Error throwables in an Error object
             throw new Error(String(error));
         }
     }

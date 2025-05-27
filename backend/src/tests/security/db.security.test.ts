@@ -20,20 +20,15 @@
 
 import { jest, describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import { Pool, PoolClient } from 'pg';
-import { setupTestDatabase, teardownTestDatabase, testQuery } from '../../utils/testSetup';
+import { setupTestDatabase, teardownTestDatabase } from '../../utils/testSetup';
 
 // Import test utilities
 import {
-  MockPoolFactory,
-  MockQueryResultFactory,
-  DatabaseErrors,
   MockUtils,
 } from '../__mocks__/db.mock';
 
 import {
-  TestConfigs,
   MockSetup,
-  ErrorSimulation,
 } from '../__helpers__/db.helper';
 
 // Security-specific test utilities

@@ -21,7 +21,7 @@
  */
 
 import { jest, describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from '@jest/globals';
-import { Pool, PoolConfig } from 'pg';
+import { Pool } from 'pg';
 
 // Import test utilities
 import {
@@ -30,16 +30,12 @@ import {
   DatabaseErrors,
   QueryScenarios,
   MockUtils,
-  PerformanceMocks,
 } from '../__mocks__/db.mock';
 
 import {
   TestConfigs,
   PoolConfigBuilder,
-  MockSetup,
-  QueryAssertions,
   ErrorSimulation,
-  PerformanceHelpers,
 } from '../__helpers__/db.helper';
 
 // Create mock constructor BEFORE mocking the module
@@ -54,9 +50,11 @@ describe('Database Module Unit Tests', () => {
   let mockPool: jest.Mocked<Pool>;
   let consoleSpy: ReturnType<typeof MockUtils.setupConsoleSpy>;
   let originalEnv: string | undefined;
+  let originalSkipTest: string | undefined;
 
   beforeAll(() => {
     originalEnv = process.env.NODE_ENV;
+    originalSkipTest = process.env.SKIP_DB_CONNECTION_TEST;
   });
 
   afterAll(() => {
@@ -65,27 +63,51 @@ describe('Database Module Unit Tests', () => {
     } else {
       delete process.env.NODE_ENV;
     }
+    
+    if (originalSkipTest !== undefined) {
+      process.env.SKIP_DB_CONNECTION_TEST = originalSkipTest;
+    } else {
+      delete process.env.SKIP_DB_CONNECTION_TEST;
+    }
+    
     jest.restoreAllMocks();
+    jest.resetModules();
   });
-
+  
   beforeEach(() => {
-    // Create fresh mock pool
+    // Complete reset for each test
+    jest.resetModules();
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+    
+    // Clear environment variables that affect connection testing
+    delete process.env.SKIP_DB_CONNECTION_TEST;
+    
+    // Set up config mock
+    jest.doMock('../../config/index', () => ({ 
+      config: TestConfigs.test() // Use test config by default
+    }));
+    
+    // Create and configure mock pool
     mockPool = MockPoolFactory.createSuccessful();
     consoleSpy = MockUtils.setupConsoleSpy();
-    
-    // Clear all mocks
-    jest.clearAllMocks();
-    jest.resetModules();
-    
-    // Setup Pool constructor mock
     createMockPool.mockImplementation(() => mockPool);
   });
 
   afterEach(() => {
-    if (consoleSpy) {
+    // Thorough cleanup after each test
+    try {
       MockUtils.restoreConsole(consoleSpy);
+    } catch (e) {
+      // Ignore cleanup errors
     }
+    
     jest.resetModules();
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+    
+    // Reset createMockPool to avoid interference
+    createMockPool.mockReset();
   });
 
   describe('Pool Configuration', () => {
@@ -177,6 +199,9 @@ describe('Database Module Unit Tests', () => {
       const config = TestConfigs.development();
       jest.doMock('../../config/index', () => ({ config }));
       
+      // Make sure SKIP_DB_CONNECTION_TEST is not set
+      delete process.env.SKIP_DB_CONNECTION_TEST;
+      
       (mockPool.query as jest.MockedFunction<any>).mockImplementation((text: any, callback?: any) => {
         if (callback && typeof callback === 'function') {
           callback(null, QueryScenarios.connectionTest());
@@ -204,25 +229,22 @@ describe('Database Module Unit Tests', () => {
       expect(mockPool.query).not.toHaveBeenCalled();
     });
 
-    it('should handle connection error gracefully', async () => {
+    it('should skip connection test when explicitly disabled', async () => {
       // Arrange
       const config = TestConfigs.development();
       jest.doMock('../../config/index', () => ({ config }));
       
-      (mockPool.query as jest.MockedFunction<any>).mockImplementation((text: any, callback?: any) => {
-        if (callback && typeof callback === 'function') {
-          callback(ErrorSimulation.connectionTimeout(), null);
-        }
-        return Promise.reject(ErrorSimulation.connectionTimeout());
-      });
+      // Set the skip flag
+      process.env.SKIP_DB_CONNECTION_TEST = 'true';
 
       // Act
       await import('../../models/db');
 
       // Assert
-      expect(mockPool.query).toHaveBeenCalledWith('SELECT NOW()', expect.any(Function));
-      // Fix: Match the actual console.error call format
-      expect(consoleSpy.error).toHaveBeenCalledWith('Database connection error:', 'Connection timeout');
+      expect(mockPool.query).not.toHaveBeenCalled();
+      
+      // Clean up
+      delete process.env.SKIP_DB_CONNECTION_TEST;
     });
   });
 
@@ -289,7 +311,6 @@ describe('Database Module Unit Tests', () => {
       await query(queryText, queryParams);
 
       // Assert
-      // Fix: Match the actual console.log call format
       expect(consoleSpy.log).toHaveBeenCalledWith('Executed query:', expect.objectContaining({
         text: queryText,
         params: queryParams,
@@ -481,13 +502,11 @@ describe('Database Module Unit Tests', () => {
   });
 
   describe('Performance and Monitoring', () => {
-    beforeEach(() => {
-      jest.doMock('../../config/index', () => ({ config: TestConfigs.development() }));
-      jest.resetModules();
-    });
-
     it('should measure query execution time accurately', async () => {
       // Arrange
+      jest.resetModules();
+      jest.doMock('../../config/index', () => ({ config: TestConfigs.development() }));
+      
       const { query } = await import('../../models/db');
       const queryText = 'SELECT * FROM large_table';
       const expectedResult = MockQueryResultFactory.success([]);
@@ -506,57 +525,147 @@ describe('Database Module Unit Tests', () => {
     });
 
     it('should log performance metrics for slow queries', async () => {
-      // Arrange
+      // Completely isolate this test from all others
       jest.resetModules();
+      jest.clearAllMocks();
+      jest.restoreAllMocks();
+      
+      // Create completely isolated console spy
+      const isolatedConsoleSpy = {
+        log: jest.spyOn(console, 'log').mockImplementation(() => {}),
+        error: jest.spyOn(console, 'error').mockImplementation(() => {}),
+        warn: jest.spyOn(console, 'warn').mockImplementation(() => {}),
+      };
+      
+      // Create isolated development config
+      const developmentConfig = {
+        nodeEnv: 'development',
+        databaseUrl: 'postgresql://test:test@localhost:5432/test_db',
+        dbPoolMax: 20,
+        dbConnectionTimeout: 5000,
+        dbIdleTimeout: 10000,
+        dbStatementTimeout: 30000,
+        dbRequireSsl: false,
+      };
+      
       jest.doMock('../../config/index', () => ({ 
-        config: TestConfigs.development() 
+        config: developmentConfig
       }));
       
-      // Create a fresh mock that properly handles both connection test and regular queries
-      const freshMockPool = MockPoolFactory.createSuccessful();
-      createMockPool.mockImplementation(() => freshMockPool);
+      // Ensure connection testing is enabled
+      delete process.env.SKIP_DB_CONNECTION_TEST;
       
-      // Setup mock implementation that handles connection test separately
-      (freshMockPool.query as jest.MockedFunction<any>).mockImplementation((text: any, params?: any, callback?: any) => {
-        // Handle callback-style invocation (for connection test)
-        if (typeof params === 'function') {
-          callback = params;
-          params = undefined;
+      // Create completely isolated mock pool
+      const isolatedMockPool = {
+        query: jest.fn(),
+        connect: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn(),
+        removeListener: jest.fn(),
+        totalCount: 0,
+        idleCount: 0,
+        waitingCount: 0,
+      } as unknown as jest.Mocked<Pool>;
+      
+      let callCount = 0;
+      
+      // Set up isolated query behavior
+      (isolatedMockPool.query as any).mockImplementation((text: string, paramsOrCallback?: any, callback?: any) => {
+        callCount++;
+        
+        // Normalize callback parameter
+        let actualCallback = callback;
+        let actualParams = paramsOrCallback;
+        
+        if (typeof paramsOrCallback === 'function') {
+          actualCallback = paramsOrCallback;
+          actualParams = undefined;
         }
         
-        if (typeof text === 'string' && text === 'SELECT NOW()' && callback) {
-          // Connection test - succeed immediately
-          const connectionResult = { rows: [{ now: new Date() }], rowCount: 1 };
-          callback(null, connectionResult);
-          return Promise.resolve(connectionResult);
-        } else {
-          // Regular queries - return with delay simulation
-          const result = MockQueryResultFactory.success([]);
-          if (callback) {
-            setTimeout(() => callback(null, result), 10);
+        // Handle connection test (first call in development)
+        if (callCount === 1 && text === 'SELECT NOW()') {
+          const connectionTestResult = { 
+            rows: [{ now: new Date() }], 
+            rowCount: 1,
+            command: 'SELECT',
+            oid: 0,
+            fields: []
+          };
+          
+          if (actualCallback) {
+            actualCallback(null, connectionTestResult);
           }
-          return new Promise((resolve) => {
-            setTimeout(() => resolve(result), 10);
-          });
+          return Promise.resolve(connectionTestResult);
         }
+        
+        // Handle regular queries
+        const queryResult = { 
+          rows: [], 
+          rowCount: 0,
+          command: 'SELECT',
+          oid: 0,
+          fields: []
+        };
+        
+        // Add small delay to simulate query execution
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            if (actualCallback) {
+              actualCallback(null, queryResult);
+            }
+            resolve(queryResult);
+          }, 5);
+        });
       });
       
-      const { query } = await import('../../models/db');
-      const queryText = 'SELECT * FROM slow_table';
-
-      // Act
-      await query(queryText);
-
-      // Assert
-      expect(consoleSpy.log).toHaveBeenCalledWith(
-        'Executed query:', 
-        expect.objectContaining({
-          text: queryText,
-          params: undefined,
-          duration: expect.any(Number),
-          rows: expect.any(Number)
-        })
-      );
+      // Set up other mock methods
+      const isolatedClient = { query: jest.fn(), release: jest.fn() };
+      (isolatedMockPool.connect as any).mockResolvedValue(isolatedClient);
+      (isolatedMockPool.end as any).mockResolvedValue(undefined);
+      
+      // Override the global createMockPool for this test
+      const originalCreateMockPool = createMockPool.getMockImplementation();
+      createMockPool.mockImplementation(() => isolatedMockPool);
+      
+      try {
+        // Import the module to trigger initialization
+        const { query } = await import('../../models/db');
+        
+        // Verify connection test was executed
+        expect(isolatedMockPool.query).toHaveBeenCalledWith('SELECT NOW()', expect.any(Function));
+        expect(isolatedConsoleSpy.log).toHaveBeenCalledWith('Database connected successfully');
+        
+        // Clear console logs to focus on the actual test
+        isolatedConsoleSpy.log.mockClear();
+        
+        // Execute the test query
+        const testQueryText = 'SELECT * FROM slow_table';
+        await query(testQueryText);
+        
+        // Verify that query execution was logged
+        expect(isolatedConsoleSpy.log).toHaveBeenCalledWith(
+          'Executed query:', 
+          expect.objectContaining({
+            text: testQueryText,
+            params: undefined,
+            duration: expect.any(Number),
+            rows: 0
+          })
+        );
+        
+      } finally {
+        // Restore the original createMockPool implementation
+        if (originalCreateMockPool) {
+          createMockPool.mockImplementation(originalCreateMockPool);
+        } else {
+          createMockPool.mockReset();
+        }
+        
+        // Restore console
+        isolatedConsoleSpy.log.mockRestore();
+        isolatedConsoleSpy.error.mockRestore();
+        isolatedConsoleSpy.warn.mockRestore();
+      }
     });
   });
 
@@ -613,6 +722,96 @@ describe('Database Module Unit Tests', () => {
       expect(typeof dbModule.query).toBe('function');
       expect(typeof dbModule.getClient).toBe('function');
       expect(typeof dbModule.closePool).toBe('function');
+    });
+  });
+
+  // Moved connection error test to the end to avoid interference
+  describe('Connection Error Handling', () => {
+    it('should handle connection error gracefully', async () => {
+      // Complete isolation for this problematic test
+      jest.resetModules();
+      jest.clearAllMocks();
+      jest.restoreAllMocks();
+      
+      // Create completely isolated mocks
+      const isolatedErrorPool = {
+        query: jest.fn(),
+        connect: jest.fn(),
+        end: jest.fn(),
+        on: jest.fn(),
+        removeListener: jest.fn(),
+        totalCount: 0,
+        idleCount: 0,
+        waitingCount: 0,
+      } as unknown as jest.Mocked<Pool>;
+      
+      const isolatedErrorConsoleSpy = {
+        log: jest.spyOn(console, 'log').mockImplementation(() => {}),
+        error: jest.spyOn(console, 'error').mockImplementation(() => {}),
+        warn: jest.spyOn(console, 'warn').mockImplementation(() => {}),
+      };
+      
+      const errorConfig = {
+        nodeEnv: 'development',
+        databaseUrl: 'postgresql://test:test@localhost:5432/test_db',
+        dbPoolMax: 20,
+        dbConnectionTimeout: 5000,
+        dbIdleTimeout: 10000,
+        dbStatementTimeout: 30000,
+        dbRequireSsl: false,
+      };
+      
+      jest.doMock('../../config/index', () => ({ config: errorConfig }));
+      
+      // Make sure SKIP_DB_CONNECTION_TEST is not set
+      delete process.env.SKIP_DB_CONNECTION_TEST;
+      
+      // Create error inline to avoid any caching issues
+      const testError = { message: 'Connection timeout', name: 'Error' };
+      
+      // Mock the query method to handle both callback and promise rejection properly
+      (isolatedErrorPool.query as any).mockImplementation((text: any, callback?: any) => {
+        if (callback && typeof callback === 'function') {
+          // Call callback with error immediately
+          setImmediate(() => callback(testError, null));
+          // Return a resolved promise to avoid unhandled rejection
+          return Promise.resolve({ 
+            rows: [], 
+            rowCount: 0,
+            command: 'SELECT',
+            oid: 0,
+            fields: []
+          });
+        }
+        return Promise.reject(testError);
+      });
+
+      // Override global createMockPool
+      const originalImpl = createMockPool.getMockImplementation();
+      createMockPool.mockImplementation(() => isolatedErrorPool);
+
+      try {
+        // Act - Import the module and wait a bit for async operations
+        await import('../../models/db');
+        
+        // Give time for the callback to be executed
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        // Assert
+        expect(isolatedErrorPool.query).toHaveBeenCalledWith('SELECT NOW()', expect.any(Function));
+        expect(isolatedErrorConsoleSpy.error).toHaveBeenCalledWith('Database connection error:', 'Connection timeout');
+      } finally {
+        // Restore everything
+        if (originalImpl) {
+          createMockPool.mockImplementation(originalImpl);
+        } else {
+          createMockPool.mockReset();
+        }
+        
+        isolatedErrorConsoleSpy.log.mockRestore();
+        isolatedErrorConsoleSpy.error.mockRestore();
+        isolatedErrorConsoleSpy.warn.mockRestore();
+      }
     });
   });
 });

@@ -22,9 +22,9 @@
  * - Concurrent operations
  */
 
-import { jest, describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
+import { jest, describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import { Pool, PoolClient } from 'pg';
-import { setupTestDatabase, teardownTestDatabase, testQuery } from '../../utils/testSetup';
+import { setupTestDatabase, teardownTestDatabase } from '../../utils/testSetup';
 
 // Test data generators
 import { v4 as uuidv4 } from 'uuid';
