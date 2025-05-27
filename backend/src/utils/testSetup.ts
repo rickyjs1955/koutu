@@ -1,18 +1,23 @@
+// /backend/src/utils/testSetup.ts
+
 import { cleanupTestFirebase, initializeTestFirebase, resetFirebaseEmulator } from '@/tests/__helpers__/firebase.helper';
 import { Pool } from 'pg';
 
-// Test database configuration
+// Test database configuration - FIXED VERSION
 const TEST_DB_CONFIG = {
   host: 'localhost',
   port: 5433,
   user: 'postgres',
-  password: 'postgres',  // ← Fix this line
+  password: 'postgres',
   database: 'koutu_test',
   max: 20,
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,
   ssl: false,
 };
+
+// Set environment variable for tests to use
+process.env.TEST_DATABASE_URL = `postgresql://${TEST_DB_CONFIG.user}:${TEST_DB_CONFIG.password}@${TEST_DB_CONFIG.host}:${TEST_DB_CONFIG.port}/${TEST_DB_CONFIG.database}`;
 
 // Create testPool for test queries
 const testPool = new Pool(TEST_DB_CONFIG);
@@ -245,6 +250,18 @@ export const teardownTestDatabase = async () => {
     console.error('Failed to cleanup Firebase:', error);
   }
 };
+
+/**
+ * Get test database configuration for other modules
+ */
+export const getTestDatabaseConfig = () => ({
+  host: TEST_DB_CONFIG.host,
+  port: TEST_DB_CONFIG.port,
+  user: TEST_DB_CONFIG.user,
+  password: TEST_DB_CONFIG.password,
+  database: TEST_DB_CONFIG.database,
+  connectionString: process.env.TEST_DATABASE_URL,
+});
 
 // Export pool for direct access if needed
 export const getTestPool = () => testPool;

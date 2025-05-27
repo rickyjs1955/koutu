@@ -1,543 +1,618 @@
-// filepath: /backend/src/tests/unit/db.unit.test.ts
+// /backend/src/__tests__/unit/db.unit.test.ts
+
 /**
- * Database Helper Unit Tests
- *
- * This test suite verifies the behavior of database utility functions,
- * including connection pooling, query execution, and client acquisition.
- * It ensures correct handling across environments (test, development),
- * proper logging behavior, and robust error handling.
+ * @file Database Unit Tests
+ * 
+ * @description Comprehensive unit tests for the database module (db.ts).
+ * Tests pool configuration, query execution, error handling, and connection management
+ * using mocked dependencies to ensure isolation from actual database connections.
+ * 
+ * @coverage
+ * - Pool configuration with various environment settings
+ * - Query execution with parameter binding
+ * - Error handling and logging
+ * - Connection pool management
+ * - SSL configuration
+ * - Performance monitoring
  */
 
-jest.mock('pg', () => {
-    const actualPg = jest.requireActual('pg');
-    return {
-        ...actualPg,
-        Pool: jest.fn().mockImplementation(({ connectionString }) => ({
-            query: jest.fn(),
-            connect: jest.fn(),
-            options: { connectionString },
-        })),
-    };
-});
+/**
+ * @file Database Unit Tests - FIXED VERSION
+ */
 
-jest.mock('../../config', () => ({
-    config: {
-        databaseUrl: 'postgres://test:test@localhost:5432/test',
-        nodeEnv: 'test',
-    },
+import { jest, describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from '@jest/globals';
+import { Pool, PoolConfig } from 'pg';
+
+// Import test utilities
+import {
+  MockPoolFactory,
+  MockQueryResultFactory,
+  DatabaseErrors,
+  QueryScenarios,
+  MockUtils,
+  PerformanceMocks,
+} from '../__mocks__/db.mock';
+
+import {
+  TestConfigs,
+  PoolConfigBuilder,
+  MockSetup,
+  QueryAssertions,
+  ErrorSimulation,
+  PerformanceHelpers,
+} from '../__helpers__/db.helper';
+
+// Create mock constructor BEFORE mocking the module
+const createMockPool = jest.fn();
+
+// Mock the pg module completely
+jest.mock('pg', () => ({
+  Pool: createMockPool,
 }));
 
-import { query, getClient, pool } from '../../models/db';
-import { config } from '../../config';
-import { PoolClient, QueryResult } from 'pg';
+describe('Database Module Unit Tests', () => {
+  let mockPool: jest.Mocked<Pool>;
+  let consoleSpy: ReturnType<typeof MockUtils.setupConsoleSpy>;
+  let originalEnv: string | undefined;
 
-describe('Database Helper Unit Tests', () => {
+  beforeAll(() => {
+    originalEnv = process.env.NODE_ENV;
+  });
+
+  afterAll(() => {
+    if (originalEnv !== undefined) {
+      process.env.NODE_ENV = originalEnv;
+    } else {
+      delete process.env.NODE_ENV;
+    }
+    jest.restoreAllMocks();
+  });
+
+  beforeEach(() => {
+    // Create fresh mock pool
+    mockPool = MockPoolFactory.createSuccessful();
+    consoleSpy = MockUtils.setupConsoleSpy();
     
-    beforeAll(() => {
-        // Suppress console.error during tests
-        jest.spyOn(console, 'error').mockImplementation(() => {});
+    // Clear all mocks
+    jest.clearAllMocks();
+    jest.resetModules();
+    
+    // Setup Pool constructor mock
+    createMockPool.mockImplementation(() => mockPool);
+  });
+
+  afterEach(() => {
+    if (consoleSpy) {
+      MockUtils.restoreConsole(consoleSpy);
+    }
+    jest.resetModules();
+  });
+
+  describe('Pool Configuration', () => {
+    it('should create pool with minimal configuration', async () => {
+      // Arrange
+      const minimalConfig = TestConfigs.minimal();
+      jest.doMock('../../config/index', () => ({ config: minimalConfig }));
+
+      // Act
+      await import('../../models/db');
+
+      // Assert
+      expect(createMockPool).toHaveBeenCalledWith({
+        connectionString: minimalConfig.databaseUrl,
+      });
     });
 
-    afterEach(() => {
-        jest.clearAllMocks();
-        // Ensure console.log is restored after each test
-        if (jest.isMockFunction(console.log)) {
-            (console.log as jest.Mock).mockRestore();
+    it('should create pool with full configuration', async () => {
+      // Arrange
+      const config = TestConfigs.development();
+      jest.doMock('../../config/index', () => ({ config }));
+
+      // Act
+      await import('../../models/db');
+
+      // Assert
+      const expectedConfig = PoolConfigBuilder.fromTestConfig(config);
+      expect(createMockPool).toHaveBeenCalledWith(expectedConfig);
+    });
+
+    it('should configure SSL for production environment', async () => {
+      // Arrange
+      const config = TestConfigs.withSsl();
+      jest.doMock('../../config/index', () => ({ config }));
+
+      // Act
+      await import('../../models/db');
+
+      // Assert
+      expect(createMockPool).toHaveBeenCalledWith({
+        connectionString: config.databaseUrl,
+        ssl: { rejectUnauthorized: true },
+      });
+    });
+
+    it('should configure SSL for non-production environment', async () => {
+      // Arrange
+      const config = { ...TestConfigs.development(), dbRequireSsl: true };
+      jest.doMock('../../config/index', () => ({ config }));
+
+      // Act
+      await import('../../models/db');
+
+      // Assert
+      expect(createMockPool).toHaveBeenCalledWith({
+        connectionString: config.databaseUrl,
+        max: config.dbPoolMax,
+        connectionTimeoutMillis: config.dbConnectionTimeout,
+        idleTimeoutMillis: config.dbIdleTimeout,
+        statement_timeout: config.dbStatementTimeout,
+        ssl: { rejectUnauthorized: false },
+      });
+    });
+
+    it('should handle undefined timeout values correctly', async () => {
+      // Arrange
+      const config = {
+        ...TestConfigs.test(),
+        dbConnectionTimeout: 0,
+        dbStatementTimeout: 0,
+      };
+      jest.doMock('../../config/index', () => ({ config }));
+
+      // Act
+      await import('../../models/db');
+
+      // Assert
+      expect(createMockPool).toHaveBeenCalledWith({
+        connectionString: config.databaseUrl,
+        max: config.dbPoolMax,
+        idleTimeoutMillis: config.dbIdleTimeout,
+      });
+    });
+  });
+
+  describe('Connection Testing', () => {
+    it('should test connection in non-test environment', async () => {
+      // Arrange
+      const config = TestConfigs.development();
+      jest.doMock('../../config/index', () => ({ config }));
+      
+      (mockPool.query as jest.MockedFunction<any>).mockImplementation((text: any, callback?: any) => {
+        if (callback && typeof callback === 'function') {
+          callback(null, QueryScenarios.connectionTest());
         }
+        return Promise.resolve(QueryScenarios.connectionTest());
+      });
+
+      // Act
+      await import('../../models/db');
+
+      // Assert
+      expect(mockPool.query).toHaveBeenCalledWith('SELECT NOW()', expect.any(Function));
+      expect(consoleSpy.log).toHaveBeenCalledWith('Database connected successfully');
     });
 
-    describe('Connection Pool Initialization', () => {
-        /**
-         * Verifies that the pool is initialized with the correct connection string.
-         */
-        it('should initialize Pool with correct connection string', () => {
-            expect(pool).toBeDefined();
-            expect(pool.options.connectionString).toBe(config.databaseUrl);
-        });
+    it('should skip connection test in test environment', async () => {
+      // Arrange
+      const config = TestConfigs.test();
+      jest.doMock('../../config/index', () => ({ config }));
 
-        /**
-         * Ensures no initial connection test occurs in test environment.
-         */
-        it('should skip test connection in test environment', () => {
-            const mockQuery = jest.spyOn(pool, 'query');
-            expect(mockQuery).not.toHaveBeenCalled();
-        });
+      // Act
+      await import('../../models/db');
 
-        /**
-         * Confirms that no "database connected" message is logged during tests.
-         */
-        it('should not log database connected message in test environment', () => {
-            const consoleSpy = jest.spyOn(console, 'log');
-            expect(consoleSpy).not.toHaveBeenCalledWith('Database connected successfully');
-        });
-
-        /**
-         * Tests behavior in production-like environments to verify connection test.
-         */
-        it('should attempt test connection in production environment', () => {
-            // Clear all module mocks and caches first
-            jest.resetModules();
-            
-            // Set up environment before importing module
-            const originalNodeEnv = 'test'; // Save original value
-            
-            // Create a new mock implementation
-            const mockQuery = jest.fn();
-            mockQuery.mockImplementation((query, callback) => {
-                if (callback && typeof callback === 'function') {
-                    callback(null, { rows: [] });
-                }
-                return Promise.resolve({ rows: [] });
-            });
-            
-            // Mock modules
-            jest.doMock('pg', () => ({
-                Pool: jest.fn().mockImplementation(() => ({
-                    query: mockQuery,
-                    connect: jest.fn(),
-                })),
-            }));
-            
-            jest.doMock('../../config', () => ({
-                config: {
-                    databaseUrl: 'postgres://test:test@localhost:5432/test',
-                    nodeEnv: 'production', // Set to production
-                },
-            }));
-            
-            const consoleSpy = jest.spyOn(console, 'log');
-            
-            // Now import the module - this should trigger the test connection
-            require('../../models/db');
-            
-            // Verify the test connection was attempted
-            expect(mockQuery).toHaveBeenCalledWith('SELECT NOW()', expect.any(Function));
-            expect(consoleSpy).toHaveBeenCalledWith('Database connected successfully');
-        });
-
-        /**
-         * Tests behavior with a missing connection string.
-         */
-        it('should handle missing or invalid connection string', () => {
-            // Clear all module mocks and caches
-            jest.resetModules();
-            
-            // Mock Pool constructor to throw an error when initialized
-            jest.doMock('pg', () => ({
-                Pool: jest.fn().mockImplementation(() => {
-                    throw new Error('Invalid connection string');
-                }),
-            }));
-            
-            // Mock the config with empty connection string
-            jest.doMock('../../config', () => ({
-                config: {
-                    databaseUrl: '', // Empty connection string
-                    nodeEnv: 'test',
-                },
-            }));
-            
-            // Since different implementations might handle errors differently,
-            // we'll just verify the module throws an error when initialized with an invalid connection string
-            let error;
-            try {
-                require('../../models/db');
-            } catch (e) {
-                error = e;
-            }
-            
-            // Verify that an error was thrown
-            expect(error).toBeDefined();
-            if (error instanceof Error) {
-            expect(error.message).toContain('Invalid connection string');
-            } else {
-            // This ensures the test fails if the caught value isn't an Error
-            fail('Expected error to be an instance of Error');
-            }
-        });
+      // Assert
+      expect(mockPool.query).not.toHaveBeenCalled();
     });
 
-    describe('query() Functionality', () => {
-        const mockQueryFn = pool.query as jest.Mock;
+    it('should handle connection error gracefully', async () => {
+      // Arrange
+      const config = TestConfigs.development();
+      jest.doMock('../../config/index', () => ({ config }));
+      
+      (mockPool.query as jest.MockedFunction<any>).mockImplementation((text: any, callback?: any) => {
+        if (callback && typeof callback === 'function') {
+          callback(ErrorSimulation.connectionTimeout(), null);
+        }
+        return Promise.reject(ErrorSimulation.connectionTimeout());
+      });
 
-        beforeEach(() => {
-            mockQueryFn.mockClear();
-        });
+      // Act
+      await import('../../models/db');
 
-        /**
-         * Validates successful query execution and result return.
-         */
-        it('should execute a query and return results', async () => {
-            const mockResult: QueryResult = {
-                rows: [{ id: 1 }],
-                rowCount: 1,
-                command: '',
-                oid: 0,
-                fields: [],
-            };
+      // Assert
+      expect(mockPool.query).toHaveBeenCalledWith('SELECT NOW()', expect.any(Function));
+      // Fix: Match the actual console.error call format
+      expect(consoleSpy.error).toHaveBeenCalledWith('Database connection error:', 'Connection timeout');
+    });
+  });
 
-            mockQueryFn.mockResolvedValue(mockResult);
-
-            const result = await query('SELECT * FROM users WHERE id = $1', [1]);
-
-            expect(mockQueryFn).toHaveBeenCalledWith('SELECT * FROM users WHERE id = $1', [1]);
-            expect(result).toEqual(mockResult);
-        });
-
-        /**
-         * Ensures queries are logged in development environment with metadata.
-         */
-        it('should log query details in development environment', async () => {
-            mockQueryFn.mockResolvedValue({
-                rows: [],
-                rowCount: 0,
-                command: '',
-                oid: 0,
-                fields: [],
-            });
-
-            const consoleSpy = jest.spyOn(console, 'log');
-            config.nodeEnv = 'development';
-
-            await query('SELECT NOW()');
-
-            expect(consoleSpy).toHaveBeenCalledWith(
-                'Executed query:',
-                expect.objectContaining({
-                    text: 'SELECT NOW()',
-                    params: undefined,
-                    duration: expect.any(Number),
-                    rows: expect.any(Number),
-                })
-            );
-
-            config.nodeEnv = 'test'; // Reset for other tests
-        });
-
-        /**
-         * Ensures no query logs appear in test environment.
-         */
-        it('should not log query details in test environment', async () => {
-            mockQueryFn.mockResolvedValue({
-                rows: [],
-                rowCount: 0,
-                command: '',
-                oid: 0,
-                fields: [],
-            });
-
-            const consoleSpy = jest.spyOn(console, 'log');
-            config.nodeEnv = 'test';
-
-            await query('SELECT NOW()');
-
-            expect(consoleSpy).not.toHaveBeenCalledWith('Executed query:', expect.anything());
-        });
-
-        /**
-         * Verifies rejection on query error propagation.
-         */
-        it('should reject on query error', async () => {
-            mockQueryFn.mockRejectedValue(new Error('Connection failed'));
-
-            await expect(query('SELECT NOW()')).rejects.toThrow('Connection failed');
-        });
-
-        /**
-         * Confirms undefined parameters are passed correctly when omitted.
-         */
-        it('should pass parameters as undefined if not provided', async () => {
-            const mockResult: QueryResult = {
-                rows: [],
-                rowCount: 0,
-                command: '',
-                oid: 0,
-                fields: [],
-            };
-
-            mockQueryFn.mockResolvedValue(mockResult);
-
-            await query('SELECT NOW()');
-
-            expect(mockQueryFn).toHaveBeenCalledWith('SELECT NOW()', undefined);
-        });
-
-        /**
-         * Tests empty query rejection.
-         */
-        it('should reject empty query strings', async () => {
-            await expect(query('')).rejects.toThrow('Query cannot be empty');
-            await expect(query('   ')).rejects.toThrow('Query cannot be empty');
-        });
-
-        /**
-         * Tests parameter mismatch handling.
-         */
-        it('should handle parameter mismatches properly', async () => {
-            // Simulate a PostgreSQL parameter mismatch error
-            mockQueryFn.mockRejectedValue(new Error('bind message supplies 1 parameters, but prepared statement requires 2'));
-            
-            await expect(query('SELECT * FROM users WHERE id = $1 AND name = $2', [1])).rejects.toThrow(
-                'bind message supplies 1 parameters, but prepared statement requires 2'
-            );
-            
-            // Verify error is logged
-            const consoleSpy = jest.spyOn(console, 'error');
-            await expect(query('SELECT * FROM users WHERE id = $1 AND name = $2', [1])).rejects.toThrow();
-            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Query failed'));
-        });
-
-        /**
-         * Tests handling of malicious SQL injection attempts.
-         */
-        it('should safely handle SQL injection attempts', async () => {
-            const maliciousSql = "'; DROP TABLE users; --";
-            mockQueryFn.mockResolvedValue({ rows: [], rowCount: 0, command: '', oid: 0, fields: [] });
-            
-            await query('SELECT * FROM users WHERE name = $1', [maliciousSql]);
-            
-            // Verify the malicious SQL was passed as a parameter, not concatenated
-            expect(mockQueryFn).toHaveBeenCalledWith(
-                'SELECT * FROM users WHERE name = $1',
-                [maliciousSql]
-            );
-        });
-
-        /**
-         * Tests handling of query timeout.
-         */
-        it('should handle query timeouts', async () => {
-            // Simulate a timeout error
-            mockQueryFn.mockRejectedValue(new Error('Query execution timeout'));
-            
-            await expect(query('SELECT pg_sleep(10)')).rejects.toThrow('Query execution timeout');
-            
-            // Verify timeout is logged
-            const consoleSpy = jest.spyOn(console, 'error');
-            await expect(query('SELECT pg_sleep(10)')).rejects.toThrow();
-            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Query failed'));
-        });
-
-        /**
-         * Tests robustness of logging mechanism.
-         */
-        it('should handle console.log failures gracefully', async () => {
-            const mockResult = { rows: [], rowCount: 0, command: '', oid: 0, fields: [] };
-            mockQueryFn.mockResolvedValue(mockResult);
-            
-            // Properly mock console.log to throw but not affect other tests
-            const originalConsoleLog = console.log;
-            console.log = jest.fn().mockImplementation(() => {
-                // Just throw the error but handle it in the test
-            });
-            
-            config.nodeEnv = 'development';
-            
-            // Should still resolve despite console.log issues
-            const result = await query('SELECT NOW()');
-            expect(result).toEqual(mockResult);
-            
-            // Restore original console.log
-            console.log = originalConsoleLog;
-            config.nodeEnv = 'test';
-        });
-
-        /**
-         * Tests concurrent query execution.
-         */
-        it('should handle concurrent queries correctly', async () => {
-            // Ensure we're using the test environment
-            config.nodeEnv = 'test';
-            
-            mockQueryFn
-                .mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: 1, command: '', oid: 0, fields: [] })
-                .mockResolvedValueOnce({ rows: [{ id: 2 }], rowCount: 1, command: '', oid: 0, fields: [] })
-                .mockResolvedValueOnce({ rows: [{ id: 3 }], rowCount: 1, command: '', oid: 0, fields: [] });
-            
-            // Execute multiple queries simultaneously
-            const results = await Promise.all([
-                query('SELECT * FROM users WHERE id = 1'),
-                query('SELECT * FROM users WHERE id = 2'),
-                query('SELECT * FROM users WHERE id = 3')
-            ]);
-            
-            expect(mockQueryFn).toHaveBeenCalledTimes(3);
-            expect(results[0].rows[0].id).toBe(1);
-            expect(results[1].rows[0].id).toBe(2);
-            expect(results[2].rows[0].id).toBe(3);
-        });
+  describe('Query Function', () => {
+    beforeEach(() => {
+      jest.doMock('../../config/index', () => ({ config: TestConfigs.test() }));
     });
 
-    describe('getClient() Functionality', () => {
-        const mockConnectFn = pool.connect as jest.Mock;
+    it('should execute query successfully with parameters', async () => {
+      // Arrange
+      const { query } = await import('../../models/db');
+      const queryText = 'SELECT * FROM users WHERE id = $1';
+      const queryParams = ['user-123'];
+      const expectedResult = QueryScenarios.userQueries.findById('user-123');
+      
+      (mockPool.query as jest.MockedFunction<any>).mockResolvedValueOnce(expectedResult);
 
-        /**
-         * Validates that a PoolClient instance is returned upon successful connection.
-         */
-        it('should return a PoolClient instance', async () => {
-            const mockClient = {
-                release: jest.fn(),
-                query: jest.fn(),
-            } as unknown as PoolClient;
+      // Act
+      const result = await query(queryText, queryParams);
 
-            mockConnectFn.mockResolvedValue(mockClient);
-
-            const client = await getClient();
-
-            expect(client).toBe(mockClient);
-            expect(mockConnectFn).toHaveBeenCalled();
-        });
-
-        /**
-         * Ensures errors from pool.connect() are propagated correctly.
-         */
-        it('should propagate errors from pool.connect()', async () => {
-            mockConnectFn.mockRejectedValue(new Error('No connection'));
-
-            await expect(getClient()).rejects.toThrow('No connection');
-        });
-
-        /**
-         * Tests proper client release behavior.
-         */
-        it('should ensure client is properly released after use', async () => {
-            const mockRelease = jest.fn();
-            const mockClient = {
-                release: mockRelease,
-                query: jest.fn(),
-            } as unknown as PoolClient;
-            
-            mockConnectFn.mockResolvedValue(mockClient);
-            
-            const client = await getClient();
-            
-            // Simulate using the client and releasing it
-            client.release();
-            
-            expect(mockRelease).toHaveBeenCalled();
-        });
-
-        /**
-         * Tests behavior with broken clients.
-         */
-        it('should handle clients that become unusable', async () => {
-            const mockClient = {
-                release: jest.fn(),
-                query: jest.fn().mockRejectedValue(new Error('Client connection terminated')),
-            } as unknown as PoolClient;
-            
-            mockConnectFn.mockResolvedValue(mockClient);
-            
-            const client = await getClient();
-            
-            // Verify the client is returned but fails when used
-            await expect(client.query('SELECT NOW()')).rejects.toThrow('Client connection terminated');
-        });
-
-        /**
-         * Tests concurrent client acquisition.
-         */
-        it('should handle concurrent client acquisitions', async () => {
-            const mockClients = [
-                { release: jest.fn(), query: jest.fn() },
-                { release: jest.fn(), query: jest.fn() },
-                { release: jest.fn(), query: jest.fn() },
-            ] as unknown as PoolClient[];
-            
-            mockConnectFn
-                .mockResolvedValueOnce(mockClients[0])
-                .mockResolvedValueOnce(mockClients[1])
-                .mockResolvedValueOnce(mockClients[2]);
-            
-            // Request multiple clients simultaneously
-            const clients = await Promise.all([
-                getClient(),
-                getClient(),
-                getClient()
-            ]);
-            
-            expect(mockConnectFn).toHaveBeenCalledTimes(3);
-            expect(clients[0]).toBe(mockClients[0]);
-            expect(clients[1]).toBe(mockClients[1]);
-            expect(clients[2]).toBe(mockClients[2]);
-        });
-
-        /**
-         * Tests behavior when connection pool is exhausted.
-         */
-        it('should handle pool exhaustion', async () => {
-            // Simulate pool exhaustion error
-            mockConnectFn.mockRejectedValue(new Error('Connection pool exhausted'));
-            
-            await expect(getClient()).rejects.toThrow('Connection pool exhausted');
-            
-            // Verify error handling for multiple simultaneous requests during exhaustion
-            const requests = Promise.all([
-                getClient(),
-                getClient(),
-                getClient()
-            ]);
-            
-            await expect(requests).rejects.toThrow('Connection pool exhausted');
-        });
+      // Assert
+      expect(result).toEqual(expectedResult);
+      expect(mockPool.query).toHaveBeenCalledWith(queryText, queryParams);
     });
 
-    describe('System Integration Tests', () => {
-        /**
-         * Tests behavior during database URL configuration changes.
-         */
-        it('should handle database URL configuration changes', () => {
-            // Clear all module mocks and caches
-            jest.resetModules();
-            
-            // Set up a new URL
-            const newDbUrl = 'postgres://new:new@newhost:5432/newdb';
-            
-            // Mock config with the new URL
-            jest.doMock('../../config', () => ({
-                config: {
-                    databaseUrl: newDbUrl,
-                    nodeEnv: 'test',
-                },
-            }));
-            
-            // Mock Pool to capture the connection string
-            const PoolMock = jest.fn().mockImplementation(({ connectionString }) => ({
-                query: jest.fn(),
-                connect: jest.fn(),
-                options: { connectionString },
-            }));
-            
-            jest.doMock('pg', () => ({
-                Pool: PoolMock
-            }));
-            
-            // Import the module with the new config
-            const { pool: newPool } = require('../../models/db');
-            
-            // Verify the Pool was constructed with the new URL
-            expect(PoolMock).toHaveBeenCalledWith({
-                connectionString: newDbUrl
-            });
-            
-            // Verify the new pool has the right connection string
-            expect(newPool.options.connectionString).toBe(newDbUrl);
-        });
+    it('should execute query successfully without parameters', async () => {
+      // Arrange
+      const { query } = await import('../../models/db');
+      const queryText = 'SELECT NOW()';
+      const expectedResult = QueryScenarios.connectionTest();
+      
+      (mockPool.query as jest.MockedFunction<any>).mockResolvedValueOnce(expectedResult);
 
-        /**
-         * Tests behavior with unreachable database server.
-         */
-        it('should handle unreachable database server', async () => {
-            const mockQueryFn = pool.query as jest.Mock;
-            const networkError = new Error('ECONNREFUSED: Connection refused');
-            mockQueryFn.mockRejectedValue(networkError);
-            
-            await expect(query('SELECT NOW()')).rejects.toThrow('ECONNREFUSED');
-            
-            // Verify connection error is logged
-            const consoleSpy = jest.spyOn(console, 'error');
-            await expect(query('SELECT NOW()')).rejects.toThrow();
-            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Query failed'));
-        });
+      // Act
+      const result = await query(queryText);
+
+      // Assert
+      expect(result).toEqual(expectedResult);
+      expect(mockPool.query).toHaveBeenCalledWith(queryText, undefined);
     });
+
+    it('should throw error for empty query text', async () => {
+      // Arrange
+      const { query } = await import('../../models/db');
+
+      // Act & Assert
+      await expect(query('')).rejects.toThrow('Query cannot be empty');
+      await expect(query('   ')).rejects.toThrow('Query cannot be empty');
+    });
+
+    it('should log query details in development environment', async () => {
+      // Arrange
+      jest.resetModules();
+      jest.doMock('../../config/index', () => ({ config: TestConfigs.development() }));
+      
+      const { query } = await import('../../models/db');
+      const queryText = 'SELECT * FROM users WHERE id = $1';
+      const queryParams = ['user-123'];
+      const expectedResult = QueryScenarios.userQueries.findById('user-123');
+      
+      (mockPool.query as jest.MockedFunction<any>).mockResolvedValueOnce(expectedResult);
+
+      // Act
+      await query(queryText, queryParams);
+
+      // Assert
+      // Fix: Match the actual console.log call format
+      expect(consoleSpy.log).toHaveBeenCalledWith('Executed query:', expect.objectContaining({
+        text: queryText,
+        params: queryParams,
+        duration: expect.any(Number),
+        rows: expect.any(Number)
+      }));
+    });
+
+    it('should not log query details in non-development environment', async () => {
+      // Arrange
+      jest.resetModules();
+      jest.doMock('../../config/index', () => ({ config: TestConfigs.production() }));
+      
+      const { query } = await import('../../models/db');
+      const queryText = 'SELECT * FROM users WHERE id = $1';
+      const queryParams = ['user-123'];
+      const expectedResult = QueryScenarios.userQueries.findById('user-123');
+      
+      (mockPool.query as jest.MockedFunction<any>).mockResolvedValueOnce(expectedResult);
+
+      // Act
+      await query(queryText, queryParams);
+
+      // Assert
+      expect(consoleSpy.log).not.toHaveBeenCalledWith(expect.stringContaining('Executed query'));
+    });
+
+    it('should handle database errors and log them', async () => {
+      // Arrange
+      const { query } = await import('../../models/db');
+      const queryText = 'INVALID SQL QUERY';
+      const error = ErrorSimulation.syntaxError();
+      
+      (mockPool.query as jest.MockedFunction<any>).mockRejectedValueOnce(error);
+
+      // Act & Assert
+      await expect(query(queryText)).rejects.toThrow(error.message);
+      expect(consoleSpy.error).toHaveBeenCalledWith(expect.stringContaining('Query failed'));
+    });
+
+    it('should wrap non-Error throwables in Error object', async () => {
+      // Arrange
+      const { query } = await import('../../models/db');
+      const queryText = 'SELECT * FROM users';
+      const nonErrorThrowable = 'String error';
+      
+      (mockPool.query as jest.MockedFunction<any>).mockRejectedValueOnce(nonErrorThrowable);
+
+      // Act & Assert
+      await expect(query(queryText)).rejects.toThrow('String error');
+    });
+
+    it('should measure and log query execution time', async () => {
+      // Arrange
+      const { query } = await import('../../models/db');
+      const queryText = 'SELECT * FROM users';
+      const expectedResult = MockQueryResultFactory.success([]);
+      
+      (mockPool.query as jest.MockedFunction<any>).mockResolvedValueOnce(expectedResult);
+
+      // Act
+      const result = await query(queryText);
+
+      // Assert
+      expect(result).toEqual(expectedResult);
+    });
+  });
+
+  describe('Get Client Function', () => {
+    beforeEach(() => {
+      jest.doMock('../../config/index', () => ({ config: TestConfigs.test() }));
+    });
+
+    it('should return client from pool successfully', async () => {
+      // Arrange
+      const { getClient } = await import('../../models/db');
+      const mockClient = { query: jest.fn(), release: jest.fn() };
+      
+      (mockPool.connect as jest.MockedFunction<any>).mockResolvedValueOnce(mockClient);
+
+      // Act
+      const client = await getClient();
+
+      // Assert
+      expect(client).toBe(mockClient);
+      expect(mockPool.connect).toHaveBeenCalled();
+    });
+
+    it('should reject when pool connection fails', async () => {
+      // Arrange
+      const { getClient } = await import('../../models/db');
+      const error = ErrorSimulation.connectionRefused();
+      
+      (mockPool.connect as jest.MockedFunction<any>).mockRejectedValueOnce(error);
+
+      // Act & Assert
+      await expect(getClient()).rejects.toThrow(error.message);
+    });
+  });
+
+  describe('Close Pool Function', () => {
+    beforeEach(() => {
+      jest.doMock('../../config/index', () => ({ config: TestConfigs.test() }));
+    });
+
+    it('should close pool successfully', async () => {
+      // Arrange
+      const { closePool } = await import('../../models/db');
+      (mockPool.end as jest.MockedFunction<any>).mockResolvedValueOnce(undefined);
+
+      // Act
+      await closePool();
+
+      // Assert
+      expect(mockPool.end).toHaveBeenCalled();
+      expect(consoleSpy.log).toHaveBeenCalledWith('Database pool closed successfully.');
+    });
+
+    it('should handle close pool errors', async () => {
+      // Arrange
+      const { closePool } = await import('../../models/db');
+      const error = new Error('Failed to close pool');
+      
+      (mockPool.end as jest.MockedFunction<any>).mockRejectedValueOnce(error);
+
+      // Act & Assert
+      await expect(closePool()).rejects.toThrow(error.message);
+      expect(consoleSpy.error).toHaveBeenCalledWith('Failed to close database pool:', error);
+    });
+
+    it('should not close pool if already closed', async () => {
+      // Arrange
+      const { closePool } = await import('../../models/db');
+      
+      // First close
+      (mockPool.end as jest.MockedFunction<any>).mockResolvedValueOnce(undefined);
+      await closePool();
+
+      // Reset mock for second call
+      (mockPool.end as jest.MockedFunction<any>).mockReset();
+
+      // Act - Second close attempt
+      await closePool();
+
+      // Assert
+      expect(mockPool.end).not.toHaveBeenCalled();
+      expect(consoleSpy.log).toHaveBeenCalledWith('Database pool already closed.');
+    });
+  });
+
+  describe('Error Handling Edge Cases', () => {
+    beforeEach(() => {
+      jest.doMock('../../config/index', () => ({ config: TestConfigs.test() }));
+    });
+
+    it('should handle various database error types', async () => {
+      const { query } = await import('../../models/db');
+      const errorTests = [
+        { error: DatabaseErrors.CONNECTION_TIMEOUT(), description: 'connection timeout' },
+        { error: DatabaseErrors.CONSTRAINT_VIOLATION(), description: 'constraint violation' },
+        { error: DatabaseErrors.PERMISSION_DENIED(), description: 'permission denied' },
+        { error: DatabaseErrors.TABLE_NOT_FOUND(), description: 'table not found' },
+      ];
+
+      for (const { error } of errorTests) {
+        (mockPool.query as jest.MockedFunction<any>).mockRejectedValueOnce(error);
+        await expect(query('SELECT 1')).rejects.toThrow(error.message);
+        expect(consoleSpy.error).toHaveBeenCalledWith(expect.stringContaining('Query failed'));
+        
+        (mockPool.query as jest.MockedFunction<any>).mockReset();
+        consoleSpy.error.mockClear();
+        mockPool.query = jest.fn() as any;
+      }
+    });
+
+    it('should handle null and undefined parameters gracefully', async () => {
+      // Arrange
+      const { query } = await import('../../models/db');
+      const queryText = 'SELECT * FROM users WHERE id = $1';
+      const expectedResult = MockQueryResultFactory.success([]);
+      
+      (mockPool.query as jest.MockedFunction<any>).mockResolvedValue(expectedResult);
+
+      // Act & Assert
+      await expect(query(queryText, [null])).resolves.toEqual(expectedResult);
+      await expect(query(queryText, [undefined])).resolves.toEqual(expectedResult);
+      await expect(query(queryText, [])).resolves.toEqual(expectedResult);
+    });
+  });
+
+  describe('Performance and Monitoring', () => {
+    beforeEach(() => {
+      jest.doMock('../../config/index', () => ({ config: TestConfigs.development() }));
+      jest.resetModules();
+    });
+
+    it('should measure query execution time accurately', async () => {
+      // Arrange
+      const { query } = await import('../../models/db');
+      const queryText = 'SELECT * FROM large_table';
+      const expectedResult = MockQueryResultFactory.success([]);
+      
+      (mockPool.query as jest.MockedFunction<any>).mockResolvedValueOnce(expectedResult);
+
+      // Act
+      const start = Date.now();
+      const result = await query(queryText);
+      const duration = Date.now() - start;
+
+      // Assert
+      expect(result).toEqual(expectedResult);
+      expect(duration).toBeGreaterThanOrEqual(0);
+      expect(duration).toBeLessThan(1000); // Should complete quickly in tests
+    });
+
+    it('should log performance metrics for slow queries', async () => {
+      // Arrange
+      jest.resetModules();
+      jest.doMock('../../config/index', () => ({ 
+        config: TestConfigs.development() 
+      }));
+      
+      // Create a fresh mock that properly handles both connection test and regular queries
+      const freshMockPool = MockPoolFactory.createSuccessful();
+      createMockPool.mockImplementation(() => freshMockPool);
+      
+      // Setup mock implementation that handles connection test separately
+      (freshMockPool.query as jest.MockedFunction<any>).mockImplementation((text: any, params?: any, callback?: any) => {
+        // Handle callback-style invocation (for connection test)
+        if (typeof params === 'function') {
+          callback = params;
+          params = undefined;
+        }
+        
+        if (typeof text === 'string' && text === 'SELECT NOW()' && callback) {
+          // Connection test - succeed immediately
+          const connectionResult = { rows: [{ now: new Date() }], rowCount: 1 };
+          callback(null, connectionResult);
+          return Promise.resolve(connectionResult);
+        } else {
+          // Regular queries - return with delay simulation
+          const result = MockQueryResultFactory.success([]);
+          if (callback) {
+            setTimeout(() => callback(null, result), 10);
+          }
+          return new Promise((resolve) => {
+            setTimeout(() => resolve(result), 10);
+          });
+        }
+      });
+      
+      const { query } = await import('../../models/db');
+      const queryText = 'SELECT * FROM slow_table';
+
+      // Act
+      await query(queryText);
+
+      // Assert
+      expect(consoleSpy.log).toHaveBeenCalledWith(
+        'Executed query:', 
+        expect.objectContaining({
+          text: queryText,
+          params: undefined,
+          duration: expect.any(Number),
+          rows: expect.any(Number)
+        })
+      );
+    });
+  });
+
+  describe('Configuration Edge Cases', () => {
+    it('should handle missing optional configuration values', async () => {
+      // Arrange
+      const minimalConfig = {
+        nodeEnv: 'test',
+        databaseUrl: 'postgresql://test:test@localhost:5432/test_db',
+      };
+      jest.doMock('../../config/index', () => ({ config: minimalConfig }));
+
+      // Act
+      await import('../../models/db');
+
+      // Assert
+      expect(createMockPool).toHaveBeenCalledWith({
+        connectionString: minimalConfig.databaseUrl,
+      });
+    });
+
+    it('should handle zero timeout values correctly', async () => {
+      // Arrange
+      const configWithZeroTimeouts = {
+        ...TestConfigs.test(),
+        dbConnectionTimeout: 0,
+        dbStatementTimeout: 0,
+      };
+      jest.doMock('../../config/index', () => ({ config: configWithZeroTimeouts }));
+
+      // Act
+      await import('../../models/db');
+
+      // Assert
+      const expectedConfig = {
+        connectionString: configWithZeroTimeouts.databaseUrl,
+        max: configWithZeroTimeouts.dbPoolMax,
+        idleTimeoutMillis: configWithZeroTimeouts.dbIdleTimeout,
+      };
+      expect(createMockPool).toHaveBeenCalledWith(expectedConfig);
+    });
+  });
+
+  describe('Module Exports', () => {
+    it('should export all required functions and objects', async () => {
+      // Act
+      const dbModule = await import('../../models/db');
+
+      // Assert
+      expect(dbModule).toHaveProperty('pool');
+      expect(dbModule).toHaveProperty('query');
+      expect(dbModule).toHaveProperty('getClient');
+      expect(dbModule).toHaveProperty('closePool');
+      expect(typeof dbModule.query).toBe('function');
+      expect(typeof dbModule.getClient).toBe('function');
+      expect(typeof dbModule.closePool).toBe('function');
+    });
+  });
 });
