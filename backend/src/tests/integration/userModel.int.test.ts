@@ -325,7 +325,7 @@ describe('userModel Real Integration Tests', () => {
         [createdUser.id, 'test.jpg']
       );
       await TestDatabaseConnection.query(
-        'INSERT INTO garment_items (user_id, name) VALUES ($1, $2)', 
+        'INSERT INTO garment_items (user_id, name) VALUES ($1, $2)', // ADD: name value
         [createdUser.id, 'Test Shirt']
       );
       await TestDatabaseConnection.query(
@@ -397,7 +397,7 @@ describe('userModel Real Integration Tests', () => {
           [createdUser.id, 'image1.jpg', 'image2.jpg']
         ),
         TestDatabaseConnection.query(
-          'INSERT INTO garment_items (user_id, name) VALUES ($1, $2), ($1, $3), ($1, $4)', 
+          'INSERT INTO garment_items (user_id, name) VALUES ($1, $2), ($1, $3), ($1, $4)', // ADD: name values
           [createdUser.id, 'Shirt', 'Pants', 'Jacket']
         ),
         TestDatabaseConnection.query(
@@ -453,7 +453,7 @@ describe('userModel Real Integration Tests', () => {
         created_at: expect.any(Date)
       });
       
-      // Verify in database
+      // Verify user in database
       const dbUser = await TestDatabaseConnection.query(
         'SELECT * FROM users WHERE id = $1', 
         [result.id]
@@ -461,11 +461,16 @@ describe('userModel Real Integration Tests', () => {
       const savedUser = dbUser.rows[0];
       
       expect(savedUser.email).toBe(oauthInput.email);
-      expect(savedUser.name).toBe(oauthInput.name);
-      expect(savedUser.avatar_url).toBe(oauthInput.avatar_url);
-      expect(savedUser.oauth_provider).toBe(oauthInput.oauth_provider);
-      expect(savedUser.oauth_id).toBe(oauthInput.oauth_id);
-      expect(savedUser.password_hash).toBeFalsy(); // Should be empty for OAuth users
+      expect(savedUser.password_hash).toBeFalsy(); // Should be NULL for OAuth users
+      
+      // UPDATED: Check OAuth data in separate table
+      const oauthData = await TestDatabaseConnection.query(
+        'SELECT * FROM user_oauth_providers WHERE user_id = $1',
+        [result.id]
+      );
+      expect(oauthData.rows).toHaveLength(1);
+      expect(oauthData.rows[0].provider).toBe(oauthInput.oauth_provider);
+      expect(oauthData.rows[0].provider_id).toBe(oauthInput.oauth_id);
     });
 
     it('should find OAuth user by provider and ID', async () => {
@@ -475,11 +480,11 @@ describe('userModel Real Integration Tests', () => {
       
       const foundUser = await userModel.findByOAuth(oauthInput.oauth_provider, oauthInput.oauth_id);
       
+      // UPDATED: Remove OAuth column expectations
       expect(foundUser).toMatchObject({
         id: createdUser.id,
-        email: oauthInput.email,
-        oauth_provider: oauthInput.oauth_provider,
-        oauth_id: oauthInput.oauth_id
+        email: oauthInput.email
+        // REMOVED: oauth_provider and oauth_id expectations
       });
     });
 
@@ -604,7 +609,9 @@ describe('userModel Real Integration Tests', () => {
       expect(foundUser?.email).toBe(specialEmail);
       
       const userWithProviders = await userModel.getUserWithOAuthProviders(user.id);
-      expect(userWithProviders?.name).toBe(specialName);
+      expect(userWithProviders?.email).toBe(specialEmail);
+      // REMOVED: name expectation since it's not stored in users table
+      expect(userWithProviders?.linkedProviders).toContain(oauthInput.oauth_provider);
     });
 
     it('should maintain data consistency under load', async () => {
@@ -737,7 +744,7 @@ describe('userModel Real Integration Tests', () => {
           [user.id, 'profile.jpg']
         ),
         TestDatabaseConnection.query(
-          'INSERT INTO garment_items (user_id, name) VALUES ($1, $2)', 
+          'INSERT INTO garment_items (user_id, name) VALUES ($1, $2)', // ADD: name value
           [user.id, 'Favorite Shirt']
         ),
         TestDatabaseConnection.query(
@@ -794,7 +801,7 @@ describe('userModel Real Integration Tests', () => {
       
       // 4. Get user profile with OAuth info
       const profile = await userModel.getUserWithOAuthProviders(createdUser.id);
-      expect(profile?.oauth_provider).toBe(provider);
+      // REMOVED: oauth_provider expectation
       expect(profile?.linkedProviders).toContain(provider);
       
       // 5. Link additional OAuth provider
@@ -880,7 +887,7 @@ describe('userModel Real Integration Tests', () => {
           [user.id, 'test1.jpg']
         ),
         TestDatabaseConnection.query(
-          'INSERT INTO garment_items (user_id, name) VALUES ($1, $2)', 
+          'INSERT INTO garment_items (user_id, name) VALUES ($1, $2)', // ADD: name value
           [user.id, 'Test Garment']
         ),
         TestDatabaseConnection.query(

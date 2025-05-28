@@ -176,30 +176,26 @@ export const userModel = {
     };
   },
 
+  /**
+   * Find user by OAuth provider and ID (using only user_oauth_providers table)
+   */
   async findByOAuth(provider: string, providerId: string): Promise<User | null> {
-    // First, check the user_oauth_providers table for linked accounts
-    const linkedResult = await query(
+    // Only check the user_oauth_providers table for linked accounts
+    const result = await query(
       `SELECT u.* FROM users u
        JOIN user_oauth_providers p ON u.id = p.user_id
        WHERE p.provider = $1 AND p.provider_id = $2`,
       [provider, providerId]
     );
   
-    if (linkedResult.rows.length > 0) {
-      return linkedResult.rows[0];
-    }
-  
-    // Then check the users table for direct OAuth accounts
-    const result = await query(
-      'SELECT * FROM users WHERE oauth_provider = $1 AND oauth_id = $2',
-      [provider, providerId]
-    );
-  
     return result.rows[0] || null;
   },
   
+  /**
+   * Create OAuth user (creates user without password and links OAuth provider)
+   */
   async createOAuthUser(data: CreateOAuthUserInput): Promise<UserOutput> {
-    const { email, name, avatar_url, oauth_provider, oauth_id } = data;
+    const { email, oauth_provider, oauth_id } = data;
     
     // Check if user with email already exists
     const existingUser = await query('SELECT * FROM users WHERE email = $1', [email]);
@@ -210,21 +206,44 @@ export const userModel = {
     // Generate UUID
     const id = uuidv4();
     
-    // Insert user
-    const result = await query(
-      `INSERT INTO users 
-      (id, email, name, avatar_url, oauth_provider, oauth_id, created_at, updated_at) 
-      VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) 
-      RETURNING id, email, name, avatar_url, created_at`,
-      [id, email, name || null, avatar_url || null, oauth_provider, oauth_id]
-    );
-    
-    return result.rows[0];
+    try {
+      // Start transaction
+      await query('BEGIN');
+      
+      // Insert user without password (OAuth users don't need passwords)
+      const userResult = await query(
+        `INSERT INTO users 
+        (id, email, created_at, updated_at) 
+        VALUES ($1, $2, NOW(), NOW()) 
+        RETURNING id, email, created_at`,
+        [id, email]
+      );
+      
+      // Insert OAuth provider info
+      await query(
+        `INSERT INTO user_oauth_providers 
+        (user_id, provider, provider_id, created_at) 
+        VALUES ($1, $2, $3, NOW())`,
+        [id, oauth_provider, oauth_id]
+      );
+      
+      // Commit transaction
+      await query('COMMIT');
+      
+      return userResult.rows[0];
+    } catch (error) {
+      // Rollback transaction on error
+      await query('ROLLBACK');
+      throw error;
+    }
   },
   
+  /**
+   * Get user with OAuth providers (modified to work without schema changes)
+   */
   async getUserWithOAuthProviders(id: string): Promise<any> {
     const userResult = await query(
-      'SELECT id, email, name, avatar_url, oauth_provider, created_at FROM users WHERE id = $1',
+      'SELECT id, email, created_at FROM users WHERE id = $1',
       [id]
     );
     
@@ -242,14 +261,53 @@ export const userModel = {
     
     const linkedProviders = providersResult.rows.map(row => row.provider);
     
-    // If the user has a direct OAuth provider, add it to the list
-    if (user.oauth_provider) {
-      linkedProviders.push(user.oauth_provider);
-    }
-    
     return {
       ...user,
-      linkedProviders
+      linkedProviders,
+      // Add placeholder fields for compatibility
+      name: null,
+      avatar_url: null,
+      oauth_provider: null
     };
+  },
+
+  /**
+   * Link OAuth provider to existing user
+   */
+  async linkOAuthProvider(userId: string, provider: string, providerId: string): Promise<boolean> {
+    try {
+      await query(
+        'INSERT INTO user_oauth_providers (user_id, provider, provider_id, created_at) VALUES ($1, $2, $3, NOW())',
+        [userId, provider, providerId]
+      );
+      return true;
+    } catch (error) {
+      // Handle duplicate key error gracefully
+      return false;
+    }
+  },
+
+  /**
+   * Unlink OAuth provider from user
+   */
+  async unlinkOAuthProvider(userId: string, provider: string): Promise<boolean> {
+    const result = await query(
+      'DELETE FROM user_oauth_providers WHERE user_id = $1 AND provider = $2',
+      [userId, provider]
+    );
+    
+    return (result.rowCount ?? 0) > 0;
+  },
+
+  /**
+   * Check if user has password (for OAuth-only users)
+   */
+  async hasPassword(userId: string): Promise<boolean> {
+    const result = await query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    return result.rows[0]?.password_hash != null;
   }
 };

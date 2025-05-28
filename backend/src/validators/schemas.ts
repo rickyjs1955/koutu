@@ -172,7 +172,7 @@ export const UpdatePolygonSchema = z.object({
 });
 
 // ==================== MIDDLEWARE FUNCTIONS ====================
-
+/* COMMENTED OUT FOR NOW
 // Generic validation middleware factory
 export const createValidationMiddleware = (schema: z.ZodSchema, field: 'body' | 'query' | 'params' | 'file') => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -240,7 +240,7 @@ export const validateFile = (req: Request, res: Response, next: NextFunction) =>
     next(error);
   }
 };
-
+*/
 // ==================== HELPER FUNCTIONS ====================
 
 function calculatePolygonArea(points: Array<{ x: number; y: number }>): number {

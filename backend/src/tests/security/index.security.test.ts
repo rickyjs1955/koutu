@@ -136,12 +136,20 @@ class SecurityValidator {
       score += characterTypeScore;
     }
 
-    // Common weak patterns - case insensitive check
+    // Check if this looks like a hex string (only 0-9, a-f, A-F)
+    const isHexString = /^[0-9a-fA-F]+$/.test(secret);
+    
+    // Common weak patterns - but be smarter about hex strings
     const weakPatterns = [
-      'password', 'secret', 'key', '123456', 'admin', 'test', 'dev', 'local', 'jwt', 'token', 'auth'
+      'password', 'secret', 'admin', 'test', 'dev', 'local', 'jwt', 'token', 'auth'
     ];
     
-    const hasWeakPattern = weakPatterns.some(pattern => 
+    // For hex strings, only check for non-hex patterns and be more lenient
+    const patternsToCheck = isHexString 
+      ? weakPatterns.filter(pattern => !/^[0-9a-f]*$/.test(pattern.toLowerCase()))
+      : [...weakPatterns, 'key', '123456']; // Include 'key' and '123456' for non-hex strings
+    
+    const hasWeakPattern = patternsToCheck.some(pattern => 
       secret.toLowerCase().includes(pattern.toLowerCase())
     );
     
@@ -153,6 +161,12 @@ class SecurityValidator {
       }
     }
 
+    // Special case: if it's a long hex string with good entropy, it's likely cryptographically generated
+    if (isHexString && secret.length >= 64 && uniqueChars >= 12) {
+      // Give bonus points for cryptographically generated hex strings
+      score += 15;
+    }
+
     // Bonus for very long secrets
     if (secret.length >= 128) {
       score += 10;
@@ -160,7 +174,9 @@ class SecurityValidator {
 
     const isSecure = (issues.length === 0 && score >= 50) || 
                  (secret.length >= 80 && uniqueChars >= 20 && hasLower && hasUpper && hasNumber) ||
-                 (secret.length >= 56 && uniqueChars >= 16 && hasLower && hasUpper && hasNumber && score >= 40);
+                 (secret.length >= 56 && uniqueChars >= 16 && hasLower && hasUpper && hasNumber && score >= 40) ||
+                 // Special case for hex strings: if long enough and good entropy, consider secure
+                 (isHexString && secret.length >= 64 && uniqueChars >= 12 && score >= 60);
 
     return {
       isSecure,

@@ -49,7 +49,7 @@ describe('Database Security Tests', () => {
     // Use correct database credentials
     testPool = new Pool({
       host: 'localhost',
-      port: 5433,
+      port: 5432,
       user: 'postgres',
       password: 'postgres',
       database: 'koutu_test',
@@ -451,7 +451,7 @@ describe('Database Security Tests', () => {
     it('should prevent connection pool exhaustion attacks', async () => {
       const smallPool = new Pool({
         host: 'localhost',
-        port: 5433,
+        port: 5432,
         user: 'postgres',
         password: 'postgres',
         database: 'koutu_test',

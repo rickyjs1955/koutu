@@ -116,9 +116,9 @@ export class PolygonServiceUtils {
         image: {
           id: image.id,
           file_path: image.file_path,
-          width: image.original_metadata?.width,
-          height: image.original_metadata?.height,
-          format: image.original_metadata?.format
+          width: image.original_metadata?.width ?? null,
+          height: image.original_metadata?.height ?? null,
+          format: image.original_metadata?.format ?? null
         },
         export_metadata: {
           exported_at: new Date().toISOString(),

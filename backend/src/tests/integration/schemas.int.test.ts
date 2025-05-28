@@ -8,13 +8,14 @@ import {
   CreateGarmentWithBusinessRulesSchema,
   CreatePolygonWithGeometryValidationSchema,
   FileUploadSchema,
+} from '../../validators/schemas';
+
+import {
   validateBody,
-  validateQuery,
-  validateParams,
   validateUUIDParam,
   validateImageQuery,
   validateFile
-} from '../../validators/schemas';
+} from '../../middlewares/validate';
 
 // Import test helpers and FIXED data
 import {

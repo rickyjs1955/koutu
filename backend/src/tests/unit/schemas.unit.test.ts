@@ -1,5 +1,5 @@
 // backend/src/__tests__/unit/schemas.unit.test.ts
-import { beforeEach, afterEach, describe, it, expect } from '@jest/globals';
+import { beforeEach, describe, it, expect } from '@jest/globals';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 
@@ -8,37 +8,30 @@ import {
   CreateGarmentWithBusinessRulesSchema,
   CreatePolygonWithGeometryValidationSchema,
   FileUploadSchema,
+} from '../../validators/schemas';
+
+import {
   validateBody,
-  validateQuery,
-  validateParams,
   validateUUIDParam,
   validateImageQuery,
   validateFile
-} from '../../validators/schemas';
+} from '../../middlewares/validate';
 
 // Import test helpers and data
 import {
-  mockValidGarment,
-  mockInvalidGarment,
-  mockValidPolygon,
-  mockSmallPolygon,
-  mockSelfIntersectingPolygon,
   mockValidFile,
   mockInvalidFile,
   mockOversizedFile,
   createMockRequest,
   createMockResponse,
   createMockNext,
-  createMaliciousSchemaRequest,
   generateSchemaTestData,
-  performanceSchemaTestData,
   validationScenarios
 } from '../__mocks__/schemas.mock';
 
 import {
   setupSchemaTestEnvironment,
   createSchemaStressTests,
-  validateMiddlewareFlow,
   testSchemaPerformance
 } from '../__helpers__/schemas.helper';
 

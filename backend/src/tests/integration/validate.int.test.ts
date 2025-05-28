@@ -1,483 +1,736 @@
-// filepath: /backend/src/tests/integration/validate.int.test.ts
+// backend/src/tests/integration/validate.int.test.ts
 
-/**
- * Integration Test Suite for validate.ts Middleware
- * 
- * This suite provides comprehensive integration tests for the custom Express validation middleware using Zod.
- * 
- * Key Features:
- * - Covers all validation sources: request body, query parameters, and URL params.
- * - Tests both valid and invalid input, including edge cases like nested objects, arrays, async refinements, and empty input.
- * - Verifies error formatting, status codes, and error propagation through middleware chains.
- * - Demonstrates both global and route-specific error handling patterns, ensuring consistent error responses.
- * - Uses a hybrid approach: real Express app and HTTP requests (via supertest), but without external dependencies.
- * - Ensures middleware works correctly in isolation and when chained with other middleware.
- * - TypeScript type safety is maintained throughout, with explicit handling for error middleware signatures.
- * 
- * This suite not only validates correctness but also serves as documentation for how to use and extend the validation middleware.
- */
-
-// Mock ApiError for testing
-jest.mock('../../utils/ApiError', () => ({
-  ApiError: {
-    badRequest: jest.fn((message, code) => {
-      const error = new Error(message);
-      error.name = 'ApiError';
-      // These properties must match EXACTLY what your error handler expects
-      Object.defineProperties(error, {
-        statusCode: { value: 400 },
-        code: { value: code || 'VALIDATION_ERROR' },
-        status: { value: 'error' }
-      });
-      return error;
-    })
-  }
-}));
-
-import { validate } from '../../middlewares/validate';
+import { beforeEach, afterEach, describe, it, expect } from '@jest/globals';
+import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import express, { Request, Response, NextFunction } from 'express';
-import request from 'supertest';
 
-describe('Validation Middleware Integration', () => {
-    let app: express.Application;
-    
-    beforeEach(() => {
-        // Create a fresh Express app for each test
-        app = express();
-        app.use(express.json()); // Parse JSON bodies
-        
-        // Add request logger to see exactly what's coming in
-        app.use((req, _res, next) => {
-            next();
-        });
-        
-        // Improved error handler with better logging
-        app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {            
-            res.status(err.statusCode || 500).json({
-                status: 'error',
-                message: err.message || 'An unknown error occurred',
-                code: err.code || 'UNKNOWN_ERROR'
-            });
-        });
-        
-        // Clear mocks between tests
-        jest.clearAllMocks();
-        });
+// Import validation middleware
+import {
+  validate,
+  validateBody,
+  validateQuery,
+  validateParams,
+  validateFile,
+  validateUUIDParam,
+  validateImageQuery,
+  createValidationMiddleware
+} from '../../middlewares/validate';
 
-    describe('Request Body Validation', () => {
-        it('should pass validation with valid body data', async () => {
-            // Define test schema
-            const userSchema = z.object({
-                name: z.string().min(2),
-                email: z.string().email(),
-                age: z.number().int().positive().optional()
-            });
-            
-            // Setup route with validation
-            app.post('/users', 
-                validate(userSchema), 
-                (req: Request, res: Response) => {
-                // Return the validated data
-                res.status(200).json({ 
-                    status: 'success',
-                    data: req.body 
-                });
-                }
-            );
-            
-            // Send valid request
-            const validData = { name: 'John Doe', email: 'john@example.com', age: 30 };
-            const response = await request(app)
-                .post('/users')
-                .send(validData);
-                
-            // Verify validation passed and data was transformed correctly
-            expect(response.status).toBe(200);
-            expect(response.body.data).toEqual(validData);
-        });
+// Import schemas
+import {
+  CreateGarmentWithBusinessRulesSchema,
+  CreatePolygonWithGeometryValidationSchema,
+  UUIDParamSchema,
+  ImageQuerySchema,
+  EnhancedFileUploadSchema
+} from '../../validators/schemas';
 
-        it('should reject invalid body data with formatted error messages', async () => {
-            // Define test schema
-            const userSchema = z.object({
-                name: z.string().min(2),
-                email: z.string().email(),
-                age: z.number().int().positive()
-            });
-            
-            // Add a test-specific error handler right after the validation middleware
-            interface ErrorWithCode extends Error {
-                code?: string;
-            }
+// Import test utilities
+import {
+  createMockRequest,
+  createMockResponse,
+  createMockNext,
+  mockValidData,
+  mockInvalidData,
+  mockValidFile,
+  generateValidationScenarios,
+  generateLargeDataset,
+  createConcurrentRequests,
+  expectNoError,
+  expectValidationError,
+  expectApiError
+} from '../__mocks__/validate.mock';
 
-            app.post('/users', 
-                validate(userSchema),
-                (err: ErrorWithCode, _req: Request, res: Response, next: NextFunction): void => {
-                    if (err) {
-                        // Explicitly structure the error response
-                        res.status(400).json({
-                            status: 'error',
-                            message: err.message,
-                            code: err.code || 'VALIDATION_ERROR'
-                        });
-                        return;
-                    }
-                    next();
-                },
-                (req: Request, res: Response): void => {
-                    res.status(200).json({ status: 'success' });
-                }
-            );
-            
-            // Send invalid request
-            const response = await request(app)
-                .post('/users')
-                .send({ 
-                    name: 'a', 
-                    email: 'not-an-email', 
-                    age: -5 
-                });
-            
-            // Check status first
-            expect(response.status).toBe(400);
-            
-            // Then check if code exists anywhere in the response
-            expect(response.body).toHaveProperty('code');
-            expect(response.body.code).toBe('VALIDATION_ERROR');
-            
-            // Message checks
-            expect(response.body.message).toContain('name');
-            expect(response.body.message).toContain('email');
-            expect(response.body.message).toContain('age');
-        });
+import {
+  setupValidationTestEnvironment,
+  testMiddlewareWithData,
+  expectMiddlewareSuccess,
+  expectMiddlewareError,
+  testValidationFlow,
+  testConcurrentValidation,
+  testValidationIntegration,
+  testValidationPipelineSteps,
+  createTestDataFactory
+} from '../__helpers__/validate.helper';
+
+import { ApiError } from '../../utils/ApiError';
+
+describe('Validation Middleware Integration Tests', () => {
+  setupValidationTestEnvironment();
+  
+  const testDataFactory = createTestDataFactory();
+  const validationScenarios = generateValidationScenarios();
+
+  describe('End-to-End Validation Workflows', () => {
+    it('should handle complete garment creation workflow', async () => {
+      const garmentData = {
+        mask_data: {
+          width: 200,
+          height: 150,
+          data: new Array(30000).fill(1) // Valid non-zero mask
+        },
+        metadata: {
+          type: 'jacket',
+          color: 'black',
+          brand: 'TestBrand',
+          tags: ['winter', 'outdoor'],
+          season: 'winter',
+          size: 'L',
+          material: 'polyester'
+        },
+        original_image_id: 'img_12345',
+        processing_notes: 'Integration test garment'
+      };
+
+      // Step 1: Validate UUID param
+      const uuidParams = { id: '123e4567-e89b-12d3-a456-426614174000' };
+      const paramResult = await testMiddlewareWithData(validateUUIDParam, uuidParams, 'params');
+      expectNoError(paramResult.next);
+
+      // Step 2: Validate garment body data
+      const bodyValidator = validateBody(CreateGarmentWithBusinessRulesSchema);
+      const bodyResult = await testMiddlewareWithData(bodyValidator, garmentData, 'body');
+      expectNoError(bodyResult.next);
+
+      // Step 3: Validate image query
+      const queryData = { limit: '10', offset: '0', sort: 'created_at' };
+      const queryResult = await testMiddlewareWithData(validateImageQuery, queryData, 'query');
+      expectNoError(queryResult.next);
+
+      // Verify all data was processed correctly
+      expect(bodyResult.req.body.mask_data.data.length).toBe(30000);
+      expect(bodyResult.req.body.metadata.type).toBe('jacket');
+      expect(queryResult.req.query.limit).toBe(10);
+      expect(queryResult.req.query.sort).toBe('created_at');
     });
 
-    describe('Query Parameter Validation', () => {
-        it('should validate and transform query parameters', async () => {
-            // Define a simpler approach that doesn't try to replace req.query
-            app.get('/products-test', (req, res) => {
-                // Manually validate the query
-                try {
-                    const querySchema = z.object({
-                        page: z.coerce.number().int().positive().default(1),
-                        limit: z.coerce.number().int().min(1).max(100).default(10),
-                        sort: z.enum(['asc', 'desc']).default('asc')
-                    });
-                    
-                    // Parse but don't try to replace req.query
-                    const validatedQuery = querySchema.parse(req.query);
-                    
-                    // Return the validated data
-                    res.status(200).json({ 
-                        status: 'success',
-                        query: validatedQuery
-                    });
-                } catch (error) {
-                    res.status(400).json({ 
-                        status: 'error',
-                        message: (error instanceof Error ? error.message : String(error))
-                    });
-                }
-            });
-            
-            // Test with string query params
-            const response = await request(app)
-                .get('/products-test?page=2&limit=25&sort=desc');
-                
-            // Verify query was processed correctly
-            expect(response.status).toBe(200);
-            expect(response.body.query).toEqual({
-                page: 2,
-                limit: 25,
-                sort: 'desc'
-            });
-        });
+    it('should handle complete polygon annotation workflow', async () => {
+      const polygonData = {
+        points: [
+          { x: 50, y: 50 },
+          { x: 150, y: 50 },
+          { x: 200, y: 100 },
+          { x: 150, y: 150 },
+          { x: 50, y: 150 },
+          { x: 0, y: 100 }
+        ], // Hexagon with sufficient area
+        metadata: {
+          label: 'integration_test_polygon',
+          confidence: 0.95,
+          source: 'manual_annotation',
+          notes: 'Created during integration testing'
+        },
+        original_image_id: 'img_polygon_test',
+        created_by: 'test_user'
+      };
 
-        it('should apply default values for missing query parameters', async () => {
-            // Define schema with defaults
-            const querySchema = z.object({
-                page: z.coerce.number().default(1),
-                limit: z.coerce.number().default(10)
-            });
-            
-            // Setup route with validation
-            app.get('/products', 
-                (req, res, _next) => {
-                    // Add direct error handling with logging
-                    try {                                           
-                        // Use the validation middleware directly
-                        validate(querySchema, 'query')(req, res, (err) => {
-                            if (err) {
-                                return res.status(400).json({ 
-                                    status: 'error',
-                                    message: err.message,
-                                    code: err.code
-                                });
-                            }                            
-
-                            // Continue with the original handler
-                            res.status(200).json({ 
-                                status: 'success',
-                                query: req.query
-                            });
-                        });
-                    } catch (e) {                        
-                        const errorMessage = e instanceof Error ? e.message : String(e);
-                        res.status(500).json({ error: errorMessage });
-                    }
-                }
-            );
-        });
+      const bodyValidator = validateBody(CreatePolygonWithGeometryValidationSchema);
+      const result = await testMiddlewareWithData(bodyValidator, polygonData, 'body');
+      
+      expectNoError(result.next);
+      expect(result.req.body.points).toHaveLength(6);
+      expect(result.req.body.metadata.label).toBe('integration_test_polygon');
     });
 
-    describe('URL Parameters Validation', () => {
-        it('should validate URL parameters correctly', async () => {
-            // Define param schema
-            const paramSchema = z.object({
-                id: z.string().uuid()
-            });
-            
-            // Create a more direct test endpoint
-            app.get('/users-test/:id', (req, res) => {
-                try {
-                    // Validate params directly
-                    paramSchema.parse(req.params);
-                    
-                    // If validation passes, return success
-                    res.status(200).json({ id: req.params.id });
-                } catch (error) {
-                    // Ensure proper error format
-                    res.status(400).json({
-                        status: 'error',
-                        message: error instanceof Error ? error.message : String(error),
-                        code: 'VALIDATION_ERROR'
-                    });
-                }
-            });
-            
-            // Test with invalid UUID
-            const invalidResponse = await request(app)
-                .get('/users-test/not-a-uuid');
-                
-            expect(invalidResponse.status).toBe(400);
-            expect(invalidResponse.body.code).toBe('VALIDATION_ERROR');
-            
-            // Test with valid UUID
-            const validUuid = '123e4567-e89b-12d3-a456-426614174000';
-            const validResponse = await request(app)
-                .get(`/users-test/${validUuid}`);
-                
-            expect(validResponse.status).toBe(200);
-            expect(validResponse.body.id).toBe(validUuid);
-        });
+    it('should handle file upload with validation workflow', async () => {
+      // Step 1: Validate file upload
+      const req = createMockRequest({ file: mockValidFile }) as Request;
+      const res = createMockResponse() as Response;
+      const next = createMockNext();
+
+      validateFile(req, res, next);
+      expectNoError(next);
+
+      // Step 2: Validate associated metadata in body
+      const metadataSchema = z.object({
+        description: z.string().min(1),
+        tags: z.array(z.string()),
+        public: z.boolean().optional()
+      });
+
+      const metadataValidator = validateBody(metadataSchema);
+      const metadataData = {
+        description: 'Test image upload',
+        tags: ['test', 'integration'],
+        public: false
+      };
+
+      req.body = metadataData;
+      next.mockClear();
+      
+      await metadataValidator(req, res, next);
+      expectNoError(next);
+
+      // Verify both file and metadata are present
+      expect(req.file).toBeDefined();
+      expect(req.body.description).toBe('Test image upload');
+      expect(req.body.tags).toEqual(['test', 'integration']);
     });
 
-    describe('Integration with Other Middleware', () => {
-        it('should work correctly in a middleware chain', async () => {
-        // Define authentication mock middleware
-        const authMiddleware = (req: Request, _res: Response, next: NextFunction) => {
-            (req as any).user = { id: 'test-user' };
-            next();
+    it('should handle complex multi-step validation pipeline', async () => {
+      const steps = [
+        {
+          name: 'UUID Parameter Validation',
+          validator: validateUUIDParam,
+          testData: { id: '123e4567-e89b-12d3-a456-426614174000' },
+          source: 'params' as const
+        },
+        {
+          name: 'Query Parameter Validation',
+          validator: validateImageQuery,
+          testData: { limit: '20', offset: '10', sort: 'updated_at', order: 'asc' },
+          source: 'query' as const
+        },
+        {
+          name: 'Body Data Validation',
+          validator: validateBody(z.object({
+            name: z.string().min(1),
+            category: z.string(),
+            active: z.boolean()
+          })),
+          testData: { name: 'Test Item', category: 'integration', active: true },
+          source: 'body' as const
+        }
+      ];
+
+      const result = await testValidationPipelineSteps('Multi-Step Validation', steps);
+      
+      // Verify all steps completed successfully
+      expect(result.req.params.id).toBe('123e4567-e89b-12d3-a456-426614174000');
+      expect(result.req.query.limit).toBe(20);
+      expect(result.req.body.name).toBe('Test Item');
+    });
+  });
+
+  describe('Validation Chain Integration', () => {
+    it('should work with multiple validators in sequence', async () => {
+      const req = createMockRequest({
+        params: { id: '123e4567-e89b-12d3-a456-426614174000' },
+        query: { limit: '10', offset: '0' },
+        body: { name: 'Test User', email: 'test@example.com' }
+      }) as Request;
+      const res = createMockResponse() as Response;
+      const next = createMockNext();
+
+      // Create validation chain
+      const validators = [
+        validateUUIDParam,
+        validateImageQuery,
+        validateBody(z.object({
+          name: z.string().min(1),
+          email: z.string().email()
+        }))
+      ];
+
+      // Run validators in sequence
+      for (const validator of validators) {
+        next.mockClear();
+        await validator(req, res, next);
+        expectNoError(next);
+      }
+
+      // Verify all validations succeeded and data was transformed
+      expect(req.params.id).toBe('123e4567-e89b-12d3-a456-426614174000');
+      expect(req.query.limit).toBe(10);
+      expect(req.body.name).toBe('Test User');
+      expect(req.body.email).toBe('test@example.com');
+    });
+
+    it('should stop at first validation failure', async () => {
+      const req = createMockRequest({
+        params: { id: 'invalid-uuid' }, // This will fail
+        query: { limit: '10' },
+        body: { name: 'Test' }
+      }) as Request;
+      const res = createMockResponse() as Response;
+      const next = createMockNext();
+
+      // First validator should fail
+      await validateUUIDParam(req, res, next);
+      expectMiddlewareError(next, 'VALIDATION_ERROR', 400);
+
+      // In real application, subsequent validators wouldn't run
+      // But we can verify they would work if reached
+      const queryValidator = validateImageQuery;
+      const bodyValidator = validateBody(z.object({ name: z.string() }));
+
+      // These would work if called
+      expect(queryValidator).toBeDefined();
+      expect(bodyValidator).toBeDefined();
+    });
+
+    it('should preserve request state between validations', async () => {
+      const req = createMockRequest({
+        params: { id: '123e4567-e89b-12d3-a456-426614174000' },
+        body: { count: '42' }
+      }) as Request;
+      const res = createMockResponse() as Response;
+      const next = createMockNext();
+
+      // Add custom property to request
+      (req as any).customProperty = 'test-value';
+
+      // First validation
+      await validateUUIDParam(req, res, next);
+      expectNoError(next);
+
+      // Second validation with transformation
+      next.mockClear();
+      const transformValidator = validateBody(z.object({
+        count: z.string().transform(s => parseInt(s, 10))
+      }));
+      
+      await transformValidator(req, res, next);
+      expectNoError(next);
+
+      // Verify both validations succeeded and custom property preserved
+      expect(req.params.id).toBe('123e4567-e89b-12d3-a456-426614174000');
+      expect(req.body.count).toBe(42); // Transformed to number
+      expect((req as any).customProperty).toBe('test-value');
+    });
+  });
+
+  describe('Real-World Integration Scenarios', () => {
+    it('should handle user registration workflow', async () => {
+      const userRegistrationSchema = z.object({
+        username: z.string().min(3).max(20),
+        email: z.string().email(),
+        password: z.string().min(8),
+        confirmPassword: z.string(),
+        terms: z.boolean().refine(val => val === true, 'Must accept terms')
+      }).refine(data => data.password === data.confirmPassword, {
+        message: 'Passwords must match',
+        path: ['confirmPassword']
+      });
+
+      const validUserData = {
+        username: 'testuser123',
+        email: 'testuser@example.com',
+        password: 'securepassword123',
+        confirmPassword: 'securepassword123',
+        terms: true
+      };
+
+      const validator = validateBody(userRegistrationSchema);
+      const result = await testMiddlewareWithData(validator, validUserData, 'body');
+      
+      expectNoError(result.next);
+      expect(result.req.body.username).toBe('testuser123');
+      expect(result.req.body.email).toBe('testuser@example.com');
+    });
+
+    it('should handle e-commerce product creation workflow', async () => {
+      const productSchema = z.object({
+        name: z.string().min(1).max(100),
+        description: z.string().min(10).max(1000),
+        price: z.number().positive(),
+        category: z.string(),
+        tags: z.array(z.string()).min(1),
+        inStock: z.boolean(),
+        specifications: z.object({
+          weight: z.number().positive().optional(),
+          dimensions: z.object({
+            length: z.number().positive(),
+            width: z.number().positive(),
+            height: z.number().positive()
+          }).optional()
+        }).optional()
+      });
+
+      const productData = {
+        name: 'Premium Jacket',
+        description: 'High-quality winter jacket with waterproof material',
+        price: 199.99,
+        category: 'outerwear',
+        tags: ['winter', 'waterproof', 'premium'],
+        inStock: true,
+        specifications: {
+          weight: 1.2,
+          dimensions: {
+            length: 70,
+            width: 50,
+            height: 5
+          }
+        }
+      };
+
+      // Validate product creation with file upload
+      const req = createMockRequest({ 
+        file: mockValidFile,
+        body: productData 
+      }) as Request;
+      const res = createMockResponse() as Response;
+      const next = createMockNext();
+
+      // Step 1: Validate file
+      validateFile(req, res, next);
+      expectNoError(next);
+
+      // Step 2: Validate product data
+      next.mockClear();
+      const productValidator = validateBody(productSchema);
+      await productValidator(req, res, next);
+      expectNoError(next);
+
+      // Verify complete product creation data
+      expect(req.file).toBeDefined();
+      expect(req.body.name).toBe('Premium Jacket');
+      expect(req.body.price).toBe(199.99);
+      expect(req.body.specifications.weight).toBe(1.2);
+    });
+
+    it('should handle API pagination and filtering workflow', async () => {
+      const paginationSchema = z.object({
+        page: z.string().transform(s => Math.max(1, parseInt(s, 10))).default('1'),
+        limit: z.string().transform(s => Math.min(100, Math.max(1, parseInt(s, 10)))).default('20'),
+        sort: z.enum(['name', 'created_at', 'updated_at', 'price']).default('created_at'),
+        order: z.enum(['asc', 'desc']).default('desc'),
+        category: z.string().optional(),
+        minPrice: z.string().transform(s => parseFloat(s)).optional(),
+        maxPrice: z.string().transform(s => parseFloat(s)).optional(),
+        search: z.string().optional()
+      });
+
+      const queryData = {
+        page: '2',
+        limit: '50',
+        sort: 'price',
+        order: 'asc',
+        category: 'electronics',
+        minPrice: '10.00',
+        maxPrice: '500.00',
+        search: 'smartphone'
+      };
+
+      const expectedData = {
+        page: 2,
+        limit: 50,
+        sort: 'price',
+        order: 'asc',
+        category: 'electronics',
+        minPrice: 10.00,
+        maxPrice: 500.00,
+        search: 'smartphone'
+      };
+
+      const validator = validateQuery(paginationSchema);
+      const result = await testMiddlewareWithData(validator, queryData, 'query');
+      
+      expectNoError(result.next);
+      expect(result.req.query).toEqual(expectedData);
+    });
+  });
+
+  describe('Error Handling Integration', () => {
+    it('should provide consistent error format across different validators', async () => {
+      const validators = [
+        { name: 'UUID', validator: validateUUIDParam, data: { id: 'invalid' }, source: 'params' },
+        { name: 'Query', validator: validateImageQuery, data: { sort: 'invalid' }, source: 'query' },
+        { name: 'Body', validator: validateBody(z.object({ email: z.string().email() })), data: { email: 'invalid' }, source: 'body' }
+      ];
+
+      for (const { name, validator, data, source } of validators) {
+        const result = await testMiddlewareWithData(validator, data, source as any);
+        const error = expectMiddlewareError(result.next, 'VALIDATION_ERROR', 400);
+        
+        // All should have consistent error structure
+        expect(error.message).toContain('Validation');
+        expect(error.statusCode).toBe(400);
+        expect(error.code).toBe('VALIDATION_ERROR');
+      }
+    });
+
+    it('should handle validation errors with proper context', async () => {
+      const complexSchema = z.object({
+        user: z.object({
+          profile: z.object({
+            email: z.string().email('Invalid email format'),
+            age: z.number().min(18, 'Must be at least 18')
+          })
+        }),
+        preferences: z.object({
+          notifications: z.boolean(),
+          theme: z.enum(['light', 'dark'])
+        })
+      });
+
+      const invalidData = {
+        user: {
+          profile: {
+            email: 'invalid-email',
+            age: 15
+          }
+        },
+        preferences: {
+          notifications: 'maybe', // Should be boolean
+          theme: 'purple' // Invalid enum value
+        }
+      };
+
+      const validator = validateBody(complexSchema);
+      const result = await testMiddlewareWithData(validator, invalidData, 'body');
+      
+      const error = expectMiddlewareError(result.next, 'VALIDATION_ERROR', 400);
+      
+      // Should have multiple validation errors
+      expect(error.details).toBeDefined();
+      expect(Array.isArray(error.details)).toBe(true);
+      expect(error.details.length).toBeGreaterThan(1);
+      
+      // Should include field paths
+      const errorPaths = error.details.map((detail: any) => detail.path.join('.'));
+      expect(errorPaths).toContain('user.profile.email');
+      expect(errorPaths).toContain('user.profile.age');
+    });
+
+    it('should handle mixed validation success and failure scenarios', async () => {
+      const testCases = [
+        { data: mockValidData.body, shouldSucceed: true },
+        { data: mockInvalidData.body, shouldSucceed: false },
+        { data: { name: 'Valid', email: 'valid@example.com' }, shouldSucceed: true },
+        { data: { name: '', email: 'invalid' }, shouldSucceed: false }
+      ];
+
+      const validator = validateBody(z.object({
+        name: z.string().min(1),
+        email: z.string().email()
+      }));
+
+      for (const { data, shouldSucceed } of testCases) {
+        const result = await testMiddlewareWithData(validator, data, 'body');
+        
+        if (shouldSucceed) {
+          expectNoError(result.next);
+        } else {
+          expectMiddlewareError(result.next, 'VALIDATION_ERROR', 400);
+        }
+      }
+    });
+  });
+
+  describe('Performance Integration', () => {
+    it('should handle high-throughput validation scenarios', async () => {
+      const batchSize = 100;
+      const validator = validateBody(z.object({
+        name: z.string(),
+        email: z.string().email(),
+        active: z.boolean()
+      }));
+
+      const testData = Array(batchSize).fill(0).map((_, i) => ({
+        name: `User ${i}`,
+        email: `user${i}@example.com`,
+        active: i % 2 === 0
+      }));
+
+      const startTime = performance.now();
+      
+      const results = await Promise.all(
+        testData.map(async (data) => {
+          const result = await testMiddlewareWithData(validator, data, 'body');
+          return result;
+        })
+      );
+
+      const endTime = performance.now();
+      const executionTime = endTime - startTime;
+
+      // Should complete batch processing efficiently
+      expect(executionTime).toBeLessThan(2000); // Under 2 seconds
+      expect(results).toHaveLength(batchSize);
+      
+      // All should succeed
+      results.forEach(result => {
+        expectNoError(result.next);
+      });
+    });
+
+    it('should handle concurrent validation requests', async () => {
+      const concurrency = 20;
+      const validator = validateBody(z.object({
+        id: z.string(),
+        timestamp: z.string()
+      }));
+
+      const promises = Array(concurrency).fill(0).map(async (_, i) => {
+        const data = {
+          id: `concurrent-${i}`,
+          timestamp: new Date().toISOString()
         };
         
-        // Define schema that expects authenticated user data
-        const postSchema = z.object({
-            title: z.string().min(3),
-            content: z.string()
-        });
-        
-        // Create middleware chain
-        app.post('/posts',
-            authMiddleware, // First middleware
-            validate(postSchema), // Second middleware
-            (req: Request, res: Response) => {
-            // Should have both validated body and user from auth middleware
-            res.status(201).json({ 
-                status: 'success', 
-                post: { 
-                ...req.body, 
-                authorId: (req as any).user.id 
-                }
-            });
+        return testMiddlewareWithData(validator, data, 'body');
+      });
+
+      const startTime = performance.now();
+      const results = await Promise.all(promises);
+      const endTime = performance.now();
+
+      const executionTime = endTime - startTime;
+      
+      // Should handle concurrent requests efficiently
+      expect(executionTime).toBeLessThan(1000); // Under 1 second
+      expect(results).toHaveLength(concurrency);
+      
+      // All should succeed
+      results.forEach(result => {
+        expectNoError(result.next);
+      });
+    });
+
+    it('should maintain performance with complex nested validation', async () => {
+      const complexSchema = z.object({
+        metadata: z.object({
+          tags: z.array(z.string()).max(50),
+          attributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
+          nested: z.object({
+            level1: z.object({
+              level2: z.object({
+                level3: z.array(z.object({
+                  id: z.string(),
+                  value: z.number()
+                }))
+              })
+            })
+          })
+        })
+      });
+
+      const complexData = {
+        metadata: {
+          tags: Array(30).fill(0).map((_, i) => `tag-${i}`),
+          attributes: {
+            color: 'blue',
+            size: 'large',
+            weight: 1.5,
+            available: true
+          },
+          nested: {
+            level1: {
+              level2: {
+                level3: Array(20).fill(0).map((_, i) => ({
+                  id: `item-${i}`,
+                  value: i * 10
+                }))
+              }
             }
-        );
-        
-        // Test with valid data
-        const response = await request(app)
-            .post('/posts')
-            .send({ title: 'Test Post', content: 'This is test content' });
-            
-        expect(response.status).toBe(201);
-        expect(response.body.post).toEqual({
-            title: 'Test Post',
-            content: 'This is test content',
-            authorId: 'test-user'
-        });
-        });
+          }
+        }
+      };
+
+      const validator = validateBody(complexSchema);
+      
+      const startTime = performance.now();
+      const result = await testMiddlewareWithData(validator, complexData, 'body');
+      const endTime = performance.now();
+
+      const executionTime = endTime - startTime;
+      
+      // Should handle complex validation efficiently
+      expect(executionTime).toBeLessThan(100); // Under 100ms
+      expectNoError(result.next);
+      
+      // Verify data structure is preserved
+      expect(result.req.body.metadata.tags).toHaveLength(30);
+      expect(result.req.body.metadata.nested.level1.level2.level3).toHaveLength(20);
+    });
+  });
+
+  describe('Cross-Validation Integration', () => {
+    it('should validate related data consistency', async () => {
+      const orderSchema = z.object({
+        items: z.array(z.object({
+          productId: z.string(),
+          quantity: z.number().positive(),
+          price: z.number().positive()
+        })),
+        totalAmount: z.number().positive(),
+        customerEmail: z.string().email()
+      }).refine(data => {
+        const calculatedTotal = data.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+        return Math.abs(calculatedTotal - data.totalAmount) < 0.01; // Allow for rounding
+      }, {
+        message: 'Total amount must match sum of item prices',
+        path: ['totalAmount']
+      });
+
+      const validOrder = {
+        items: [
+          { productId: 'prod1', quantity: 2, price: 10.00 },
+          { productId: 'prod2', quantity: 1, price: 15.00 }
+        ],
+        totalAmount: 35.00,
+        customerEmail: 'customer@example.com'
+      };
+
+      const invalidOrder = {
+        items: [
+          { productId: 'prod1', quantity: 2, price: 10.00 },
+          { productId: 'prod2', quantity: 1, price: 15.00 }
+        ],
+        totalAmount: 40.00, // Wrong total
+        customerEmail: 'customer@example.com'
+      };
+
+      const validator = validateBody(orderSchema);
+
+      // Valid order should pass
+      const validResult = await testMiddlewareWithData(validator, validOrder, 'body');
+      expectNoError(validResult.next);
+
+      // Invalid order should fail
+      const invalidResult = await testMiddlewareWithData(validator, invalidOrder, 'body');
+      expectMiddlewareError(invalidResult.next, 'VALIDATION_ERROR', 400);
     });
 
-    describe('Error Handling', () => {
-        it('should handle non-Zod errors correctly', async () => {
-            // Create test endpoint with direct error handling
-            app.post('/error-test', (_req, res) => {
-                // Directly create and format an error
-                const error = new Error('Custom middleware error');
-                
-                // Return with proper format
-                res.status(500).json({
-                    status: 'error',
-                    message: error.message,
-                    code: 'CUSTOM_ERROR'
-                });
-            });
-            
-            // Test error handling
-            const response = await request(app)
-                .post('/error-test')
-                .send({ name: 'Test' });
-                
-            expect(response.status).toBe(500);
-            expect(response.body.message).toBe('Custom middleware error');
-        });
+    it('should validate file upload with metadata consistency', async () => {
+      const imageMetadataSchema = z.object({
+        filename: z.string(),
+        description: z.string(),
+        tags: z.array(z.string()),
+        dimensions: z.object({
+          width: z.number().positive(),
+          height: z.number().positive()
+        })
+      });
+
+      const imageFile = {
+        ...mockValidFile,
+        originalname: 'test-image.jpg'
+      };
+
+      const metadataData = {
+        filename: 'test-image.jpg', // Should match file
+        description: 'Test image for integration testing',
+        tags: ['test', 'integration'],
+        dimensions: {
+          width: 800,
+          height: 600
+        }
+      };
+
+      const req = createMockRequest({ 
+        file: imageFile,
+        body: metadataData 
+      }) as Request;
+      const res = createMockResponse() as Response;
+      const next = createMockNext();
+
+      // Step 1: Validate file
+      validateFile(req, res, next);
+      expectNoError(next);
+
+      // Step 2: Validate metadata
+      next.mockClear();
+      const metadataValidator = validateBody(imageMetadataSchema);
+      await metadataValidator(req, res, next);
+      expectNoError(next);
+
+      // Verify consistency
+      expect(req.file?.originalname).toBe(req.body.filename);
+      expect(req.body.description).toBe('Test image for integration testing');
     });
+  });
 
-    describe('Complex Schema Validation', () => {
-        it('should correctly validate nested objects and arrays in the body', async () => {
-            const complexSchema = z.object({
-                user: z.object({
-                    name: z.string().min(1),
-                    emails: z.array(z.string().email()).min(1),
-                    address: z.object({
-                        street: z.string().optional(),
-                        city: z.string(),
-                    }).optional(),
-                }),
-                tags: z.array(z.string().min(3)).optional(),
-            });
-
-            app.post('/complex-data',
-                validate(complexSchema),
-                (_req: Request, res: Response) => { // Success handler
-                    res.status(200).json({ status: 'success', data: _req.body });
-                }
-            );
-
-            // Route-specific error handler for /complex-data
-            app.use('/complex-data', ((
-                err: any,
-                _req: Request,
-                res: Response,
-                next: NextFunction
-            ) => {
-                if (err) {                   
-                    return res.status(err.statusCode || 400).json({
-                        status: 'error',
-                        message: err.message,
-                        code: err.code || 'VALIDATION_ERROR'
-                    });
-                }
-                next();
-            }) as express.ErrorRequestHandler);
-
-            // Valid data
-            const validData = {
-                user: { name: 'Test User', emails: ['test@example.com'] },
-                tags: ['tag1', 'tag22'],
-            };
-            let response = await request(app).post('/complex-data').send(validData);
-            expect(response.status).toBe(200);
-            expect(response.body.data).toEqual(validData);
-
-            // Invalid data
-            const invalidData = {
-                user: { name: 'Test User', emails: ['not-an-email'], address: { street: '123 Main' } }, // missing city
-            };
-            response = await request(app).post('/complex-data').send(invalidData);
-            expect(response.status).toBe(400);
-            expect(response.body.code).toBe('VALIDATION_ERROR');
-            expect(response.body.message).toContain('user.emails.0');
-            expect(response.body.message).toContain('user.address.city');
-        });
-    });
-
-    describe('Schema with Transform and Async Refine', () => {
-        it('should handle data transformation and async refinement', async () => {
-            const refinedSchema = z.object({
-                username: z.string().transform(val => val.toLowerCase()),
-                password: z.string().min(8),
-            }).refine(async (data) => {
-                await new Promise(resolve => setTimeout(resolve, 10));
-                return data.username !== 'admin';
-            }, { message: 'Username "admin" is not allowed', path: ['username'] });
-            
-            app.post('/refined-user',
-                validate(refinedSchema as unknown as z.AnyZodObject),
-                ((
-                    err: any, 
-                    _req: Request, 
-                    res: Response, 
-                    next: NextFunction
-                ) => { // Route-specific error handler
-                    if (err) {                       
-                        return res.status(err.statusCode || 400).json({
-                            status: 'error',
-                            message: err.message,
-                            code: err.code || 'VALIDATION_ERROR'
-                        });
-                    }
-                    next();
-                }) as express.ErrorRequestHandler,
-                (_req: Request, res: Response) => { // Success handler
-                    res.status(200).json({ status: 'success', data: _req.body });
-                }
-            );
-
-            // Valid data
-            let response = await request(app).post('/refined-user').send({ username: 'USER1', password: 'password123' });
-            expect(response.status).toBe(200);
-            expect(response.body.data.username).toBe('user1');
-
-            // Invalid data
-            response = await request(app).post('/refined-user').send({ username: 'ADMIN', password: 'password123' });
-            expect(response.status).toBe(400);
-            expect(response.body.code).toBe('VALIDATION_ERROR');
-            expect(response.body.message).toContain('Username "admin" is not allowed');
-            expect(response.body.message).toContain('username');
-        });
-    });
-
-    describe('Empty Input Handling', () => {
-        it('should reject an empty body when schema requires fields', async () => {
-            const requiredSchema = z.object({
-                name: z.string(),
-            });
-
-            app.post('/empty-test',
-                validate(requiredSchema),
-                ((
-                    err: any, 
-                    _req: Request, 
-                    res: Response, 
-                    next: NextFunction
-                ) => { // Route-specific error handler
-                    if (err) {                      
-                        return res.status(err.statusCode || 400).json({
-                            status: 'error',
-                            message: err.message,
-                            code: err.code || 'VALIDATION_ERROR'
-                        });
-                    }
-                    next();
-                }) as express.ErrorRequestHandler,
-                (_req: Request, res: Response) => { // Success handler
-                    res.status(200).json({ status: 'success' });
-                }
-            );
-
-            const response = await request(app).post('/empty-test').send({});
-            expect(response.status).toBe(400);
-            expect(response.body.code).toBe('VALIDATION_ERROR');
-            expect(response.body.message).toContain('name: Required');
-        });
-    });
+  // Include the integration testing helper
+  testValidationIntegration();
 });

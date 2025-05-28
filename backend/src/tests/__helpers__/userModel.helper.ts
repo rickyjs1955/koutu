@@ -124,9 +124,8 @@ export class UserModelTestHelper {
    * Setup mock for successful OAuth user lookup
    */
   static setupFindByOAuthSuccess() {
-    mockQuery
-      .mockResolvedValueOnce(mockQueryResults.selectUserNotFound) // No linked account
-      .mockResolvedValueOnce(mockQueryResults.oauthUser); // Direct OAuth account
+    // Only return from linked accounts now, not direct OAuth
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // No linked account
   }
 
   /**
@@ -140,9 +139,7 @@ export class UserModelTestHelper {
    * Setup mock for OAuth user not found
    */
   static setupFindByOAuthNotFound() {
-    mockQuery
-      .mockResolvedValueOnce(mockQueryResults.selectUserNotFound) // No linked account
-      .mockResolvedValueOnce(mockQueryResults.selectUserNotFound); // No direct OAuth account
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // No linked account
   }
 
   /**
@@ -178,10 +175,36 @@ export class UserModelTestHelper {
   }
 
   /**
-   * Verify that query was called with expected parameters
+   * Expect query to be called with normalized whitespace
    */
   static expectQueryCalledWith(query: string, params?: any[]) {
-    expect(mockQuery).toHaveBeenCalledWith(query, params);
+    if (params) {
+      // Normalize whitespace for comparison
+      const normalizedQuery = query.replace(/\s+/g, ' ').trim();
+      
+      // Check if any call matches the normalized query
+      const calls = mockQuery.mock.calls;
+      const matchingCall = calls.find(call => {
+        const normalizedCall = call[0].replace(/\s+/g, ' ').trim();
+        return normalizedCall === normalizedQuery && 
+               JSON.stringify(call[1]) === JSON.stringify(params);
+      });
+      
+      expect(matchingCall).toBeDefined();
+    } else {
+      expect(mockQuery).toHaveBeenCalledWith(query);
+    }
+  }
+
+  /**
+   * Expect specific call number with exact parameters
+   */
+  static expectNthQueryCalledWith(callNumber: number, query: string, params?: any[]) {
+    if (params) {
+      expect(mockQuery).toHaveBeenNthCalledWith(callNumber, query, params);
+    } else {
+      expect(mockQuery).toHaveBeenNthCalledWith(callNumber, query);
+    }
   }
 
   /**
@@ -254,5 +277,50 @@ export class UserModelTestHelper {
       created_at: new Date('2024-01-01T10:00:00Z'),
       ...overrides
     };
+  }
+
+  /**
+   * Setup for new transaction-based OAuth user creation
+   */
+  static setupCreateOAuthUserSuccessNew() {
+    // First query: check if email exists
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] }) // Email doesn't exist
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN transaction
+      .mockResolvedValueOnce({ // INSERT user
+        rows: [{
+          id: '550e8400-e29b-41d4-a716-446655440000',
+          email: 'john.doe@example.com',
+          created_at: new Date('2024-01-01T10:00:00Z')
+        }]
+      })
+      .mockResolvedValueOnce({ rows: [] }) // INSERT oauth provider
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT transaction
+  }
+
+  /**
+   * Setup for new getUserWithOAuthProviders (without OAuth columns)
+   */
+  static setupGetUserWithOAuthProvidersNew() {
+    mockQuery
+      .mockResolvedValueOnce({ // User query
+        rows: [{
+          id: '550e8400-e29b-41d4-a716-446655440000',
+          email: 'john.doe@example.com',
+          created_at: new Date('2024-01-01T10:00:00Z')
+        }]
+      })
+      .mockResolvedValueOnce({ // OAuth providers query
+        rows: [
+          { provider: 'github' }
+        ]
+      });
+  }
+
+  /**
+   * Setup findByOAuth to return null (no direct OAuth accounts)
+   */
+  static setupFindByOAuthNotFoundNew() {
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // No linked account found
   }
 }

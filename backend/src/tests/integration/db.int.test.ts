@@ -43,7 +43,7 @@ describe('Database Integration Tests', () => {
     // Use correct database credentials from testSetup.ts
     testPool = new Pool({
       host: 'localhost',
-      port: 5433,
+      port: 5432,
       user: 'postgres',
       password: 'postgres',
       database: 'koutu_test',
@@ -779,7 +779,7 @@ describe('Database Integration Tests', () => {
       jest.doMock('../../config/index', () => ({
         config: {
           nodeEnv: 'test',
-          databaseUrl: 'postgresql://postgres:postgres@localhost:5433/koutu_test',
+          databaseUrl: 'postgresql://postgres:postgres@localhost:5432/koutu_test',
           dbPoolMax: 5,
           dbConnectionTimeout: 3000,
           dbIdleTimeout: 5000,

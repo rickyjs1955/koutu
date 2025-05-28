@@ -12,11 +12,12 @@ import {
   CreatePolygonWithGeometryValidationSchema,
   EnhancedFileUploadSchema,
   FileUploadSchema,
-  validateBody,
-  validateFile,
-  validateUUIDParam
 } from '../../validators/schemas';
-import { createMockRequest, createMockResponse, createMockNext } from '../__mocks__/schemas.mock';
+import { createMockRequest, 
+         createMockResponse, 
+         createMockNext 
+} from '../__mocks__/schemas.mock';
+import { validateUUIDParam } from '../../middlewares/validate';
 
 describe('Schema Security Tests', () => {
     beforeEach(() => {
