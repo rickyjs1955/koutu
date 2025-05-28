@@ -55,7 +55,7 @@ describe('testSetup Integration Tests', () => {
       const pool = getTestPool();
       expect(pool).toBeDefined();
       expect(pool.options.host).toBe('localhost');
-      expect(pool.options.port).toBe(5433);
+      expect(pool.options.port).toBe(5432);
       expect(pool.options.database).toBe('koutu_test');
     });
 

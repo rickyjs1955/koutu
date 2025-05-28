@@ -23,11 +23,34 @@ const MAIN_DB_CONFIG = {
 };
 
 export class TestDatabase {
-  private static testPool: Pool;
-  private static mainPool: Pool;
+  private static testPool: Pool | null = null;
+  private static mainPool: Pool | null = null;
+  private static isInitialized = false;
 
   static async initialize() {
     console.log('🔧 Setting up test database...');
+    
+    // If already initialized, return existing pool
+    if (this.isInitialized && this.testPool && !this.testPool.ended) {
+      return this.testPool;
+    }
+    
+    // Clean up any existing pools first
+    if (this.testPool && !this.testPool.ended) {
+      try {
+        await this.testPool.end();
+      } catch (error) {
+        // Ignore errors when ending existing pools
+      }
+    }
+    
+    if (this.mainPool && !this.mainPool.ended) {
+      try {
+        await this.mainPool.end();
+      } catch (error) {
+        // Ignore errors when ending existing pools
+      }
+    }
     
     // Connect to main postgres database to create test database
     this.mainPool = new Pool(MAIN_DB_CONFIG);
@@ -114,17 +137,25 @@ export class TestDatabase {
     // Override the database connection for tests
     process.env.DATABASE_URL = `postgresql://postgres:postgres@localhost:5432/koutu_test`;
     
+    this.isInitialized = true;
     return this.testPool;
   }
 
   static async cleanup() {
     console.log('🧹 Cleaning up test database...');
     
-    if (this.testPool) {
-      await this.testPool.end();
-    }
+    this.isInitialized = false;
     
-    if (this.mainPool) {
+    if (this.testPool && !this.testPool.ended) {
+      try {
+        await this.testPool.end();
+      } catch (error) {
+        console.log('⚠️ Error ending test pool:', error);
+      }
+    }
+    this.testPool = null;
+    
+    if (this.mainPool && !this.mainPool.ended) {
       try {
         // Drop test database
         await this.mainPool.query(`
@@ -138,14 +169,23 @@ export class TestDatabase {
         console.log('⚠️ Error dropping test database:', error);
       }
       
-      await this.mainPool.end();
+      try {
+        await this.mainPool.end();
+      } catch (error) {
+        console.log('⚠️ Error ending main pool:', error);
+      }
     }
+    this.mainPool = null;
   }
 
   static async clearAllTables() {
-    if (!this.testPool) return;
+    if (!this.testPool || this.testPool.ended) return;
     
-    await this.testPool.query('TRUNCATE wardrobes, garment_items, original_images, user_oauth_providers, users RESTART IDENTITY CASCADE');
+    try {
+      await this.testPool.query('TRUNCATE wardrobes, garment_items, original_images, user_oauth_providers, users RESTART IDENTITY CASCADE');
+    } catch (error) {
+      console.log('⚠️ Error clearing tables:', error);
+    }
   }
 
   static getPool() {
@@ -153,6 +193,9 @@ export class TestDatabase {
   }
 
   static async query(text: string, params?: any[]) {
+    if (!this.testPool || this.testPool.ended) {
+      throw new Error('Test database not initialized or has been closed. Call initialize() first.');
+    }
     return this.testPool.query(text, params);
   }
 }

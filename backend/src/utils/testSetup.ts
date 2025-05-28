@@ -6,7 +6,7 @@ import { Pool } from 'pg';
 // Test database configuration - FIXED VERSION
 const TEST_DB_CONFIG = {
   host: 'localhost',
-  port: 5433,
+  port: 5432,
   user: 'postgres',
   password: 'postgres',
   database: 'koutu_test',
@@ -14,6 +14,12 @@ const TEST_DB_CONFIG = {
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,
   ssl: false,
+};
+
+// Base config for connecting to postgres database (for database creation)
+const BASE_DB_CONFIG = {
+  ...TEST_DB_CONFIG,
+  database: 'postgres' // Connect to default postgres database first
 };
 
 // Set environment variable for tests to use
@@ -53,22 +59,86 @@ const waitForService = async (url: string, maxRetries = 30, interval = 1000): Pr
 };
 
 /**
- * Wait for PostgreSQL to be ready
+ * Create test database if it doesn't exist
+ */
+const ensureTestDatabase = async (): Promise<void> => {
+  const basePool = new Pool(BASE_DB_CONFIG);
+  
+  try {
+    // Check if test database exists
+    const result = await basePool.query(
+      "SELECT 1 FROM pg_database WHERE datname = $1",
+      [TEST_DB_CONFIG.database]
+    );
+    
+    if (result.rows.length === 0) {
+      console.log(`Creating test database: ${TEST_DB_CONFIG.database}`);
+      // Note: Database name cannot be parameterized, but we control this value
+      await basePool.query(`CREATE DATABASE ${TEST_DB_CONFIG.database}`);
+      console.log(`Test database ${TEST_DB_CONFIG.database} created successfully`);
+    } else {
+      console.log(`Test database ${TEST_DB_CONFIG.database} already exists`);
+    }
+  } catch (error) {
+    console.error('Error ensuring test database exists:', error);
+    throw error;
+  } finally {
+    await basePool.end();
+  }
+};
+
+/**
+ * Wait for PostgreSQL to be ready and ensure test database exists
  */
 const waitForPostgreSQL = async (): Promise<boolean> => {
   const maxRetries = 30;
+  
+  // First, wait for PostgreSQL service to be available
   for (let i = 0; i < maxRetries; i++) {
     try {
-      // Test connection
-      const client = await testPool.connect();
+      const basePool = new Pool(BASE_DB_CONFIG);
+      const client = await basePool.connect();
       await client.query('SELECT 1');
       client.release();
-      return true;
+      await basePool.end();
+      console.log('PostgreSQL service is ready');
+      break;
     } catch (error) {
-      console.log(`Waiting for PostgreSQL... (${i + 1}/${maxRetries})`);
+      console.log(`Waiting for PostgreSQL service... (${i + 1}/${maxRetries})`);
+      if (i === maxRetries - 1) {
+        console.error('PostgreSQL service not ready after maximum retries');
+        return false;
+      }
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
+
+  // Ensure test database exists
+  try {
+    await ensureTestDatabase();
+  } catch (error) {
+    console.error('Failed to ensure test database exists:', error);
+    return false;
+  }
+
+  // Now test connection to the test database
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const client = await testPool.connect();
+      await client.query('SELECT 1');
+      client.release();
+      console.log(`Connected to test database: ${TEST_DB_CONFIG.database}`);
+      return true;
+    } catch (error) {
+      console.log(`Waiting for test database connection... (${i + 1}/${maxRetries})`);
+      if (i === maxRetries - 1) {
+        console.error('Test database connection not ready after maximum retries');
+        return false;
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  
   return false;
 };
 
@@ -79,7 +149,7 @@ export const setupTestDatabase = async () => {
   try {
     console.log('Setting up test database...');
     
-    // Wait for PostgreSQL to be ready
+    // Wait for PostgreSQL to be ready and ensure test database exists
     const isReady = await waitForPostgreSQL();
     if (!isReady) {
       throw new Error('PostgreSQL test database is not ready after 30 seconds');
