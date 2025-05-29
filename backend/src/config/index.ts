@@ -31,7 +31,7 @@ export const config = {
   
   // File storage - keeping these for backward compatibility
   uploadsDir: path.join(__dirname, '../../../uploads'),
-  maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '5242880', 10), // 5MB
+  maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '8388608', 10), // 8MB (8 * 1024 * 1024)
   
   // Firebase configuration
   firebase: {

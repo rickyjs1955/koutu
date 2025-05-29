@@ -22,16 +22,64 @@ export const imageProcessingService = {
         throw new Error('Could not determine image dimensions');
       }
       
-      // Validate supported formats
-      const supportedFormats = ['jpeg', 'png', 'webp', 'gif'];
+      // Validate supported formats (Instagram compatible)
+      const supportedFormats = ['jpeg', 'png', 'bmp'];
       if (!supportedFormats.includes(metadata.format)) {
         throw new Error(`Unsupported image format: ${metadata.format}`);
+      }
+      
+      // Instagram dimension validation
+      if (metadata.width < 320) {
+        throw new Error(`Image width too small (minimum 320px, got ${metadata.width}px)`);
+      }
+      
+      if (metadata.width > 1440) {
+        throw new Error(`Image width too large (maximum 1440px, got ${metadata.width}px)`);
+      }
+      
+      // Instagram aspect ratio validation
+      const aspectRatio = metadata.width / metadata.height;
+      if (aspectRatio < 0.8 || aspectRatio > 1.91) {
+        throw new Error(`Invalid aspect ratio: ${aspectRatio.toFixed(2)}:1 (must be between 4:5 and 1.91:1)`);
       }
       
       return metadata;
     } catch (error) {
       console.error('Image buffer validation error:', error);
       throw new Error(`Invalid image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  },
+
+  async convertToSRGB(inputPath: string): Promise<string> {
+    try {
+      const absolutePath = storageService.getAbsolutePath(inputPath);
+      
+      // Check current color space
+      const metadata = await sharp(absolutePath).metadata();
+      
+      // If already sRGB, return original path
+      if (metadata.space === 'srgb') {
+        return inputPath;
+      }
+      
+      // Create converted file path
+      const fileExtension = path.extname(inputPath);
+      const fileNameWithoutExt = path.basename(inputPath, fileExtension);
+      const dirName = path.dirname(inputPath);
+      const convertedFileName = `${fileNameWithoutExt}_srgb${fileExtension}`;
+      const convertedPath = path.join(dirName, convertedFileName);
+      const convertedAbsolutePath = storageService.getAbsolutePath(convertedPath);
+      
+      // Convert to sRGB
+      await sharp(absolutePath)
+        .toColorspace('srgb')
+        .toFile(convertedAbsolutePath);
+      
+      console.log(`Converted ${metadata.space} to sRGB: ${convertedPath}`);
+      return convertedPath;
+    } catch (error) {
+      console.error('Color space conversion error:', error);
+      throw new Error(`Failed to convert to sRGB: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   },
   

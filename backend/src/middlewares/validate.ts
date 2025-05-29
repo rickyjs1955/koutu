@@ -162,18 +162,17 @@ export const validateFile = (req: Request, res: Response, next: NextFunction) =>
     
     // 1. Check for path traversal in filename
     if (file.originalname.includes('..') || file.originalname.includes('/') || file.originalname.includes('\\')) {
-      const error = ApiError.badRequest('Invalid filename - path traversal not allowed', 'INVALID_FILE', {
-        validationErrors: [{ message: 'Path traversal detected in filename', path: ['originalname'] }]
-      });
+      const error = ApiError.badRequest('Invalid filename - path traversal not allowed', 'INVALID_FILE');
       return next(error);
     }
     
     // 2. Check file size limits
-    const MAX_FILE_SIZE = 1024 * 1024; // 1MB limit
+    const MAX_FILE_SIZE = 8388608; // 8MB
     if (file.size > MAX_FILE_SIZE) {
-      const error = ApiError.badRequest(`File too large (max ${MAX_FILE_SIZE / (1024 * 1024)}MB)`, 'INVALID_FILE', {
-        validationErrors: [{ message: 'File size exceeds maximum allowed', path: ['size'] }]
-      });
+      const error = ApiError.badRequest(
+        `File too large (max 8MB, got ${Math.round(file.size / 1024 / 1024)}MB)`, 
+        'INVALID_FILE'
+      );
       return next(error);
     }
     
@@ -186,11 +185,12 @@ export const validateFile = (req: Request, res: Response, next: NextFunction) =>
     }
     
     // 4. Check mime type - only allow images
-    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/bmp'];
     if (!allowedMimeTypes.includes(file.mimetype.toLowerCase())) {
-      const error = ApiError.badRequest('Only image files are allowed', 'INVALID_FILE', {
-        validationErrors: [{ message: 'Invalid file type', path: ['mimetype'] }]
-      });
+      const error = ApiError.badRequest(
+        'Only JPEG, PNG, and BMP images are allowed (Instagram compatible)', 
+        'INVALID_FILE'
+      );
       return next(error);
     }
     
@@ -220,10 +220,9 @@ export const validateFile = (req: Request, res: Response, next: NextFunction) =>
     }
   } catch (err) {
     const error = ApiError.internal(
-      'File validation error',
+      'File validation error', 
       'FILE_VALIDATION_ERROR', 
-      err as Error
-    );
+      err as Error);
     next(error);
   }
 };

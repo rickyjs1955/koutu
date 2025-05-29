@@ -94,10 +94,10 @@ export const FileUploadSchema = z.object({
   originalname: z.string().max(255, 'Filename too long (max 255 characters)'),
   encoding: z.string(),
   mimetype: z.string().regex(
-    /^image\/(jpeg|jpg|png|webp)$/i, 
-    'Invalid image type. Only JPEG, PNG, and WebP are allowed'
+    /^image\/(jpeg|jpg|png|bmp)$/i, 
+    'Invalid image type. Only JPEG, PNG, and BMP are allowed (Instagram compatible)'
   ),
-  size: z.number().max(5242880, 'File too large (max 5MB)'),
+  size: z.number().max(8388608, 'File too large (max 8MB)'), // Updated to 8MB
   buffer: z.instanceof(Buffer)
 });
 
@@ -179,6 +179,28 @@ export const UpdatePolygonSchema = z.object({
     notes: z.string().optional()
   }).optional()
 });
+
+// ==================== INSTAGRAM-SPECIFIC VALIDATION SCHEMA ====================
+export const InstagramImageSchema = z.object({
+  width: z.number().min(320, 'Width must be at least 320px').max(1440, 'Width must not exceed 1440px'),
+  height: z.number().positive('Height must be positive'),
+  format: z.enum(['jpeg', 'png', 'bmp'], { 
+    errorMap: () => ({ message: 'Format must be JPEG, PNG, or BMP' }) 
+  }),
+  aspectRatio: z.number()
+    .min(0.8, 'Aspect ratio too tall (minimum 4:5)')
+    .max(1.91, 'Aspect ratio too wide (maximum 1.91:1)'),
+  colorSpace: z.string().optional()
+}).refine(
+  (data) => {
+    const aspectRatio = data.width / data.height;
+    return aspectRatio >= 0.8 && aspectRatio <= 1.91;
+  },
+  {
+    message: 'Image aspect ratio must be between 4:5 (portrait) and 1.91:1 (landscape)',
+    path: ['aspectRatio']
+  }
+);
 
 // ==================== HELPER FUNCTIONS ====================
 

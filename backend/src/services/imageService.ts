@@ -41,10 +41,18 @@ export const imageService = {
 
     try {
       // Save the file to storage
-      const filePath = await storageService.saveFile(fileBuffer, originalFilename);
+      let filePath = await storageService.saveFile(fileBuffer, originalFilename);
 
       // Extract comprehensive metadata
-      const metadata = await imageProcessingService.extractMetadata(filePath);
+      let metadata = await imageProcessingService.extractMetadata(filePath);
+
+      // Integrate color space conversion in imageService.uploadImage()
+      if (validation.metadata?.space && validation.metadata.space !== 'srgb') {
+        console.log(`Converting ${validation.metadata.space} to sRGB for Instagram compatibility`);
+        filePath = await imageProcessingService.convertToSRGB(filePath);
+        // Re-extract metadata after conversion
+        metadata = await imageProcessingService.extractMetadata(filePath);
+      }
 
       // Create enhanced metadata object
       const enhancedMetadata = {
@@ -90,37 +98,51 @@ export const imageService = {
     const errors: string[] = [];
 
     try {
-      // Validate buffer is not empty
-      if (!fileBuffer || fileBuffer.length === 0) {
-        errors.push('File buffer is empty');
-        return { isValid: false, errors };
+      // Validate file size (8MB)
+      const MAX_FILE_SIZE = 8388608; // 8MB
+      if (size > MAX_FILE_SIZE) {
+        errors.push(`File too large (max 8MB, got ${Math.round(size / 1024 / 1024)}MB)`);
       }
 
-      // Validate file size
-      if (size !== fileBuffer.length) {
-        errors.push('File size mismatch');
-      }
-
-      // Validate MIME type
-      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      // Validate MIME type - Instagram formats
+      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/bmp'];
       if (!allowedMimeTypes.includes(mimetype)) {
-        errors.push(`Unsupported MIME type: ${mimetype}`);
+        errors.push(`Unsupported format: ${mimetype}. Only JPEG, PNG, and BMP allowed`);
       }
 
       // Validate actual image content
       const metadata = await imageProcessingService.validateImageBuffer(fileBuffer);
 
-      // Check minimum dimensions
-      const minDimension = 50;
       if (metadata.width && metadata.height) {
-        if (metadata.width < minDimension || metadata.height < minDimension) {
-          errors.push(`Image dimensions too small (min: ${minDimension}x${minDimension})`);
+        // Instagram resolution requirements
+        const MIN_WIDTH = 320;
+        const MAX_WIDTH = 1440;
+        
+        if (metadata.width < MIN_WIDTH) {
+          errors.push(`Image width too small (min: ${MIN_WIDTH}px, got: ${metadata.width}px)`);
+        }
+        
+        if (metadata.width > MAX_WIDTH) {
+          errors.push(`Image width too large (max: ${MAX_WIDTH}px, got: ${metadata.width}px)`);
         }
 
-        // Check maximum dimensions
-        const maxDimension = 10000;
-        if (metadata.width > maxDimension || metadata.height > maxDimension) {
-          errors.push(`Image dimensions too large (max: ${maxDimension}x${maxDimension})`);
+        // Instagram aspect ratio validation (4:5 to 1.91:1)
+        const aspectRatio = metadata.width / metadata.height;
+        const MIN_ASPECT_RATIO = 0.8; // 4:5
+        const MAX_ASPECT_RATIO = 1.91; // 1.91:1
+        
+        if (aspectRatio < MIN_ASPECT_RATIO) {
+          errors.push(`Image too tall for Instagram (min 4:5 ratio, got ${aspectRatio.toFixed(2)}:1). Consider cropping to portrait format.`);
+        }
+        
+        if (aspectRatio > MAX_ASPECT_RATIO) {
+          errors.push(`Image too wide for Instagram (max 1.91:1 ratio, got ${aspectRatio.toFixed(2)}:1). Consider cropping to landscape format.`);
+        }
+
+        // Color space validation (if available in metadata)
+        if (metadata.space && metadata.space !== 'srgb') {
+          console.warn(`Non-sRGB color space detected: ${metadata.space}. Consider conversion.`);
+          // Note: We might want to auto-convert or warn the user
         }
       } else {
         errors.push('Unable to determine image dimensions');
@@ -131,12 +153,12 @@ export const imageService = {
         const formatMimeMap: Record<string, string> = {
           'jpeg': 'image/jpeg',
           'png': 'image/png',
-          'webp': 'image/webp'
+          'bmp': 'image/bmp'
         };
 
         const expectedMime = formatMimeMap[metadata.format];
         if (expectedMime && expectedMime !== mimetype) {
-          errors.push(`MIME type mismatch: expected ${expectedMime}, got ${mimetype}`);
+          errors.push(`Format mismatch: expected ${expectedMime}, got ${mimetype}`);
         }
       }
 
@@ -169,7 +191,7 @@ export const imageService = {
       }
 
       // Business Rule: Maximum storage per user (100MB)
-      const maxStoragePerUser = 100 * 1024 * 1024; // 100MB
+      const maxStoragePerUser = 500 * 1024 * 1024; // 500MB
       if (stats.totalSize >= maxStoragePerUser) {
         throw ApiError.businessLogic(
           `Storage limit reached. Maximum ${Math.round(maxStoragePerUser / (1024 * 1024))}MB allowed per user.`,
@@ -405,9 +427,11 @@ export const imageService = {
         averageSizeMB: Math.round(stats.averageSize / (1024 * 1024) * 100) / 100,
         storageLimit: {
           maxImages: 1000,
-          maxStorageMB: 100,
-          imagesRemaining: Math.max(0, 1000 - stats.total),
-          storageRemainingMB: Math.max(0, Math.round((100 * 1024 * 1024 - stats.totalSize) / (1024 * 1024) * 100) / 100)
+          maxStorageMB: 500, // Updated from 100
+          maxFileSizeMB: 8,
+          supportedFormats: ['JPEG', 'PNG', 'BMP'],
+          aspectRatioRange: '4:5 to 1.91:1',
+          resolutionRange: '320px to 1440px width'
         }
       };
 

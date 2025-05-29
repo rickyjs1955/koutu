@@ -10,12 +10,13 @@ import { sanitization } from '../utils/sanitize';
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: config.maxFileSize,
+    fileSize: 8388608, // 8MB
     files: 1
   },
   fileFilter: (req, file, cb) => {
-    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const allowedExtensions = /\.(jpeg|jpg|png|webp)$/i;
+    // Update allowed formats
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/bmp'];
+    const allowedExtensions = /\.(jpeg|jpg|png|bmp)$/i;
     
     if (!allowedMimeTypes.includes(file.mimetype)) {
       return cb(new Error(`Invalid file type: ${file.mimetype}`));
@@ -31,14 +32,14 @@ const upload = multer({
     
     cb(null, true);
   }
-}).single('image');
+});
 
 export const imageController = {
   // Upload middleware with enhanced error handling - FIXED: Make async
   uploadMiddleware: sanitization.wrapImageController(
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       return new Promise((resolve) => {
-        upload(req, res, (err) => {
+        upload.single('image')(req, res, (err) => {
           if (err instanceof multer.MulterError) {
             switch (err.code) {
               case 'LIMIT_FILE_SIZE':
@@ -57,7 +58,10 @@ export const imageController = {
                 next(ApiError.badRequest(`Upload error: ${err.message}`, 'UPLOAD_ERROR'));
             }
           } else if (err) {
-            next(ApiError.badRequest(err.message, 'INVALID_FILE'));
+            next(ApiError.badRequest(
+              `File too large. Maximum size: 8MB`, // Hardcode since we know the limit
+              'FILE_TOO_LARGE'
+            ));
           } else {
             next();
           }
