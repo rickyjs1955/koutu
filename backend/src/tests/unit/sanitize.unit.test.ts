@@ -480,4 +480,509 @@ describe('Sanitization Module Unit Tests', () => {
       expect(typeof result).toBe('string');
     });
   });
+
+  describe('Additional Sanitization Tests', () => {
+    describe('Date Handling in Sanitization', () => {
+      describe('sanitizeImageForResponse', () => {
+        it('should handle Date objects and convert to ISO strings', () => {
+          const testDate = new Date('2023-01-01T12:00:00Z');
+          const imageWithDates = {
+            id: 'test-id',
+            status: 'new',
+            upload_date: testDate,
+            created_at: testDate,
+            updated_at: testDate,
+            original_metadata: { description: 'test' }
+          };
+
+          const result = sanitization.sanitizeImageForResponse(imageWithDates);
+          
+          expect(result.upload_date).toBe('2023-01-01T12:00:00.000Z');
+          expect(result.created_at).toBe('2023-01-01T12:00:00.000Z');
+          expect(result.updated_at).toBe('2023-01-01T12:00:00.000Z');
+        });
+
+        it('should handle string dates and preserve them', () => {
+          const imageWithStrings = {
+            id: 'test-id',
+            status: 'new',
+            upload_date: '2023-01-01T12:00:00.000Z',
+            created_at: '2023-01-01T12:00:00.000Z',
+            updated_at: '2023-01-01T12:00:00.000Z',
+            original_metadata: { description: 'test' }
+          };
+
+          const result = sanitization.sanitizeImageForResponse(imageWithStrings);
+          
+          expect(result.upload_date).toBe('2023-01-01T12:00:00.000Z');
+          expect(result.created_at).toBe('2023-01-01T12:00:00.000Z');
+          expect(result.updated_at).toBe('2023-01-01T12:00:00.000Z');
+        });
+
+        it('should handle undefined dates gracefully', () => {
+          const imageWithUndefined = {
+            id: 'test-id',
+            status: 'new',
+            upload_date: undefined,
+            created_at: undefined,
+            updated_at: undefined,
+            original_metadata: { description: 'test' }
+          };
+
+          const result = sanitization.sanitizeImageForResponse(imageWithUndefined);
+          
+          expect(result.upload_date).toBeUndefined();
+          expect(result.created_at).toBeUndefined();
+          expect(result.updated_at).toBeUndefined();
+        });
+
+        it('should handle mixed Date and string types', () => {
+          const mixedImage = {
+            id: 'test-id',
+            status: 'new',
+            upload_date: new Date('2023-01-01T12:00:00Z'),
+            created_at: '2023-01-02T12:00:00.000Z',
+            updated_at: undefined,
+            original_metadata: { description: 'test' }
+          };
+
+          const result = sanitization.sanitizeImageForResponse(mixedImage);
+          
+          expect(result.upload_date).toBe('2023-01-01T12:00:00.000Z');
+          expect(result.created_at).toBe('2023-01-02T12:00:00.000Z');
+          expect(result.updated_at).toBeUndefined();
+        });
+      });
+
+      describe('sanitizeGarmentForResponse', () => {
+        it('should handle Date objects in garment data', () => {
+          const testDate = new Date('2023-01-01T12:00:00Z');
+          const garmentWithDates = {
+            id: 'garment-id',
+            created_at: testDate,
+            updated_at: testDate,
+            data_version: 1
+          };
+
+          const result = sanitization.sanitizeGarmentForResponse(garmentWithDates);
+          
+          expect(result.created_at).toBe('2023-01-01T12:00:00.000Z');
+          expect(result.updated_at).toBe('2023-01-01T12:00:00.000Z');
+        });
+      });
+
+      describe('sanitizePolygonForResponse', () => {
+        it('should handle Date objects in polygon data', () => {
+          const testDate = new Date('2023-01-01T12:00:00Z');
+          const polygonWithDates = {
+            id: 'polygon-id',
+            points: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 5, y: 10 }],
+            created_at: testDate,
+            updated_at: testDate
+          };
+
+          const result = sanitization.sanitizePolygonForResponse(polygonWithDates);
+          
+          expect(result.created_at).toBe('2023-01-01T12:00:00.000Z');
+          expect(result.updated_at).toBe('2023-01-01T12:00:00.000Z');
+        });
+      });
+
+      describe('sanitizeWardrobeForResponse', () => {
+        it('should handle Date objects in wardrobe data', () => {
+          const testDate = new Date('2023-01-01T12:00:00Z');
+          const wardrobeWithDates = {
+            id: 'wardrobe-id',
+            name: 'Test Wardrobe',
+            created_at: testDate,
+            updated_at: testDate
+          };
+
+          const result = sanitization.sanitizeWardrobeForResponse(wardrobeWithDates);
+          
+          expect(result.created_at).toBe('2023-01-01T12:00:00.000Z');
+          expect(result.updated_at).toBe('2023-01-01T12:00:00.000Z');
+        });
+      });
+
+      describe('dateToString helper', () => {
+        it('should convert Date to ISO string', () => {
+          const testDate = new Date('2023-01-01T12:00:00Z');
+          // Access private method through prototype manipulation for testing
+          const sanitizer = new (sanitization as any).constructor();
+          const result = sanitizer.dateToString(testDate);
+          
+          expect(result).toBe('2023-01-01T12:00:00.000Z');
+        });
+
+        it('should return string as-is', () => {
+          const sanitizer = new (sanitization as any).constructor();
+          const result = sanitizer.dateToString('2023-01-01T12:00:00.000Z');
+          
+          expect(result).toBe('2023-01-01T12:00:00.000Z');
+        });
+
+        it('should return undefined for undefined input', () => {
+          const sanitizer = new (sanitization as any).constructor();
+          const result = sanitizer.dateToString(undefined);
+          
+          expect(result).toBeUndefined();
+        });
+      });
+
+      describe('Backward Compatibility', () => {
+      it('should maintain backward compatibility with existing image responses', () => {
+        // Test that existing tests still pass with the new date handling
+        const legacyImage = {
+          id: 'legacy-id',
+          status: 'processed',
+          upload_date: '2023-01-01T10:00:00.000Z', // Already string
+          original_metadata: { width: 800, height: 600 }
+        };
+
+        const result = sanitization.sanitizeImageForResponse(legacyImage);
+        
+        expect(result).toMatchObject({
+          id: 'legacy-id',
+          status: 'processed',
+          upload_date: '2023-01-01T10:00:00.000Z',
+          file_path: '/api/v1/images/legacy-id/file',
+          metadata: expect.objectContaining({
+            description: '',
+            width: 800,
+            height: 600
+          })
+        });
+      });
+      });
+
+      describe('Integration with Database Models', () => {
+        it('should work with actual database model responses', () => {
+          // Simulate what a real database model returns
+          const databaseImage = {
+            id: 'db-image-id',
+            user_id: 'user-123',
+            file_path: 'uploads/image.jpg',
+            status: 'new' as const,
+            upload_date: new Date('2023-01-01T12:00:00Z'), // Database returns Date
+            original_metadata: {
+              width: 1024,
+              height: 768,
+              format: 'jpeg',
+              size: 204800
+            }
+          };
+
+          const result = sanitization.sanitizeImageForResponse(databaseImage);
+          
+          expect(result.upload_date).toBe('2023-01-01T12:00:00.000Z');
+          expect(typeof result.upload_date).toBe('string');
+        });
+      });
+    });
+
+    describe('Date Error Scenarios', () => {
+      describe('Invalid Date Objects', () => {
+        it('should handle Invalid Date objects gracefully', () => {
+          const invalidDate = new Date('invalid-date-string');
+          const imageWithInvalidDate = {
+            id: 'test-id',
+            status: 'new',
+            upload_date: invalidDate,
+            created_at: invalidDate,
+            updated_at: invalidDate,
+            original_metadata: { description: 'test' }
+          };
+
+          const result = sanitization.sanitizeImageForResponse(imageWithInvalidDate);
+          
+          // Invalid Date objects should become undefined
+          expect(result.upload_date).toBeUndefined();
+          expect(result.created_at).toBeUndefined();
+          expect(result.updated_at).toBeUndefined();
+        });
+
+        it('should handle Date objects with extreme values', () => {
+          const testCases = [
+            { 
+              date: new Date(-8640000000000000), // Min date - VALID
+              shouldBeValid: true,
+              expectedPattern: /^-\d{6}-\d{2}-\d{2}T/
+            },
+            { 
+              date: new Date(8640000000000000),  // Max date - VALID
+              shouldBeValid: true,
+              expectedPattern: /^\+\d{6}-\d{2}-\d{2}T/
+            },
+            { 
+              date: new Date(NaN),               // Invalid
+              shouldBeValid: false 
+            },
+            { 
+              date: new Date(Infinity),          // Invalid
+              shouldBeValid: false 
+            },
+            { 
+              date: new Date(-Infinity),         // Invalid
+              shouldBeValid: false 
+            }
+          ];
+
+          testCases.forEach((testCase, index) => {
+            const imageWithExtremeDate = {
+              id: `test-id-${index}`,
+              status: 'new',
+              upload_date: testCase.date,
+              original_metadata: { description: 'test' }
+            };
+
+            const result = sanitization.sanitizeImageForResponse(imageWithExtremeDate);
+            expect(result.id).toBe(`test-id-${index}`);
+            
+            if (testCase.shouldBeValid) {
+              expect(typeof result.upload_date).toBe('string');
+              if (testCase.expectedPattern) {
+                expect(result.upload_date).toMatch(testCase.expectedPattern);
+              }
+            } else {
+              expect(result.upload_date).toBeUndefined();
+            }
+          });
+        });
+      });
+
+      describe('Invalid Date Strings', () => {
+        it('should handle malformed ISO date strings', () => {
+          const malformedDateStrings = [
+            '2023-13-01T12:00:00Z',      // Invalid month
+            '2023-02-30T12:00:00Z',      // Invalid day
+            '2023-01-01T25:00:00Z',      // Invalid hour  
+            'not-a-date-at-all',         // Completely invalid
+            '2023-01-01',                // Missing time
+            'T12:00:00Z',                // Missing date
+          ];
+
+          malformedDateStrings.forEach((dateString, index) => {
+            const imageWithMalformedDate = {
+              id: `test-id-${index}`,
+              status: 'new',
+              upload_date: dateString,
+              original_metadata: { description: 'test' }
+            };
+
+            const result = sanitization.sanitizeImageForResponse(imageWithMalformedDate);
+            expect(result.id).toBe(`test-id-${index}`);
+            // String dates should be preserved as-is
+            expect(result.upload_date).toBe(dateString);
+          });
+        });
+
+        it('should handle empty and whitespace strings correctly', () => {
+          const edgeCases = [
+            { input: '', description: 'empty string' },
+            { input: '   ', description: 'whitespace string' },
+            { input: '\t\n', description: 'tab and newline' },
+          ];
+
+          edgeCases.forEach(({ input, description }) => {
+            const imageWithEdgeCase = {
+              id: 'edge-test',
+              status: 'new',
+              upload_date: input,
+              original_metadata: { description: 'test' }
+            };
+
+            const result = sanitization.sanitizeImageForResponse(imageWithEdgeCase);
+            // String values should be preserved exactly as-is
+            expect(result.upload_date).toBe(input);
+          });
+        });
+      });
+
+      describe('Mixed Error Scenarios', () => {
+        it('should handle mixed valid and invalid dates', () => {
+          const mixedDateObject = {
+            id: 'mixed-test',
+            status: 'new',
+            upload_date: new Date('2023-01-01T12:00:00Z'), // Valid Date
+            created_at: new Date('invalid-date'),           // Invalid Date
+            updated_at: '2023-13-01T12:00:00Z',            // Invalid string (but preserved)
+            original_metadata: { description: 'test' }
+          };
+
+          const result = sanitization.sanitizeImageForResponse(mixedDateObject);
+          expect(result.id).toBe('mixed-test');
+          
+          // Valid Date → ISO string
+          expect(result.upload_date).toBe('2023-01-01T12:00:00.000Z');
+          // Invalid Date → undefined
+          expect(result.created_at).toBeUndefined();
+          // Invalid string → preserved as-is
+          expect(result.updated_at).toBe('2023-13-01T12:00:00Z');
+        });
+
+        it('should handle null and undefined values', () => {
+          const nullUndefinedObject = {
+            id: 'null-test',
+            status: 'new',
+            upload_date: null as any,      // null → undefined
+            created_at: undefined,         // undefined → undefined
+            updated_at: new Date('2023-01-01T12:00:00Z'), // Valid Date
+            original_metadata: { description: 'test' }
+          };
+
+          const result = sanitization.sanitizeImageForResponse(nullUndefinedObject);
+          expect(result.upload_date).toBeUndefined();
+          expect(result.created_at).toBeUndefined();
+          expect(result.updated_at).toBe('2023-01-01T12:00:00.000Z');
+        });
+      });
+
+      describe('dateToString Direct Testing', () => {
+        let sanitizer: any;
+        
+        beforeEach(() => {
+          sanitizer = new (sanitization as any).constructor();
+        });
+
+        it('should handle all input types correctly', () => {
+          const testCases = [
+            // Null/undefined cases
+            { input: null, expected: undefined, description: 'null' },
+            { input: undefined, expected: undefined, description: 'undefined' },
+            
+            // String cases
+            { input: '', expected: '', description: 'empty string' },
+            { input: '   ', expected: '   ', description: 'whitespace string' },
+            { input: 'valid-2023-01-01T12:00:00.000Z', expected: 'valid-2023-01-01T12:00:00.000Z', description: 'valid date string' },
+            { input: 'invalid-date', expected: 'invalid-date', description: 'invalid date string' },
+            
+            // Date object cases
+            { input: new Date('2023-01-01T12:00:00Z'), expected: '2023-01-01T12:00:00.000Z', description: 'valid Date object' },
+            { input: new Date('invalid'), expected: undefined, description: 'invalid Date object' },
+            { input: new Date(NaN), expected: undefined, description: 'NaN Date object' },
+            
+            // Other types
+            { input: 123, expected: undefined, description: 'number' },
+            { input: true, expected: undefined, description: 'boolean' },
+            { input: {}, expected: undefined, description: 'object' },
+            { input: [], expected: undefined, description: 'array' },
+          ];
+
+          testCases.forEach(({ input, expected, description }) => {
+            const result = sanitizer.dateToString(input);
+            expect(result).toBe(expected);
+          });
+        });
+
+        it('should handle Symbol without crashing', () => {
+          expect(() => {
+            const result = sanitizer.dateToString(Symbol('test') as any);
+            expect(result).toBeUndefined();
+          }).not.toThrow();
+        });
+      });
+
+      describe('Cross-Entity Consistency', () => {
+        it('should handle invalid dates consistently across all entity types', () => {
+          const invalidDate = new Date('invalid');
+          const validDateString = '2023-01-01T12:00:00.000Z';
+
+          // Test all entity types
+          const garment = {
+            id: 'garment-test',
+            created_at: invalidDate,
+            updated_at: validDateString
+          };
+
+          const polygon = {
+            id: 'polygon-test',
+            points: [{ x: 0, y: 0 }],
+            created_at: invalidDate,
+            updated_at: validDateString
+          };
+
+          const wardrobe = {
+            id: 'wardrobe-test',
+            name: 'Test',
+            created_at: invalidDate,
+            updated_at: validDateString
+          };
+
+          // All should handle dates the same way
+          const garmentResult = sanitization.sanitizeGarmentForResponse(garment);
+          const polygonResult = sanitization.sanitizePolygonForResponse(polygon);
+          const wardrobeResult = sanitization.sanitizeWardrobeForResponse(wardrobe);
+
+          // Invalid Date objects should become undefined
+          expect(garmentResult.created_at).toBeUndefined();
+          expect(polygonResult.created_at).toBeUndefined();
+          expect(wardrobeResult.created_at).toBeUndefined();
+
+          // Valid date strings should be preserved
+          expect(garmentResult.updated_at).toBe(validDateString);
+          expect(polygonResult.updated_at).toBe(validDateString);
+          expect(wardrobeResult.updated_at).toBe(validDateString);
+        });
+      });
+
+      describe('Performance with Error Conditions', () => {
+        it('should handle many invalid dates efficiently', () => {
+          // Use Date objects that are guaranteed to be invalid
+          const manyInvalidDates = Array.from({ length: 50 }, (_, i) => ({
+            id: `perf-test-${i}`,
+            status: 'new',
+            upload_date: new Date(NaN), // Guaranteed invalid Date
+            created_at: `malformed-${i}`,
+            updated_at: i % 2 === 0 ? undefined : new Date(NaN), // Also guaranteed invalid
+            original_metadata: { description: 'test' }
+          }));
+
+          const startTime = Date.now();
+          
+          const results = manyInvalidDates.map(image => 
+            sanitization.sanitizeImageForResponse(image as any)
+          );
+
+          const endTime = Date.now();
+          const executionTime = endTime - startTime;
+          
+          // Verify all results are valid
+          results.forEach((result, index) => {
+            expect(result.id).toBe(`perf-test-${index}`);
+            expect(result.upload_date).toBeUndefined(); // Invalid Date should be undefined
+            expect(result.created_at).toBe(`malformed-${index}`); // String preserved
+            // updated_at should be undefined for all cases (even indices are undefined, odd are invalid Date)
+            expect(result.updated_at).toBeUndefined();
+          });
+          
+          // Should be fast
+          expect(executionTime).toBeLessThan(500);
+        });
+
+        it('should demonstrate JavaScript Date parsing is unpredictable', () => {
+          // This test just shows what actually happens - no expectations!
+          const testInputs = [
+            'invalid-0',
+            'invalid-1', 
+            'definitely-not-a-date',
+            'xyz123abc',
+            'abc-def-ghi'
+          ];
+
+          console.log('JavaScript Date parsing results:');
+          testInputs.forEach(input => {
+            const date = new Date(input);
+            const isValid = !isNaN(date.getTime());
+            console.log(`new Date('${input}') -> valid: ${isValid}, value: ${isValid ? date.toISOString() : 'Invalid Date'}`);
+          });
+
+          // Always passes - this is just for educational purposes
+          expect(true).toBe(true);
+        });
+      });
+    });
+  });
 });
+
+

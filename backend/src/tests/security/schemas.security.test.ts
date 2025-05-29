@@ -12,6 +12,7 @@ import {
   CreatePolygonWithGeometryValidationSchema,
   EnhancedFileUploadSchema,
   FileUploadSchema,
+  UpdateImageStatusSchema,
 } from '../../validators/schemas';
 import { createMockRequest, 
          createMockResponse, 
@@ -682,6 +683,179 @@ describe('Schema Security Tests', () => {
             expect(result).toBeDefined();
             }).not.toThrow();
         });
+        });
+    });
+
+    describe('UpdateImageStatusSchema Security', () => {
+        it('should prevent status injection attacks', () => {
+            // String-based injection attempts
+            const maliciousStrings = [
+            "new'; DROP TABLE images; --",
+            "processed OR 1=1", 
+            "<script>alert('xss')</script>",
+            "javascript:alert('status')",
+            "new\nUNION SELECT * FROM users",
+            "labeled; DELETE FROM image_metadata;",
+            "processed' AND '1'='1"
+            ];
+
+            // Non-string injection attempts  
+            const maliciousObjects = [
+            Buffer.from('malicious'),
+            { toString: () => "new'; DROP TABLE images; --" },
+            123,
+            true,
+            null,
+            undefined,
+            []
+            ];
+
+            // Test string injections - should get enum validation errors
+            maliciousStrings.forEach(maliciousString => {
+            const result = UpdateImageStatusSchema.safeParse({ status: maliciousString });
+            expect(result.success).toBe(false);
+            
+            if (!result.success) {
+                expect(result.error.issues).toHaveLength(1);
+                expect(result.error.issues[0].code).toBe('invalid_enum_value');
+                expect(result.error.issues[0].message).toBe('Status must be one of: new, processed, labeled');
+                if ('received' in result.error.issues[0]) {
+                    expect(result.error.issues[0].received).toBe(maliciousString);
+                }
+            }
+            });
+
+            // Test non-string injections - should get type validation errors
+            maliciousObjects.forEach(maliciousObject => {
+            const result = UpdateImageStatusSchema.safeParse({ status: maliciousObject });
+            expect(result.success).toBe(false);
+            
+            if (!result.success) {
+                expect(result.error.issues).toHaveLength(1);
+                // Different types trigger different validation errors
+                expect(['invalid_type', 'invalid_enum_value']).toContain(result.error.issues[0].code);
+                expect(result.error.issues[0]).toHaveProperty('received');
+            }
+            });
+        });
+
+        it('should handle prototype pollution attempts', () => {
+            const pollutionAttempts = [
+            { status: 'new', __proto__: { isAdmin: true } } as any,
+            { status: 'processed', constructor: { prototype: { admin: true } } } as any,
+            { status: 'labeled', prototype: { elevated: true } } as any
+            ];
+
+            pollutionAttempts.forEach(attempt => {
+            const result = UpdateImageStatusSchema.safeParse(attempt);
+            
+            if (result.success) {
+                // Zod strips unknown properties by default for object schemas
+                expect(Object.keys(result.data)).toEqual(['status']);
+                
+                // Verify prototype pollution didn't succeed by checking the object directly
+                expect(result.data.hasOwnProperty('__proto__')).toBe(false);
+                expect(result.data.hasOwnProperty('constructor')).toBe(false);
+                expect(result.data.hasOwnProperty('prototype')).toBe(false);
+                
+                // Verify no prototype pollution occurred
+                expect((result.data as any).__proto__).toBe(Object.prototype);
+                expect((result.data as any).isAdmin).toBeUndefined();
+                expect((result.data as any).admin).toBeUndefined();
+                expect((result.data as any).elevated).toBeUndefined();
+            }
+            });
+        });
+
+        it('should maintain consistent validation timing', () => {
+            const validStatus = { status: 'new' };
+            const invalidStatus = { status: 'invalid_status_that_does_not_exist' };
+
+            const timings: number[] = [];
+
+            for (let i = 0; i < 10; i++) {
+            const start1 = performance.now();
+            UpdateImageStatusSchema.safeParse(validStatus);
+            const end1 = performance.now();
+            
+            const start2 = performance.now();
+            UpdateImageStatusSchema.safeParse(invalidStatus);
+            const end2 = performance.now();
+            
+            timings.push(Math.abs((end1 - start1) - (end2 - start2)));
+            }
+
+            const avgDifference = timings.reduce((a, b) => a + b, 0) / timings.length;
+            expect(avgDifference).toBeLessThan(50); // Should not reveal timing information
+        });
+
+        it('should prevent enumeration attacks', () => {
+            const enumerationAttempts = [
+            'active',
+            'inactive', 
+            'pending',
+            'complete',
+            'failed',
+            'cancelled',
+            'deleted',
+            'archived'
+            ];
+
+            enumerationAttempts.forEach(attempt => {
+            const result = UpdateImageStatusSchema.safeParse({ status: attempt });
+            expect(result.success).toBe(false);
+            
+            if (!result.success) {
+                // All invalid statuses should return the same error message
+                expect(result.error.issues[0].message).toBe('Status must be one of: new, processed, labeled');
+            }
+            });
+        });
+    });
+
+    // ==================== PERFORMANCE TESTS ====================
+    // Add to schemas performance section
+
+    describe('UpdateImageStatusSchema Performance', () => {
+        it('should handle high-volume status updates efficiently', () => {
+            const batchSize = 1000;
+            const validStatuses = ['new', 'processed', 'labeled'];
+            
+            const startTime = performance.now();
+            
+            const results = Array.from({ length: batchSize }, (_, i) => {
+            const status = validStatuses[i % validStatuses.length];
+            return UpdateImageStatusSchema.safeParse({ status });
+            });
+            
+            const endTime = performance.now();
+            const executionTime = endTime - startTime;
+            
+            // Should handle 1000 validations quickly
+            expect(executionTime).toBeLessThan(100); // Under 100ms
+            expect(results.every(r => r.success)).toBe(true);
+            expect(results).toHaveLength(batchSize);
+        });
+
+        it('should validate status updates without memory leaks', () => {
+            const iterations = 10000;
+            const initialMemory = process.memoryUsage().heapUsed;
+            
+            for (let i = 0; i < iterations; i++) {
+            const status = ['new', 'processed', 'labeled'][i % 3];
+            UpdateImageStatusSchema.safeParse({ status });
+            }
+            
+            // Force garbage collection if available
+            if (global.gc) {
+            global.gc();
+            }
+            
+            const finalMemory = process.memoryUsage().heapUsed;
+            const memoryIncrease = finalMemory - initialMemory;
+            
+            // Should not have significant memory increase (less than 1MB)
+            expect(memoryIncrease).toBeLessThan(1024 * 1024);
         });
     });
 });

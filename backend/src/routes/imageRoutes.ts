@@ -1,4 +1,4 @@
-// /backend/src/routes/imageRoutes.ts
+// /backend/src/routes/imageRoutes.ts - FIXED IMPORTS
 import express from 'express';
 import { imageController } from '../controllers/imageController';
 import { 
@@ -11,10 +11,12 @@ import {
   validateQuery, 
   validateParams,
   validateFile,
+  validateBody
+} from '../middlewares/validate';
+import { 
   ImageQuerySchema,
   UUIDParamSchema,
-  UpdateImageStatusSchema,
-  validateBody,
+  UpdateImageStatusSchema  // ✅ Need to add this to schemas.ts
 } from '../validators/schemas';
 import { requestIdMiddleware } from '../middlewares/errorHandler';
 import { z } from 'zod';

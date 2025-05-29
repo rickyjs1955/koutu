@@ -757,6 +757,25 @@ export const validateUUIDParameterHandling = (uuidValidator: Function) => {
 };
 
 /**
+ * Helper to generate test data for status updates
+ */
+export const generateUpdateStatusTestData = {
+  validStatusUpdate: () => ({
+    status: ['new', 'processed', 'labeled'][Math.floor(Math.random() * 3)]
+  }),
+  
+  invalidStatusUpdate: () => ({
+    status: ['invalid', 'pending', 'complete', 'failed'][Math.floor(Math.random() * 4)]
+  }),
+  
+  randomStatusUpdate: () => ({
+    status: Math.random() > 0.7 
+      ? ['new', 'processed', 'labeled'][Math.floor(Math.random() * 3)]
+      : 'invalid_status'
+  })
+};
+
+/**
  * Export default helper for easy importing
  */
 export default {
@@ -767,5 +786,6 @@ export default {
   validateMiddlewareFlow,
   validateBusinessRules,
   testSchemaPerformance,
-  validateUUIDParameterHandling
+  validateUUIDParameterHandling,
+  generateUpdateStatusTestData
 };

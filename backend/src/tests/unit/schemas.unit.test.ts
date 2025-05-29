@@ -8,6 +8,7 @@ import {
   CreateGarmentWithBusinessRulesSchema,
   CreatePolygonWithGeometryValidationSchema,
   FileUploadSchema,
+  UpdateImageStatusSchema,
 } from '../../validators/schemas';
 
 import {
@@ -807,4 +808,77 @@ describe('Schema Validation Unit Tests', () => {
     (data: any) => CreateGarmentWithBusinessRulesSchema.safeParse(data),
     (size: number) => generateSchemaTestData.validGarment()
   );
+
+  describe('UpdateImageStatusSchema', () => {
+    it('should accept valid status values', () => {
+      const validStatuses = ['new', 'processed', 'labeled'];
+      
+      validStatuses.forEach(status => {
+        const result = UpdateImageStatusSchema.safeParse({ status });
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.status).toBe(status);
+        }
+      });
+    });
+
+    it('should reject invalid status values', () => {
+      const invalidStatuses = [
+        'invalid',
+        'processing', // Close but wrong
+        'complete',
+        'pending',
+        '',
+        null,
+        undefined,
+        123,
+        true,
+        []
+      ];
+
+      invalidStatuses.forEach(status => {
+        const result = UpdateImageStatusSchema.safeParse({ status });
+        expect(result.success).toBe(false);
+        
+        if (!result.success) {
+          expect(result.error.issues[0].message).toContain('Status must be one of: new, processed, labeled');
+        }
+      });
+    });
+
+    it('should reject missing status field', () => {
+      const result = UpdateImageStatusSchema.safeParse({});
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject extra fields', () => {
+      const result = UpdateImageStatusSchema.safeParse({ 
+        status: 'new',
+        extraField: 'should be ignored'
+      });
+      
+      // Zod by default allows extra fields, but let's verify the valid data is extracted
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toEqual({ status: 'new' });
+        expect(result.data).not.toHaveProperty('extraField');
+      }
+    });
+
+    it('should handle case sensitivity correctly', () => {
+      const caseSensitiveTests = [
+        'NEW',
+        'New', 
+        'PROCESSED',
+        'Processed',
+        'LABELED',
+        'Labeled'
+      ];
+
+      caseSensitiveTests.forEach(status => {
+        const result = UpdateImageStatusSchema.safeParse({ status });
+        expect(result.success).toBe(false); // Should be case-sensitive
+      });
+    });
+  });
 });

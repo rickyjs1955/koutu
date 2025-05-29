@@ -1,4 +1,4 @@
-// backend/src/validators/schemas.ts - Fixed version
+// backend/src/validators/schemas.ts - Added Missing Schema
 import { z } from 'zod';
 import { Request, Response, NextFunction } from 'express';
 
@@ -138,6 +138,15 @@ export const ImageQuerySchema = z.object({
   search: z.string().optional()
 });
 
+// ==================== MISSING SCHEMA - ADDED ==================== 
+
+// Update image status schema - ADDED
+export const UpdateImageStatusSchema = z.object({
+  status: z.enum(['new', 'processed', 'labeled'], {
+    errorMap: () => ({ message: 'Status must be one of: new, processed, labeled' })
+  })
+});
+
 // ==================== ADDITIONAL SCHEMAS ====================
 
 // Update garment metadata schema
@@ -171,76 +180,6 @@ export const UpdatePolygonSchema = z.object({
   }).optional()
 });
 
-// ==================== MIDDLEWARE FUNCTIONS ====================
-/* COMMENTED OUT FOR NOW
-// Generic validation middleware factory
-export const createValidationMiddleware = (schema: z.ZodSchema, field: 'body' | 'query' | 'params' | 'file') => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const dataToValidate = req[field];
-      const result = schema.safeParse(dataToValidate);
-      
-      if (result.success) {
-        // Replace the original data with the validated/transformed data
-        (req as any)[field] = result.data;
-        next();
-      } else {
-        const error = new Error('Validation failed');
-        (error as any).statusCode = 400;
-        (error as any).code = 'VALIDATION_ERROR';
-        (error as any).details = result.error.issues;
-        next(error);
-      }
-    } catch (err) {
-      const error = new Error('Validation middleware error');
-      (error as any).statusCode = 500;
-      (error as any).code = 'MIDDLEWARE_ERROR';
-      (error as any).originalError = err;
-      next(error);
-    }
-  };
-};
-
-// Specific validation middleware
-export const validateBody = (schema: z.ZodSchema) => createValidationMiddleware(schema, 'body');
-export const validateQuery = (schema: z.ZodSchema) => createValidationMiddleware(schema, 'query');
-export const validateParams = (schema: z.ZodSchema) => createValidationMiddleware(schema, 'params');
-
-// Pre-configured validation middleware
-export const validateUUIDParam = createValidationMiddleware(UUIDParamSchema, 'params');
-export const validateImageQuery = createValidationMiddleware(ImageQuerySchema, 'query');
-
-// File validation middleware
-export const validateFile = (req: Request, res: Response, next: NextFunction) => {
-  try {
-    if (!req.file) {
-      const error = new Error('No file provided');
-      (error as any).statusCode = 400;
-      (error as any).code = 'NO_FILE';
-      return next(error);
-    }
-
-    const result = EnhancedFileUploadSchema.safeParse(req.file);
-    
-    if (result.success) {
-      req.file = result.data as Express.Multer.File;
-      next();
-    } else {
-      const error = new Error('Invalid file upload');
-      (error as any).statusCode = 400;
-      (error as any).code = 'INVALID_FILE';
-      (error as any).details = result.error.issues;
-      next(error);
-    }
-  } catch (err) {
-    const error = new Error('File validation error');
-    (error as any).statusCode = 500;
-    (error as any).code = 'FILE_VALIDATION_ERROR';
-    (error as any).originalError = err;
-    next(error);
-  }
-};
-*/
 // ==================== HELPER FUNCTIONS ====================
 
 function calculatePolygonArea(points: Array<{ x: number; y: number }>): number {

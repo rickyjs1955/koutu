@@ -1,12 +1,12 @@
-// src/utils/sanitize.ts
+// src/utils/sanitize.ts - FIXED ImageData interface
 import { Request, Response, NextFunction } from 'express';
 
 interface ImageData {
     id: string;
     status?: string;
-    upload_date?: string;
-    created_at?: string;
-    updated_at?: string;
+    upload_date?: string | Date;  // FIXED: Accept both string and Date
+    created_at?: string | Date;   // FIXED: Accept both string and Date
+    updated_at?: string | Date;   // FIXED: Accept both string and Date
     file_path?: string;
     original_metadata?: any;
     metadata?: any;
@@ -24,6 +24,8 @@ interface GarmentData {
     };
     file_path?: string;
     mask_path?: string;
+    created_at?: string | Date;   // FIXED: Accept both string and Date
+    updated_at?: string | Date;   // FIXED: Accept both string and Date
     [key: string]: any;
 }
 
@@ -36,6 +38,8 @@ interface PolygonData {
         notes?: string;
         [key: string]: any;
     };
+    created_at?: string | Date;   // FIXED: Accept both string and Date
+    updated_at?: string | Date;   // FIXED: Accept both string and Date
     [key: string]: any;
 }
 
@@ -44,6 +48,8 @@ interface WardrobeData {
     name?: string;
     description?: string;
     garments?: GarmentData[];
+    created_at?: string | Date;   // FIXED: Accept both string and Date
+    updated_at?: string | Date;   // FIXED: Accept both string and Date
     [key: string]: any;
 }
 
@@ -61,6 +67,44 @@ class SanitizationModule {
     private readonly MAX_STRING_LENGTH = 1000;
     private readonly MAX_FILENAME_LENGTH = 255;
     private readonly MAX_HEADER_LENGTH = 500;
+
+    /**
+     * Helper function to safely convert Date to ISO string
+     * FIXED: Handle invalid Date objects gracefully
+     */
+    private dateToString = (date: string | Date | undefined): string | undefined => {
+        // Handle null/undefined
+        if (date === null || date === undefined) {
+            return undefined;
+        }
+        
+        // Handle empty string - preserve it
+        if (date === '') {
+            return '';
+        }
+        
+        // Handle string dates - preserve as-is
+        if (typeof date === 'string') {
+            return date;
+        }
+        
+        // Handle Date objects
+        if (date instanceof Date) {
+            // Check if the Date object is valid
+            if (isNaN(date.getTime())) {
+                return undefined;
+            }
+            
+            try {
+                return date.toISOString();
+            } catch (error) {
+                return undefined;
+            }
+        }
+        
+        // For any other type, return undefined
+        return undefined;
+    }
 
     /**
      * Sanitize user input by removing malicious content
@@ -345,6 +389,7 @@ class SanitizationModule {
 
     /**
      * Sanitize image data for API response
+     * FIXED: Handle Date objects properly
      */
     sanitizeImageForResponse = (image: ImageData): any => {
         if (!image || typeof image !== 'object') {
@@ -354,9 +399,9 @@ class SanitizationModule {
         const sanitized: any = {
             id: image.id,
             status: image.status,
-            upload_date: image.upload_date,
-            created_at: image.created_at,
-            updated_at: image.updated_at,
+            upload_date: this.dateToString(image.upload_date),     // FIXED: Convert Date to string
+            created_at: this.dateToString(image.created_at),       // FIXED: Convert Date to string
+            updated_at: this.dateToString(image.updated_at),       // FIXED: Convert Date to string
             file_path: this.sanitizePath('images', image.id, 'file')
         };
 
@@ -372,6 +417,7 @@ class SanitizationModule {
 
     /**
      * Sanitize garment data for API response
+     * FIXED: Handle Date objects properly
      */
     sanitizeGarmentForResponse = (garment: GarmentData): any => {
         if (!garment || typeof garment !== 'object') {
@@ -388,18 +434,29 @@ class SanitizationModule {
             sanitized.metadata = this.sanitizeGarmentMetadata(garment.metadata);
         }
 
-        // Copy other safe fields
-        ['original_image_id', 'status', 'created_at', 'updated_at', 'data_version'].forEach(field => {
-            if (garment[field] !== undefined) {
-                sanitized[field] = garment[field];
-            }
-        });
+        // Copy other safe fields with Date handling
+        if (garment.original_image_id !== undefined) {
+            sanitized.original_image_id = garment.original_image_id;
+        }
+        if (garment.status !== undefined) {
+            sanitized.status = garment.status;
+        }
+        if (garment.created_at !== undefined) {
+            sanitized.created_at = this.dateToString(garment.created_at);  // FIXED
+        }
+        if (garment.updated_at !== undefined) {
+            sanitized.updated_at = this.dateToString(garment.updated_at);  // FIXED
+        }
+        if (garment.data_version !== undefined) {
+            sanitized.data_version = garment.data_version;
+        }
 
         return sanitized;
     }
 
     /**
      * Sanitize polygon data for API response
+     * FIXED: Handle Date objects properly
      */
     sanitizePolygonForResponse = (polygon: PolygonData): any => {
         if (!polygon || typeof polygon !== 'object') {
@@ -442,18 +499,26 @@ class SanitizationModule {
             sanitized.metadata = metadataResult;
         }
 
-        // Copy other safe fields
-        ['original_image_id', 'label', 'created_at', 'updated_at'].forEach(field => {
-            if (polygon[field] !== undefined) {
-                sanitized[field] = polygon[field];
-            }
-        });
+        // Copy other safe fields with Date handling
+        if (polygon.original_image_id !== undefined) {
+            sanitized.original_image_id = polygon.original_image_id;
+        }
+        if (polygon.label !== undefined) {
+            sanitized.label = polygon.label;
+        }
+        if (polygon.created_at !== undefined) {
+            sanitized.created_at = this.dateToString(polygon.created_at);  // FIXED
+        }
+        if (polygon.updated_at !== undefined) {
+            sanitized.updated_at = this.dateToString(polygon.updated_at);  // FIXED
+        }
 
         return sanitized;
     }
 
     /**
      * Sanitize wardrobe data for API response
+     * FIXED: Handle Date objects properly
      */
     sanitizeWardrobeForResponse = (wardrobe: WardrobeData): any => {
         if (!wardrobe || typeof wardrobe !== 'object') {
@@ -479,12 +544,13 @@ class SanitizationModule {
             );
         }
 
-        // Copy other safe fields
-        ['created_at', 'updated_at'].forEach(field => {
-            if (wardrobe[field] !== undefined) {
-                sanitized[field] = wardrobe[field];
-            }
-        });
+        // Copy other safe fields with Date handling
+        if (wardrobe.created_at !== undefined) {
+            sanitized.created_at = this.dateToString(wardrobe.created_at);  // FIXED
+        }
+        if (wardrobe.updated_at !== undefined) {
+            sanitized.updated_at = this.dateToString(wardrobe.updated_at);  // FIXED
+        }
 
         return sanitized;
     }

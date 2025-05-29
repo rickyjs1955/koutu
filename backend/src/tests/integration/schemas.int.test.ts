@@ -8,6 +8,7 @@ import {
   CreateGarmentWithBusinessRulesSchema,
   CreatePolygonWithGeometryValidationSchema,
   FileUploadSchema,
+  UpdateImageStatusSchema,
 } from '../../validators/schemas';
 
 import {
@@ -765,6 +766,14 @@ describe('Schema Validation Integration Tests', () => {
   });
 
   describe('Performance and Scalability Integration', () => {
+    // Add cleanup and memory management
+    beforeEach(() => {
+      // Force garbage collection if available (helps with consistent timing)
+      if (global.gc) {
+        global.gc();
+      }
+    });
+    
     it('should handle high-throughput validation scenarios', () => {
       const startTime = performance.now();
       const batchSize = 200;
@@ -922,4 +931,67 @@ describe('Schema Validation Integration Tests', () => {
     (data: any) => CreateGarmentWithBusinessRulesSchema.safeParse(data),
     (size: number) => generateSchemaTestData.validGarment()
   );
+
+  describe('UpdateImageStatusSchema Integration', () => {
+    it('should integrate with middleware validation', () => {
+      const mockReq = createMockRequest({
+        method: 'PATCH',
+        path: '/api/v1/images/123/status',
+        body: { status: 'processed' }
+      });
+      const mockRes = createMockResponse();
+      const mockNext = createMockNext();
+
+      const statusValidator = validateBody(UpdateImageStatusSchema);
+      statusValidator(mockReq as Request, mockRes as Response, mockNext);
+      
+      expect(mockNext).toHaveBeenCalledWith();
+    });
+
+    it('should handle status update workflow', () => {
+      const imageId = '123e4567-e89b-12d3-a456-426614174000';
+      
+      // Step 1: Validate UUID parameter
+      const paramReq = createMockRequest({ params: { id: imageId } });
+      const paramRes = createMockResponse();
+      const paramNext = createMockNext();
+      
+      validateUUIDParam(paramReq as Request, paramRes as Response, paramNext);
+      expect(paramNext).toHaveBeenCalledWith();
+
+      // Step 2: Validate status update body
+      const statusReq = createMockRequest({ 
+        params: { id: imageId },
+        body: { status: 'labeled' }
+      });
+      const statusRes = createMockResponse();
+      const statusNext = createMockNext();
+      
+      const statusValidator = validateBody(UpdateImageStatusSchema);
+      statusValidator(statusReq as Request, statusRes as Response, statusNext);
+      expect(statusNext).toHaveBeenCalledWith();
+    });
+
+    it('should handle realistic status transition scenarios', () => {
+      const statusTransitions = [
+        { from: 'new', to: 'processed' },
+        { from: 'processed', to: 'labeled' },
+        { from: 'new', to: 'labeled' }, // Direct transition
+      ];
+
+      statusTransitions.forEach(({ from, to }) => {
+        // Validate initial state
+        const fromResult = UpdateImageStatusSchema.safeParse({ status: from });
+        expect(fromResult.success).toBe(true);
+
+        // Validate target state
+        const toResult = UpdateImageStatusSchema.safeParse({ status: to });
+        expect(toResult.success).toBe(true);
+        
+        if (toResult.success) {
+          expect(['new', 'processed', 'labeled']).toContain(toResult.data.status);
+        }
+      });
+    });
+  });
 });

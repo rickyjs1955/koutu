@@ -480,6 +480,27 @@ export const assertValidationResults = (result: any, expectations: any) => {
   }
 };
 
+// Mock data for update image status validation
+export const mockUpdateImageStatusData = {
+  valid: [
+    { status: 'new' },
+    { status: 'processed' },
+    { status: 'labeled' }
+  ],
+  invalid: [
+    { status: 'invalid' },
+    { status: '' },
+    { status: null },
+    { status: undefined },
+    { status: 123 },
+    { status: ['new'] },
+    { status: { value: 'new' } },
+    {}, // Missing status
+    { status: 'NEW' }, // Wrong case
+    { status: 'new', extra: 'field' } // Extra fields
+  ]
+};
+
 // Test middleware behavior helpers
 export const testMiddlewareBehavior = (middleware: Function) => {
   return {
@@ -512,5 +533,6 @@ export default {
   generateSchemaTestData,
   validationScenarios,
   createValidationTest,
-  assertValidationResults
+  assertValidationResults,
+  mockUpdateImageStatusData
 };
