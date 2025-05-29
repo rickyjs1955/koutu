@@ -116,10 +116,10 @@ Backend:
 10. /backend/src/controllers/oauthController.ts         
 11. /backend/src/middlewares/auth.ts                    ✅Unit ✅Integration ✅Security
 12. /backend/src/middlewares/errorHandler.ts            ✅Unit ✅Integration ✅Security
-13. /backend/src/middlewares/validate.ts                🔔Unit 🔔Integration 🔔Security
+13. /backend/src/middlewares/validate.ts                ✅Unit ✅Integration ✅Security
 14. /backend/src/models/userModel.ts                    ✅Unit ✅Integration ✅Security
 15. /backend/src/models/db.ts                           ✅Unit ✅Integration ✅Security
-16. /backend/src/models/wardrobeModel.ts                ✅Unit ✅Integration ✅Security
+16. /backend/src/models/wardrobeModel.ts
 17. /backend/src/models/imageModel.ts
 18. /backend/src/models/garmentModel.ts
 19. /backend/src/models/polygonModel.ts
@@ -132,25 +132,24 @@ Backend:
 26. /backend/src/routes/fileRoutes.ts
 27. /backend/src/routes/polygonRoutes.ts
 28. /backend/src/routes/oauthRoutes.ts
-29. /backend/src/routes/exportRoutes.ts
-30. /backend/src/services/labelingService.ts
-31. /backend/src/services/exportService.ts
-32. /backend/src/services/imageProcessingService.ts
-33. /backend/src/services/storageService.ts
-34. /backend/src/services/oauthService.ts
-35. /backend/src/services/authService.ts
-36. /backend/src/services/garmentService.ts
-37. /backend/src/services/imageService.ts
-38. /backend/src/services/polygonService.ts
-39. /backend/src/utils/ApiError.ts                        ✅Unit ✅Integration ✅Security
-40. /backend/src/utils/sanitize.ts                        ✅Unit ✅Integration ✅Security
-41. /backend/src/utils/modelUtils.ts                      ✅Unit 🔔Integration 🔔Security
-42. /backend/src/utils/testSetup.ts                       ✅Unit ✅Integration ✅Security
-43. /backend/src/utils/PolygonServiceUtils.ts             ✅Unit ✅Integration 🔔Security
-44. /backend/src/utils/testConfig.ts                      🔔Unit 🔔Integration ✅Security
-45. /backend/src/utils/testDatabase.ts                    🔔Unit ✅Integration 🔔Security
-46. /backend/src/utils/testDatabaseConnection.ts          ✅Unit ✅Integration 🔔Security
-47. /backend/src/utils/testUserModel.ts                   ✅Unit 🔔Integration ✅Security
-48. /backend/src/validators/index.ts                      🔔Unit 🔔Integration 🔔Security
-49. /backend/src/validators/schemas.ts                    ✅Unit ✅Integration ✅Security
-50. /backend/src/app.ts
+29. /backend/src/services/labelingService.ts
+30. /backend/src/services/exportService.ts
+31. /backend/src/services/imageProcessingService.ts
+32. /backend/src/services/storageService.ts
+33. /backend/src/services/oauthService.ts
+34. /backend/src/services/authService.ts
+35. /backend/src/services/garmentService.ts
+36. /backend/src/services/imageService.ts
+37. /backend/src/services/polygonService.ts
+38. /backend/src/utils/ApiError.ts                        ✅Unit ✅Integration ✅Security
+39. /backend/src/utils/sanitize.ts                        ✅Unit ✅Integration ✅Security
+40. /backend/src/utils/modelUtils.ts                      ✅Unit 🔔Integration 🔔Security
+41. /backend/src/utils/testSetup.ts                       ✅Unit ✅Integration ✅Security
+42. /backend/src/utils/PolygonServiceUtils.ts             ✅Unit ✅Integration 🔔Security
+43. /backend/src/utils/testConfig.ts                      🔔Unit 🔔Integration ✅Security
+44. /backend/src/utils/testDatabase.ts                    🔔Unit ✅Integration 🔔Security
+45. /backend/src/utils/testDatabaseConnection.ts          ✅Unit ✅Integration 🔔Security
+46. /backend/src/utils/testUserModel.ts                   ✅Unit 🔔Integration ✅Security
+47. /backend/src/validators/index.ts                      🔔Unit 🔔Integration 🔔Security
+48. /backend/src/validators/schemas.ts                    ✅Unit ✅Integration ✅Security
+49. /backend/src/app.ts
