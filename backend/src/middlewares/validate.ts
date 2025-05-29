@@ -5,6 +5,16 @@ import { UUIDParamSchema,
          ImageQuerySchema, 
          EnhancedFileUploadSchema 
 } from '../validators/schemas';
+import sharp from 'sharp';
+
+// Extend Express Request interface to include imageMetadata
+declare global {
+  namespace Express {
+    interface Request {
+      imageMetadata?: sharp.Metadata;
+    }
+  }
+}
 
 type RequestSource = 'body' | 'query' | 'params';
 
@@ -225,4 +235,86 @@ export const validateFile = (req: Request, res: Response, next: NextFunction) =>
       err as Error);
     next(error);
   }
+};
+
+export const instagramValidationMiddleware = async (
+  req: Request, 
+  res: Response, 
+  next: NextFunction
+) => {
+  if (!req.file) {
+    return next(ApiError.badRequest('No image file provided', 'MISSING_FILE'));
+  }
+
+  try {
+    const metadata = await sharp(req.file.buffer).metadata();
+    
+    // Instagram-specific validations
+    const validationErrors: string[] = [];
+    
+    // 1. File size (already handled by multer, but double-check)
+    if (req.file.size > 8388608) { // 8MB
+      validationErrors.push('Image too large (max 8MB)');
+    }
+    
+    // 2. Dimensions
+    if (!metadata.width || !metadata.height) {
+      validationErrors.push('Unable to determine image dimensions');
+    } else {
+      if (metadata.width < 320) {
+        validationErrors.push(`Width too small (min 320px, got ${metadata.width}px)`);
+      }
+      if (metadata.width > 1440) {
+        validationErrors.push(`Width too large (max 1440px, got ${metadata.width}px)`);
+      }
+      
+      // 3. Aspect ratio
+      const aspectRatio = metadata.width / metadata.height;
+      if (aspectRatio < 0.8) {
+        validationErrors.push(`Image too tall (min 4:5 ratio, got ${aspectRatio.toFixed(2)}:1)`);
+      }
+      if (aspectRatio > 1.91) {
+        validationErrors.push(`Image too wide (max 1.91:1 ratio, got ${aspectRatio.toFixed(2)}:1)`);
+      }
+    }
+    
+    // 4. Format validation
+    const allowedFormats = ['jpeg', 'png', 'bmp'];
+    if (!metadata.format || !allowedFormats.includes(metadata.format)) {
+      validationErrors.push(`Unsupported format: ${metadata.format}. Use JPEG, PNG, or BMP`);
+    }
+    
+    // 5. Color space check (warn if not sRGB)
+    if (metadata.space && metadata.space !== 'srgb') {
+      console.warn(`Non-sRGB color space detected: ${metadata.space}. Will convert to sRGB.`);
+    }
+    
+    // 6. Additional Instagram-style checks
+    if (metadata.density && metadata.density < 72) {
+      console.warn(`Low DPI detected: ${metadata.density}. Consider higher resolution.`);
+    }
+    
+    if (validationErrors.length > 0) {
+      return next(ApiError.badRequest(
+        `Instagram validation failed: ${validationErrors.join(', ')}`,
+        'INSTAGRAM_VALIDATION_ERROR'
+      ));
+    }
+    
+    // Attach metadata to request for later use
+    req.imageMetadata = metadata;
+    next();
+    
+  } catch (error) {
+    next(ApiError.badRequest('Invalid image file', 'INVALID_IMAGE'));
+  }
+};
+
+// Enhanced error messages for better UX
+export const instagramErrorMessages = {
+  FILE_TOO_LARGE: 'Your image is too large. Please use an image under 8MB.',
+  INVALID_ASPECT_RATIO: 'Your image doesn\'t meet Instagram\'s aspect ratio requirements. Try cropping it to be between 4:5 (portrait) and 1.91:1 (landscape).',
+  INVALID_DIMENSIONS: 'Your image is too small or too large. Please use an image between 320px and 1440px wide.',
+  UNSUPPORTED_FORMAT: 'Please use a JPEG, PNG, or BMP image file.',
+  INVALID_COLOR_SPACE: 'Your image will be converted to sRGB for better compatibility.'
 };

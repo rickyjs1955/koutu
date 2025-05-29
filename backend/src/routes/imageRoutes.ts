@@ -11,7 +11,8 @@ import {
   validateQuery, 
   validateParams,
   validateFile,
-  validateBody
+  validateBody,
+  instagramValidationMiddleware
 } from '../middlewares/validate';
 import { 
   ImageQuerySchema,
@@ -38,10 +39,11 @@ router.use(rateLimitByUser(50, 15 * 60 * 1000)); // 50 requests per 15 minutes
  * @route POST /api/v1/images/upload
  * @desc Upload a new image
  * @access Private
- * @middleware upload, validation, auth
+ * @middleware upload, validation, authentication, Instagram validation
  */
 router.post('/upload', 
   imageController.uploadMiddleware,
+  instagramValidationMiddleware,
   validateFile,
   imageController.uploadImage
 );

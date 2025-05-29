@@ -1,6 +1,5 @@
-// backend/src/validators/schemas.ts - Added Missing Schema
+// backend/src/validators/schemas.ts
 import { z } from 'zod';
-import { Request, Response, NextFunction } from 'express';
 
 // ==================== CORE SCHEMAS ====================
 
@@ -120,6 +119,15 @@ export const EnhancedFileUploadSchema = FileUploadSchema.refine(
   },
   {
     message: 'File cannot be empty',
+    path: ['size']
+  }
+).refine(
+  (data) => {
+    // Instagram-specific: minimum file size (1KB)
+    return data.size >= 1024;
+  },
+  {
+    message: 'File too small for Instagram compatibility (minimum 1KB)',
     path: ['size']
   }
 );

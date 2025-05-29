@@ -124,43 +124,31 @@ export const mockMaliciousData = {
 
 // ==================== MOCK FILE DATA ====================
 
-export const mockValidFile: Express.Multer.File = {
+export const mockValidFile = {
   fieldname: 'image',
-  originalname: 'test-image.jpg',
+  originalname: 'valid-image.jpg',
   encoding: '7bit',
   mimetype: 'image/jpeg',
-  size: 512000, // 512KB
-  buffer: Buffer.from('fake image data'),
-  stream: {} as any,
-  destination: '',
-  filename: 'test-image.jpg',
-  path: ''
+  size: 2048576, // 2MB - within Instagram limits
+  buffer: Buffer.from('fake jpeg content')
 };
 
-export const mockInvalidFile: Express.Multer.File = {
+export const mockInvalidFile = {
   fieldname: 'image',
-  originalname: 'document.pdf',
+  originalname: 'invalid.pdf',
   encoding: '7bit',
-  mimetype: 'application/pdf', // Invalid - not image
+  mimetype: 'application/pdf', // Invalid for Instagram
   size: 1024000,
-  buffer: Buffer.from('fake pdf data'),
-  stream: {} as any,
-  destination: '',
-  filename: 'document.pdf',
-  path: ''
+  buffer: Buffer.from('fake pdf content')
 };
 
-export const mockOversizedFile: Express.Multer.File = {
+export const mockOversizedFile = {
   fieldname: 'image',
-  originalname: 'huge-image.jpg',
+  originalname: 'huge.jpg',
   encoding: '7bit',
   mimetype: 'image/jpeg',
-  size: 2097152, // 2MB - over 1MB limit
-  buffer: Buffer.alloc(2097152),
-  stream: {} as any,
-  destination: '',
-  filename: 'huge-image.jpg',
-  path: ''
+  size: 10485760, // 10MB - over Instagram 8MB limit
+  buffer: Buffer.from('fake oversized content')
 };
 
 export const mockMaliciousFile: Express.Multer.File = {

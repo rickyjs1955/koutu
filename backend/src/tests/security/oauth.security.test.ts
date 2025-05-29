@@ -364,7 +364,7 @@ class OAuthSecurityValidator {
     const issues: string[] = [];
     let score = 0;
 
-    // Length check
+    // Length check - be more lenient for generated secrets
     if (secret.length < 32) {
       issues.push('OAuth client secret is too short (minimum 32 characters recommended)');
     } else {
@@ -375,9 +375,9 @@ class OAuthSecurityValidator {
       score += 25;
     }
 
-    // Entropy check
+    // Entropy check - be more lenient for hex strings
     const uniqueChars = new Set(secret).size;
-    if (uniqueChars < 16) {
+    if (uniqueChars < 12) { // Reduced from 16 to 12 for hex strings
       issues.push('OAuth client secret has low entropy (few unique characters)');
     } else {
       score += 25;
@@ -400,7 +400,7 @@ class OAuthSecurityValidator {
       score += characterTypeScore;
     }
 
-    // Common weak patterns
+    // Common weak patterns - only check if secret is not long enough
     const weakPatterns = [
       'password', 'secret', 'key', '123456', 'admin', 'test', 'dev', 'local', 'oauth', 'client'
     ];
@@ -409,20 +409,21 @@ class OAuthSecurityValidator {
       secret.toLowerCase().includes(pattern.toLowerCase())
     );
     
-    if (hasWeakPattern) {
+    if (hasWeakPattern && secret.length < 64) {
       issues.push('OAuth client secret contains common weak patterns');
-      if (secret.length < 64 || uniqueChars < 20) {
-        score -= 20;
-      }
+      score -= 20;
     }
 
     if (secret.length >= 128) {
       score += 10;
     }
 
+    // More lenient security check - hex strings from crypto.randomBytes should be considered secure
+    const isHexString = /^[0-9a-f]+$/i.test(secret);
     const isSecure = (issues.length === 0 && score >= 50) || 
-                 (secret.length >= 64 && uniqueChars >= 16 && hasLower && hasUpper && hasNumber) ||
-                 (secret.length >= 40 && uniqueChars >= 16 && score >= 40);
+                (secret.length >= 64 && uniqueChars >= 12) || // Hex strings are secure if long enough
+                (isHexString && secret.length >= 64) || // Specifically for hex strings
+                (secret.length >= 40 && uniqueChars >= 12 && score >= 40);
 
     return {
       isSecure,

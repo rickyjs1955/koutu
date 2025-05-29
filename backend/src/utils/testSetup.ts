@@ -149,7 +149,7 @@ export const setupTestDatabase = async () => {
   try {
     console.log('Setting up test database...');
     
-    // Wait for PostgreSQL to be ready and ensure test database exists
+    // Wait for PostgreSQL to be ready
     const isReady = await waitForPostgreSQL();
     if (!isReady) {
       throw new Error('PostgreSQL test database is not ready after 30 seconds');
@@ -168,22 +168,62 @@ export const setupTestDatabase = async () => {
     await testQuery(`CREATE EXTENSION IF NOT EXISTS btree_gist`);
     await testQuery(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
 
-    // Clean up existing tables (in correct order to handle foreign keys)
+    // Clean up existing tables
     await testQuery(`DROP TABLE IF EXISTS child_cleanup CASCADE`);
     await testQuery(`DROP TABLE IF EXISTS parent_cleanup CASCADE`);
     await testQuery(`DROP TABLE IF EXISTS exclude_test_table CASCADE`);
     await testQuery(`DROP TABLE IF EXISTS test_table CASCADE`);
     await testQuery(`DROP TABLE IF EXISTS test_items CASCADE`);
     await testQuery(`DROP TABLE IF EXISTS garment_items CASCADE`);
+    await testQuery(`DROP TABLE IF EXISTS original_images CASCADE`);
+    await testQuery(`DROP TABLE IF EXISTS wardrobes CASCADE`);
+    await testQuery(`DROP TABLE IF EXISTS user_oauth_providers CASCADE`);
+    await testQuery(`DROP TABLE IF EXISTS users CASCADE`);
 
-    // Create garment_items table for garmentModel.int.test.ts
+    // Create users table first (base table)
+    await testQuery(`
+      CREATE TABLE users (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // Create user_oauth_providers table
+    await testQuery(`
+      CREATE TABLE user_oauth_providers (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        provider TEXT NOT NULL,
+        provider_id TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        UNIQUE(provider, provider_id)
+      )
+    `);
+
+    // Create original_images table
+    await testQuery(`
+      CREATE TABLE original_images (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        file_path TEXT NOT NULL,
+        original_metadata JSONB DEFAULT '{}',
+        upload_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        status TEXT DEFAULT 'new' CHECK (status IN ('new', 'processed', 'labeled')),
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // Create garment_items table with correct schema
     await testQuery(`
       CREATE TABLE garment_items (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        user_id TEXT NOT NULL,
-        original_image_id TEXT NOT NULL,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        original_image_id UUID REFERENCES original_images(id) ON DELETE CASCADE,
         file_path TEXT NOT NULL,
-        mask_path TEXT NOT NULL,
+        mask_path TEXT,
         metadata JSONB NOT NULL DEFAULT '{}',
         created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -191,7 +231,19 @@ export const setupTestDatabase = async () => {
       )
     `);
 
-    // Create test_items table for db.int.test.ts
+    // Create wardrobes table
+    await testQuery(`
+      CREATE TABLE wardrobes (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // Create other test tables
     await testQuery(`
       CREATE TABLE test_items (
         id SERIAL PRIMARY KEY,
@@ -200,7 +252,6 @@ export const setupTestDatabase = async () => {
       )
     `);
 
-    // Create test_table for db.int.test.ts
     await testQuery(`
       CREATE TABLE test_table (
         id SERIAL PRIMARY KEY,
@@ -208,7 +259,6 @@ export const setupTestDatabase = async () => {
       )
     `);
 
-    // Create parent_cleanup and child_cleanup tables
     await testQuery(`
       CREATE TABLE parent_cleanup (
         id SERIAL PRIMARY KEY,
@@ -225,7 +275,6 @@ export const setupTestDatabase = async () => {
       )
     `);
 
-    // Create exclude_test_table for EXCLUDE constraint tests
     await testQuery(`
       CREATE TABLE exclude_test_table (
         id SERIAL PRIMARY KEY,

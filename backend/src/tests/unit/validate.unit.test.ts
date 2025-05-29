@@ -430,7 +430,17 @@ describe('Validation Middleware Unit Tests', () => {
 
   describe('validateFile middleware', () => {
     it('should validate valid file upload', async () => {
-      const req = createMockRequest({ file: mockValidFile }) as Request;
+      const validFile = {
+        ...mockValidFile,
+        stream: {} as any,
+        destination: '/tmp',
+        filename: 'test-file.jpg',
+        path: '/tmp/test-file.jpg',
+        mimetype: 'image/jpeg', // Ensure valid mimetype
+        size: 1024 * 500 // 500KB - under limit
+      };
+
+      const req = createMockRequest({ file: validFile }) as Request;
       const res = createMockResponse() as Response;
       const next = createMockNext();
 
@@ -454,7 +464,20 @@ describe('Validation Middleware Unit Tests', () => {
     });
 
     it('should reject invalid file type', async () => {
-      const req = createMockRequest({ file: mockInvalidFile }) as Request;
+      const invalidFile = {
+        fieldname: 'file',
+        originalname: 'document.txt',
+        encoding: '7bit',
+        mimetype: 'text/plain',  // Invalid - not an image
+        size: 1024 * 100, // 100KB - valid size
+        buffer: Buffer.alloc(100),
+        stream: {} as any,
+        destination: '/tmp',
+        filename: 'document.txt',
+        path: '/tmp/document.txt'
+      };
+
+      const req = createMockRequest({ file: invalidFile }) as Request;
       const res = createMockResponse() as Response;
       const next = createMockNext();
 
@@ -464,11 +487,26 @@ describe('Validation Middleware Unit Tests', () => {
       const error = next.mock.calls[0][0] as unknown as ApiError;
       expect(error.code).toBe('INVALID_FILE');
       expect(error.statusCode).toBe(400);
-      expect(error.context?.validationErrors).toBeDefined();
+      expect(error.message).toContain('Only JPEG, PNG, and BMP images are allowed');
     });
 
     it('should reject oversized file', async () => {
-      const req = createMockRequest({ file: mockOversizedFile }) as Request;
+      // The middleware has MAX_FILE_SIZE = 8388608 (8MB)
+      // So we need a file LARGER than 8MB to trigger the error
+      const oversizedFile = {
+        fieldname: 'file',
+        originalname: 'huge-image.jpg',
+        encoding: '7bit',
+        mimetype: 'image/jpeg',  // Valid mimetype
+        size: 10 * 1024 * 1024,  // 10MB - exceeds 8MB limit
+        buffer: Buffer.alloc(100), // Small buffer for testing
+        stream: {} as any,
+        destination: '/tmp',
+        filename: 'huge-image.jpg',
+        path: '/tmp/huge-image.jpg'
+      };
+
+      const req = createMockRequest({ file: oversizedFile }) as Request;
       const res = createMockResponse() as Response;
       const next = createMockNext();
 
@@ -477,6 +515,8 @@ describe('Validation Middleware Unit Tests', () => {
       expect(next).toHaveBeenCalledWith(expect.any(ApiError));
       const error = next.mock.calls[0][0] as unknown as ApiError;
       expect(error.code).toBe('INVALID_FILE');
+      expect(error.statusCode).toBe(400);
+      expect(error.message).toContain('File too large');
     });
 
     it('should handle file validation errors gracefully', async () => {

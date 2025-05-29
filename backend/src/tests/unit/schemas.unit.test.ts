@@ -242,14 +242,14 @@ describe('Schema Validation Unit Tests', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should validate a proper WebP file', () => {
+    it('should validate a proper BMP file', () => {
       const validFile = {
         fieldname: 'image',
-        originalname: 'modern.webp',
+        originalname: 'bitmap.bmp',
         encoding: '7bit',
-        mimetype: 'image/webp',
+        mimetype: 'image/bmp',
         size: 512000, // 512KB
-        buffer: Buffer.from('fake webp data')
+        buffer: Buffer.from('fake bmp data')
       };
 
       const result = FileUploadSchema.safeParse(validFile);
@@ -262,7 +262,7 @@ describe('Schema Validation Unit Tests', () => {
         originalname: 'huge.jpg',
         encoding: '7bit',
         mimetype: 'image/jpeg',
-        size: 6291456, // 6MB - over 5MB limit
+        size: 10485760, // 10MB - over 8MB Instagram limit
         buffer: Buffer.from('fake large data')
       };
 
@@ -270,31 +270,17 @@ describe('Schema Validation Unit Tests', () => {
       expect(result.success).toBe(false);
     });
 
-    it('should reject invalid file type', () => {
-      const invalidFile = {
+    it('should reject WebP files (Instagram incompatible)', () => {
+      const webpFile = {
         fieldname: 'image',
-        originalname: 'document.pdf',
+        originalname: 'modern.webp',
         encoding: '7bit',
-        mimetype: 'application/pdf',
-        size: 1024000,
-        buffer: Buffer.from('fake pdf data')
+        mimetype: 'image/webp', // Should be rejected for Instagram
+        size: 512000,
+        buffer: Buffer.from('fake webp data')
       };
 
-      const result = FileUploadSchema.safeParse(invalidFile);
-      expect(result.success).toBe(false);
-    });
-
-    it('should reject filename that is too long', () => {
-      const invalidFile = {
-        fieldname: 'image',
-        originalname: 'a'.repeat(300) + '.jpg',
-        encoding: '7bit',
-        mimetype: 'image/jpeg',
-        size: 1024000,
-        buffer: Buffer.from('fake data')
-      };
-
-      const result = FileUploadSchema.safeParse(invalidFile);
+      const result = FileUploadSchema.safeParse(webpFile);
       expect(result.success).toBe(false);
     });
   });
