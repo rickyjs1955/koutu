@@ -1,7 +1,7 @@
 // backend/src/tests/unit/validate.unit.test.ts
 
-import { beforeEach, afterEach, describe, it, expect } from '@jest/globals';
-import { Request, Response, NextFunction } from 'express';
+import { describe, it, expect } from '@jest/globals';
+import { Request, Response } from 'express';
 import { z } from 'zod';
 
 // Import validation middleware
@@ -23,16 +23,12 @@ import {
   createMockNext,
   TestSchema,
   TestParamsSchema,
-  TestQuerySchema,
   mockValidData,
   mockInvalidData,
   mockValidFile,
   mockInvalidFile,
   mockOversizedFile,
-  expectValidationError,
-  expectApiError,
   expectNoError,
-  generateValidationScenarios,
   edgeCaseData
 } from '../__mocks__/validate.mock';
 
@@ -41,18 +37,11 @@ import {
   testMiddlewareWithData,
   expectMiddlewareSuccess,
   expectMiddlewareError,
-  testValidationFlow,
   testSchemaValidation,
   createTestDataFactory
 } from '../__helpers__/validate.helper';
 
 // Import schemas for testing
-import { 
-  UUIDParamSchema, 
-  ImageQuerySchema,
-  EnhancedFileUploadSchema 
-} from '../../validators/schemas';
-
 import { ApiError } from '../../utils/ApiError';
 
 /**
