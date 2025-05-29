@@ -1,6 +1,6 @@
 // /backend/src/utils/testDatabaseConnection.ts
 
-import { Pool, Client, PoolConfig } from 'pg';
+import { Pool, Client, PoolConfig, PoolClient } from 'pg';
 import { TEST_DB_CONFIG, MAIN_DB_CONFIG } from './testConfig';
 import fs from 'fs';
 import path from 'path';
@@ -11,6 +11,8 @@ export class TestDatabaseConnection {
   private static isInitialized = false;
   private static isInitializing = false;
   private static initializationPromise: Promise<Pool> | null = null;
+  private static activeConnections = new Set<PoolClient>();
+  private static cleanupInProgress = false;
 
   static async initialize(): Promise<Pool> {
     // Return existing initialization promise if already initializing
@@ -54,8 +56,28 @@ export class TestDatabaseConnection {
         this.mainPool = null;
       }
 
-      // Create test pool
-      this.testPool = new Pool(TEST_DB_CONFIG);
+      // Create test pool with enhanced configuration
+      this.testPool = new Pool({
+        ...TEST_DB_CONFIG,
+        // Enhanced pool configuration for better cleanup
+        max: 10, // Limit maximum connections
+        idleTimeoutMillis: 1000, // Close idle connections faster
+        connectionTimeoutMillis: 2000,
+        allowExitOnIdle: true // Allow pool to close when idle
+      });
+
+      // Add error handlers to the pool
+      this.testPool.on('error', (err) => {
+        console.warn('Database pool error:', err);
+      });
+
+      this.testPool.on('connect', (client) => {
+        console.log('Database client connected');
+      });
+
+      this.testPool.on('remove', (client) => {
+        console.log('Database client removed');
+      });
 
       // Test the connection
       const testClient = await this.testPool.connect();
@@ -119,6 +141,7 @@ export class TestDatabaseConnection {
     }
 
     const client = await this.testPool.connect();
+    this.activeConnections.add(client);
     try {
       // Create extensions with error handling for concurrent access
       try {
@@ -133,6 +156,7 @@ export class TestDatabaseConnection {
       // Create schema
       await this.createSchema(client);
     } finally {
+      this.activeConnections.delete(client);
       client.release();
     }
   }
@@ -176,6 +200,7 @@ export class TestDatabaseConnection {
       )
     `);
 
+    // Enhanced original_images table to match your test model
     await client.query(`
       CREATE TABLE IF NOT EXISTS original_images (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -184,6 +209,9 @@ export class TestDatabaseConnection {
         original_filename VARCHAR(255),
         mime_type VARCHAR(100),
         file_size INTEGER,
+        original_metadata JSONB DEFAULT '{}',
+        upload_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        status VARCHAR(20) DEFAULT 'new' CHECK (status IN ('new', 'processed', 'labeled')),
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
@@ -193,6 +221,7 @@ export class TestDatabaseConnection {
       CREATE TABLE IF NOT EXISTS garment_items (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        original_image_id UUID REFERENCES original_images(id) ON DELETE SET NULL,
         name VARCHAR(255) NOT NULL,
         description TEXT,
         category VARCHAR(100),
@@ -218,6 +247,13 @@ export class TestDatabaseConnection {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+
+    // Add indexes for better performance
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_original_images_user_id ON original_images(user_id);
+      CREATE INDEX IF NOT EXISTS idx_original_images_status ON original_images(status);
+      CREATE INDEX IF NOT EXISTS idx_original_images_upload_date ON original_images(upload_date DESC);
+    `);
   }
 
   static getPool(): Pool {
@@ -228,8 +264,21 @@ export class TestDatabaseConnection {
   }
 
   static async query(text: string, params?: any[]): Promise<any> {
+    if (this.cleanupInProgress) {
+      throw new Error('Database cleanup in progress, cannot execute queries');
+    }
+    
     const pool = this.getPool();
-    return pool.query(text, params);
+    const client = await pool.connect();
+    this.activeConnections.add(client);
+    
+    try {
+      const result = await client.query(text, params);
+      return result;
+    } finally {
+      this.activeConnections.delete(client);
+      client.release();
+    }
   }
 
   static async clearAllTables(): Promise<void> {
@@ -238,12 +287,13 @@ export class TestDatabaseConnection {
     }
 
     const client = await this.testPool.connect();
+    this.activeConnections.add(client);
     try {
       // Clear tables in reverse dependency order to avoid foreign key violations
       const tables = [
         'user_oauth_providers',
-        'original_images', 
         'garment_items',
+        'original_images', 
         'wardrobes',
         'users'
       ];
@@ -260,40 +310,86 @@ export class TestDatabaseConnection {
         await client.query('SET session_replication_role = DEFAULT');
       }
     } finally {
+      this.activeConnections.delete(client);
       client.release();
     }
   }
 
   static async cleanup(): Promise<void> {
+    if (this.cleanupInProgress) {
+      console.log('Cleanup already in progress, skipping...');
+      return;
+    }
+
+    this.cleanupInProgress = true;
+    console.log('🔄 Starting enhanced database cleanup...');
+
     try {
+      // Step 1: Wait for active connections to finish naturally
+      if (this.activeConnections.size > 0) {
+        console.log(`⏳ Waiting for ${this.activeConnections.size} active connections to finish...`);
+        
+        // Wait a short time for connections to finish naturally
+        let attempts = 0;
+        while (this.activeConnections.size > 0 && attempts < 10) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+
+        // Force release any remaining connections
+        if (this.activeConnections.size > 0) {
+          console.log(`⚠️ Force releasing ${this.activeConnections.size} remaining connections`);
+          for (const client of this.activeConnections) {
+            try {
+              (client as any).release(true); // Force release
+            } catch (error) {
+              console.warn('Error force-releasing client:', error);
+            }
+          }
+          this.activeConnections.clear();
+        }
+      }
+
+      // Step 2: Gracefully close pools (REMOVED TIMEOUTS)
       await this.cleanupPools();
+      
+      // Step 3: Drop test database
       await this.dropTestDatabase();
+
+      console.log('✅ Enhanced database cleanup completed');
     } catch (error) {
-      console.log('Cleanup error (may be expected):', error);
+      console.warn('⚠️ Cleanup had issues:', error);
     } finally {
       this.resetState();
+      this.cleanupInProgress = false;
     }
   }
 
   private static async cleanupPools(): Promise<void> {
-    // Close test pool
-    if (this.testPool && !this.testPool.ended) {
-      try {
-        await this.testPool.end();
-      } catch (error) {
-        console.log('Error closing test pool:', error);
-      }
-    }
-    this.testPool = null;
+    const promises: Promise<void>[] = [];
 
-    // Close main pool
-    if (this.mainPool && !this.mainPool.ended) {
-      try {
-        await this.mainPool.end();
-      } catch (error) {
-        console.log('Error closing main pool:', error);
-      }
+    // Close test pool WITHOUT timeout
+    if (this.testPool && !this.testPool.ended) {
+      promises.push(
+        this.testPool.end().catch(error => {
+          console.warn('Test pool cleanup error:', error);
+        })
+      );
     }
+
+    // Close main pool WITHOUT timeout
+    if (this.mainPool && !this.mainPool.ended) {
+      promises.push(
+        this.mainPool.end().catch(error => {
+          console.warn('Main pool cleanup error:', error);
+        })
+      );
+    }
+
+    // Wait for all pools to close
+    await Promise.allSettled(promises);
+    
+    this.testPool = null;
     this.mainPool = null;
   }
 
@@ -301,7 +397,9 @@ export class TestDatabaseConnection {
     // Create a new connection just for cleanup
     const cleanupPool = new Pool({
       ...MAIN_DB_CONFIG,
-      database: 'postgres'
+      database: 'postgres',
+      max: 1, // Single connection for cleanup
+      idleTimeoutMillis: 1000
     });
 
     try {
@@ -313,7 +411,7 @@ export class TestDatabaseConnection {
       `);
 
       // Small delay to ensure connections are terminated
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       // Drop test database
       await cleanupPool.query('DROP DATABASE IF EXISTS koutu_test');
@@ -334,6 +432,7 @@ export class TestDatabaseConnection {
     this.initializationPromise = null;
     this.testPool = null;
     this.mainPool = null;
+    this.activeConnections.clear();
   }
 
   // Utility method to check if initialized (for testing)
@@ -344,5 +443,10 @@ export class TestDatabaseConnection {
   // Utility method to check if initializing (for testing)  
   static get initializing(): boolean {
     return this.isInitializing;
+  }
+
+  // Utility method to get active connection count (for debugging)
+  static get activeConnectionCount(): number {
+    return this.activeConnections.size;
   }
 }

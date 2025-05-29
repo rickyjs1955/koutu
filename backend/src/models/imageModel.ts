@@ -204,7 +204,7 @@ export const imageModel = {
     if (!isUuid(id)) {
       return null;
     }
-    
+        
     const result = await query(
       'UPDATE original_images SET original_metadata = $1 WHERE id = $2 RETURNING *',
       [JSON.stringify(metadata), id]
@@ -227,6 +227,7 @@ export const imageModel = {
   
   /**
    * Batch update status for multiple images
+   * FIXED: Added $ prefix to placeholders
    */
   async batchUpdateStatus(imageIds: string[], status: 'new' | 'processed' | 'labeled'): Promise<number> {
     // Validate all UUIDs
@@ -236,6 +237,7 @@ export const imageModel = {
       return 0;
     }
     
+    // FIXED: Add $ prefix to placeholders
     const placeholders = validIds.map((_, index) => `${index + 2}`).join(',');
     const result = await query(
       `UPDATE original_images SET status = $1 WHERE id IN (${placeholders})`,

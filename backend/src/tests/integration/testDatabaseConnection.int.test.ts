@@ -13,6 +13,20 @@ const INTEGRATION_TEST_CONFIG = {
   database: 'postgres', // Connect to main db initially
 };
 
+// Updated expected configuration to match enhanced TestDatabaseConnection
+const EXPECTED_TEST_CONFIG = {
+  host: 'localhost',
+  port: 5432,
+  user: 'postgres',
+  password: 'postgres',
+  database: 'koutu_test',
+  max: 10, // Updated from 20 to 10
+  connectionTimeoutMillis: 2000, // Updated from 10000 to 2000
+  idleTimeoutMillis: 1000, // Updated from 30000 to 1000
+  allowExitOnIdle: true, // New property
+  ssl: false,
+};
+
 describe('TestDatabaseConnection Integration Tests', () => {
   beforeAll(async () => {
     // Wait for PostgreSQL to be ready
@@ -95,43 +109,43 @@ describe('TestDatabaseConnection Integration Tests', () => {
     });
 
     it('should handle multiple rapid initialization calls', async () => {
-  // Clean up first to ensure fresh state
-  await TestDatabaseConnection.cleanup();
-  
-  // Simulate multiple simultaneous initialization attempts
-  const initPromises = Array.from({ length: 5 }, () => 
-    TestDatabaseConnection.initialize()
-  );
-  
-  const pools = await Promise.all(initPromises);
-  
-  // All should return the same pool instance
-  for (const pool of pools) {
-    expect(pool).toBe(pools[0]);
-  }
-  
-  // Pool should work correctly
-  const result = await pools[0].query('SELECT NOW() as current_time');
-  expect(result.rows[0].current_time).toBeInstanceOf(Date);
-});
+      // Clean up first to ensure fresh state
+      await TestDatabaseConnection.cleanup();
+      
+      // Simulate multiple simultaneous initialization attempts
+      const initPromises = Array.from({ length: 5 }, () => 
+        TestDatabaseConnection.initialize()
+      );
+      
+      const pools = await Promise.all(initPromises);
+      
+      // All should return the same pool instance
+      for (const pool of pools) {
+        expect(pool).toBe(pools[0]);
+      }
+      
+      // Pool should work correctly
+      const result = await pools[0].query('SELECT NOW() as current_time');
+      expect(result.rows[0].current_time).toBeInstanceOf(Date);
+    });
 
     it('should set isInitialized flag correctly', async () => {
-  // Clean up first
-  await TestDatabaseConnection.cleanup();
-  
-  // First initialization
-  await TestDatabaseConnection.initialize();
-  
-  // Second call should be fast (no re-initialization)
-  const startTime = Date.now();
-  await TestDatabaseConnection.initialize();
-  const duration = Date.now() - startTime;
-  
-  expect(duration).toBeLessThan(100); // Should be very fast for cached init
-  
-  // Check initialized state through behavior
-  expect(TestDatabaseConnection.initialized).toBe(true);
-});
+      // Clean up first
+      await TestDatabaseConnection.cleanup();
+      
+      // First initialization
+      await TestDatabaseConnection.initialize();
+      
+      // Second call should be fast (no re-initialization)
+      const startTime = Date.now();
+      await TestDatabaseConnection.initialize();
+      const duration = Date.now() - startTime;
+      
+      expect(duration).toBeLessThan(100); // Should be very fast for cached init
+      
+      // Check initialized state through behavior
+      expect(TestDatabaseConnection.initialized).toBe(true);
+    });
   });
 
   describe('Database Creation and Setup', () => {
@@ -391,17 +405,18 @@ describe('TestDatabaseConnection Integration Tests', () => {
     it('should respect connection pool limits', async () => {
       const pool = TestDatabaseConnection.getPool();
       
-      // Verify pool configuration
-      expect(pool.options.max).toBe(TEST_DB_CONFIG.max);
-      expect(pool.options.connectionTimeoutMillis).toBe(TEST_DB_CONFIG.connectionTimeoutMillis);
-      expect(pool.options.idleTimeoutMillis).toBe(TEST_DB_CONFIG.idleTimeoutMillis);
+      // Verify pool configuration matches enhanced settings
+      expect(pool.options.max).toBe(EXPECTED_TEST_CONFIG.max);
+      expect(pool.options.connectionTimeoutMillis).toBe(EXPECTED_TEST_CONFIG.connectionTimeoutMillis);
+      expect(pool.options.idleTimeoutMillis).toBe(EXPECTED_TEST_CONFIG.idleTimeoutMillis);
+      expect(pool.options.allowExitOnIdle).toBe(EXPECTED_TEST_CONFIG.allowExitOnIdle);
     });
 
     it('should handle connection pool exhaustion gracefully', async () => {
       const pool = TestDatabaseConnection.getPool();
       
-      // Create more queries than pool max (20 + some buffer)
-      const manyQueries = Array.from({ length: 25 }, (_, i) => 
+      // Create more queries than pool max (10 + some buffer)
+      const manyQueries = Array.from({ length: 15 }, (_, i) => 
         pool.query('SELECT pg_sleep(0.1), $1::integer as id', [i])
       );
       
@@ -410,7 +425,7 @@ describe('TestDatabaseConnection Integration Tests', () => {
       const results = await Promise.all(manyQueries);
       const duration = Date.now() - startTime;
       
-      expect(results).toHaveLength(25);
+      expect(results).toHaveLength(15);
       expect(duration).toBeLessThan(10000); // Should complete within 10 seconds
     }, 15000);
 
@@ -464,11 +479,11 @@ describe('TestDatabaseConnection Integration Tests', () => {
     });
 
     it('should throw error when pool not initialized', async () => {
-  await TestDatabaseConnection.cleanup();
-  
-  await expect(TestDatabaseConnection.query('SELECT 1'))
-    .rejects.toThrow('Test database not initialized. Call initialize() first.');
-});
+      await TestDatabaseConnection.cleanup();
+      
+      await expect(TestDatabaseConnection.query('SELECT 1'))
+        .rejects.toThrow('Test database not initialized. Call initialize() first.');
+    });
 
     it('should handle complex queries with joins', async () => {
       // Insert test data
@@ -658,7 +673,7 @@ describe('TestDatabaseConnection Integration Tests', () => {
       expect(result1.rows[0].test).toBe(1);
       
       // Simulate some connection stress
-      const stressQueries = Array.from({ length: 30 }, () => 
+      const stressQueries = Array.from({ length: 20 }, () => 
         pool.query('SELECT pg_sleep(0.05)')
       );
       
@@ -736,16 +751,17 @@ describe('TestDatabaseConnection Integration Tests', () => {
       
       const pool = TestDatabaseConnection.getPool();
       
-      // Verify pool uses correct configuration
-      expect(pool.options.host).toBe(TEST_DB_CONFIG.host);
-      expect(pool.options.port).toBe(TEST_DB_CONFIG.port);
-      expect(pool.options.user).toBe(TEST_DB_CONFIG.user);
-      expect(pool.options.password).toBe(TEST_DB_CONFIG.password);
-      expect(pool.options.database).toBe(TEST_DB_CONFIG.database);
-      expect(pool.options.max).toBe(TEST_DB_CONFIG.max);
-      expect(pool.options.connectionTimeoutMillis).toBe(TEST_DB_CONFIG.connectionTimeoutMillis);
-      expect(pool.options.idleTimeoutMillis).toBe(TEST_DB_CONFIG.idleTimeoutMillis);
-      expect(pool.options.ssl).toBe(TEST_DB_CONFIG.ssl);
+      // Verify pool uses enhanced configuration
+      expect(pool.options.host).toBe(EXPECTED_TEST_CONFIG.host);
+      expect(pool.options.port).toBe(EXPECTED_TEST_CONFIG.port);
+      expect(pool.options.user).toBe(EXPECTED_TEST_CONFIG.user);
+      expect(pool.options.password).toBe(EXPECTED_TEST_CONFIG.password);
+      expect(pool.options.database).toBe(EXPECTED_TEST_CONFIG.database);
+      expect(pool.options.max).toBe(EXPECTED_TEST_CONFIG.max);
+      expect(pool.options.connectionTimeoutMillis).toBe(EXPECTED_TEST_CONFIG.connectionTimeoutMillis);
+      expect(pool.options.idleTimeoutMillis).toBe(EXPECTED_TEST_CONFIG.idleTimeoutMillis);
+      expect(pool.options.allowExitOnIdle).toBe(EXPECTED_TEST_CONFIG.allowExitOnIdle);
+      expect(pool.options.ssl).toBe(EXPECTED_TEST_CONFIG.ssl);
     });
 
     it('should connect to test database only', async () => {
@@ -820,38 +836,38 @@ describe('TestDatabaseConnection Integration Tests', () => {
     });
 
     it('should handle read/write concurrency correctly', async () => {
-  // Insert initial data
-  const userResult = await TestDatabaseConnection.query(`
-    INSERT INTO users (email, password_hash) 
-    VALUES ('readwrite@example.com', 'hash123')
-    RETURNING id
-  `);
-  const userId = userResult.rows[0].id;
+      // Insert initial data
+      const userResult = await TestDatabaseConnection.query(`
+        INSERT INTO users (email, password_hash) 
+        VALUES ('readwrite@example.com', 'hash123')
+        RETURNING id
+      `);
+      const userId = userResult.rows[0].id;
 
-  // Mix of read and write operations - but wait for writes to complete first
-  await Promise.all([
-    TestDatabaseConnection.query(`
-      INSERT INTO garment_items (user_id, name) VALUES ($1, 'Item 1')
-    `, [userId]),
-    TestDatabaseConnection.query(`
-      INSERT INTO garment_items (user_id, name) VALUES ($1, 'Item 2')
-    `, [userId])
-  ]);
+      // Mix of read and write operations - but wait for writes to complete first
+      await Promise.all([
+        TestDatabaseConnection.query(`
+          INSERT INTO garment_items (user_id, name) VALUES ($1, 'Item 1')
+        `, [userId]),
+        TestDatabaseConnection.query(`
+          INSERT INTO garment_items (user_id, name) VALUES ($1, 'Item 2')
+        `, [userId])
+      ]);
 
-  // Then do reads
-  const [countResult, emailResult] = await Promise.all([
-    TestDatabaseConnection.query(`
-      SELECT COUNT(*) as count FROM garment_items WHERE user_id = $1
-    `, [userId]),
-    TestDatabaseConnection.query(`
-      SELECT email FROM users WHERE id = $1
-    `, [userId])
-  ]);
+      // Then do reads
+      const [countResult, emailResult] = await Promise.all([
+        TestDatabaseConnection.query(`
+          SELECT COUNT(*) as count FROM garment_items WHERE user_id = $1
+        `, [userId]),
+        TestDatabaseConnection.query(`
+          SELECT email FROM users WHERE id = $1
+        `, [userId])
+      ]);
 
-  // Verify results
-  expect(emailResult.rows[0].email).toBe('readwrite@example.com');
-  expect(parseInt(countResult.rows[0].count)).toBe(2);
-});
+      // Verify results
+      expect(emailResult.rows[0].email).toBe('readwrite@example.com');
+      expect(parseInt(countResult.rows[0].count)).toBe(2);
+    });
   });
 
   describe('Performance and Scalability', () => {

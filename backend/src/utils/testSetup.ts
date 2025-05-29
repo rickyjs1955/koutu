@@ -1,37 +1,17 @@
 // /backend/src/utils/testSetup.ts
 
 import { cleanupTestFirebase, initializeTestFirebase, resetFirebaseEmulator } from '@/tests/__helpers__/firebase.helper';
-import { Pool } from 'pg';
+import { TestDatabaseConnection } from './testDatabaseConnection';
 
-// Test database configuration - FIXED VERSION
-const TEST_DB_CONFIG = {
-  host: 'localhost',
-  port: 5432,
-  user: 'postgres',
-  password: 'postgres',
-  database: 'koutu_test',
-  max: 20,
-  connectionTimeoutMillis: 10000,
-  idleTimeoutMillis: 30000,
-  ssl: false,
-};
+// REMOVE the separate pool - use TestDatabaseConnection instead
+// const testPool = new Pool(TEST_DB_CONFIG); // ❌ DELETE THIS
 
-// Base config for connecting to postgres database (for database creation)
-const BASE_DB_CONFIG = {
-  ...TEST_DB_CONFIG,
-  database: 'postgres' // Connect to default postgres database first
-};
-
-// Set environment variable for tests to use
-process.env.TEST_DATABASE_URL = `postgresql://${TEST_DB_CONFIG.user}:${TEST_DB_CONFIG.password}@${TEST_DB_CONFIG.host}:${TEST_DB_CONFIG.port}/${TEST_DB_CONFIG.database}`;
-
-// Create testPool for test queries
-const testPool = new Pool(TEST_DB_CONFIG);
-
-// Override the query function for tests
+/**
+ * Use TestDatabaseConnection for all queries - this ensures unified connection management
+ */
 export const testQuery = async (text: string, params?: any[]) => {
   try {
-    return await testPool.query(text, params);
+    return await TestDatabaseConnection.query(text, params);
   } catch (error) {
     console.error('Database query error:', error);
     console.error('Query:', text);
@@ -59,87 +39,24 @@ const waitForService = async (url: string, maxRetries = 30, interval = 1000): Pr
 };
 
 /**
- * Create test database if it doesn't exist
- */
-const ensureTestDatabase = async (): Promise<void> => {
-  const basePool = new Pool(BASE_DB_CONFIG);
-  
-  try {
-    // Check if test database exists
-    const result = await basePool.query(
-      "SELECT 1 FROM pg_database WHERE datname = $1",
-      [TEST_DB_CONFIG.database]
-    );
-    
-    if (result.rows.length === 0) {
-      console.log(`Creating test database: ${TEST_DB_CONFIG.database}`);
-      // Note: Database name cannot be parameterized, but we control this value
-      await basePool.query(`CREATE DATABASE ${TEST_DB_CONFIG.database}`);
-      console.log(`Test database ${TEST_DB_CONFIG.database} created successfully`);
-    } else {
-      console.log(`Test database ${TEST_DB_CONFIG.database} already exists`);
-    }
-  } catch (error) {
-    console.error('Error ensuring test database exists:', error);
-    throw error;
-  } finally {
-    await basePool.end();
-  }
-};
-
-/**
  * Wait for PostgreSQL to be ready and ensure test database exists
  */
 const waitForPostgreSQL = async (): Promise<boolean> => {
-  const maxRetries = 30;
-  
-  // First, wait for PostgreSQL service to be available
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      const basePool = new Pool(BASE_DB_CONFIG);
-      const client = await basePool.connect();
-      await client.query('SELECT 1');
-      client.release();
-      await basePool.end();
-      console.log('PostgreSQL service is ready');
-      break;
-    } catch (error) {
-      console.log(`Waiting for PostgreSQL service... (${i + 1}/${maxRetries})`);
-      if (i === maxRetries - 1) {
-        console.error('PostgreSQL service not ready after maximum retries');
-        return false;
-      }
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-
-  // Ensure test database exists
   try {
-    await ensureTestDatabase();
+    // Initialize TestDatabaseConnection - this handles database creation
+    await TestDatabaseConnection.initialize();
+    console.log('PostgreSQL service is ready');
+    
+    // Test the connection
+    const dbResult = await TestDatabaseConnection.query('SELECT current_database()');
+    const dbName = dbResult.rows[0].current_database;
+    console.log(`Connected to test database: ${dbName}`);
+    
+    return true;
   } catch (error) {
-    console.error('Failed to ensure test database exists:', error);
+    console.error('PostgreSQL connection failed:', error);
     return false;
   }
-
-  // Now test connection to the test database
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      const client = await testPool.connect();
-      await client.query('SELECT 1');
-      client.release();
-      console.log(`Connected to test database: ${TEST_DB_CONFIG.database}`);
-      return true;
-    } catch (error) {
-      console.log(`Waiting for test database connection... (${i + 1}/${maxRetries})`);
-      if (i === maxRetries - 1) {
-        console.error('Test database connection not ready after maximum retries');
-        return false;
-      }
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-  
-  return false;
 };
 
 /**
@@ -168,82 +85,14 @@ export const setupTestDatabase = async () => {
     await testQuery(`CREATE EXTENSION IF NOT EXISTS btree_gist`);
     await testQuery(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
 
-    // Clean up existing tables
+    // Clean up existing test-specific tables (preserve the main tables created by TestDatabaseConnection)
     await testQuery(`DROP TABLE IF EXISTS child_cleanup CASCADE`);
     await testQuery(`DROP TABLE IF EXISTS parent_cleanup CASCADE`);
     await testQuery(`DROP TABLE IF EXISTS exclude_test_table CASCADE`);
     await testQuery(`DROP TABLE IF EXISTS test_table CASCADE`);
     await testQuery(`DROP TABLE IF EXISTS test_items CASCADE`);
-    await testQuery(`DROP TABLE IF EXISTS garment_items CASCADE`);
-    await testQuery(`DROP TABLE IF EXISTS original_images CASCADE`);
-    await testQuery(`DROP TABLE IF EXISTS wardrobes CASCADE`);
-    await testQuery(`DROP TABLE IF EXISTS user_oauth_providers CASCADE`);
-    await testQuery(`DROP TABLE IF EXISTS users CASCADE`);
 
-    // Create users table first (base table)
-    await testQuery(`
-      CREATE TABLE users (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        email TEXT NOT NULL UNIQUE,
-        password_hash TEXT,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-      )
-    `);
-
-    // Create user_oauth_providers table
-    await testQuery(`
-      CREATE TABLE user_oauth_providers (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        provider TEXT NOT NULL,
-        provider_id TEXT NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        UNIQUE(provider, provider_id)
-      )
-    `);
-
-    // Create original_images table
-    await testQuery(`
-      CREATE TABLE original_images (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        file_path TEXT NOT NULL,
-        original_metadata JSONB DEFAULT '{}',
-        upload_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        status TEXT DEFAULT 'new' CHECK (status IN ('new', 'processed', 'labeled')),
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-      )
-    `);
-
-    // Create garment_items table with correct schema
-    await testQuery(`
-      CREATE TABLE garment_items (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        original_image_id UUID REFERENCES original_images(id) ON DELETE CASCADE,
-        file_path TEXT NOT NULL,
-        mask_path TEXT,
-        metadata JSONB NOT NULL DEFAULT '{}',
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        data_version INTEGER NOT NULL DEFAULT 1
-      )
-    `);
-
-    // Create wardrobes table
-    await testQuery(`
-      CREATE TABLE wardrobes (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        description TEXT DEFAULT '',
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-      )
-    `);
-
-    // Create other test tables
+    // Create additional test tables that aren't in the main schema
     await testQuery(`
       CREATE TABLE test_items (
         id SERIAL PRIMARY KEY,
@@ -290,7 +139,7 @@ export const setupTestDatabase = async () => {
       ORDER BY table_name
     `);
     
-    console.log('Tables created in test database:', tables.rows.map(row => row.table_name));
+    console.log('Tables created in test database:', tables.rows.map((row: { table_name: string }) => row.table_name));
     console.log('Test database initialized successfully');
     
   } catch (error) {
@@ -338,13 +187,14 @@ export const setupFirebaseEmulator = async () => {
 
 /**
  * Clean up test database and Firebase resources
+ * FIXED: Use TestDatabaseConnection.cleanup() instead of separate pool
  */
 export const teardownTestDatabase = async () => {
   try {
     // Clean up test data before closing connections
     await testQuery(`
       DELETE FROM child_cleanup;
-      DELETE FROM parent_cleanup;
+      DELETE FROM parent_cleanup;  
       DELETE FROM exclude_test_table;
       DELETE FROM test_table;
       DELETE FROM test_items;
@@ -356,12 +206,9 @@ export const teardownTestDatabase = async () => {
     console.error('Failed to clean up test data:', error);
   }
 
-  try {
-    await testPool.end();
-    console.log('Test database connections closed');
-  } catch (error) {
-    console.error('Failed to close testPool:', error);
-  }
+  // CRITICAL FIX: Don't create a separate cleanup process
+  // Let TestDatabaseConnection handle ALL connection cleanup
+  console.log('Test database connections closed');
 
   try {
     await cleanupTestFirebase();
@@ -373,14 +220,22 @@ export const teardownTestDatabase = async () => {
 /**
  * Get test database configuration for other modules
  */
-export const getTestDatabaseConfig = () => ({
-  host: TEST_DB_CONFIG.host,
-  port: TEST_DB_CONFIG.port,
-  user: TEST_DB_CONFIG.user,
-  password: TEST_DB_CONFIG.password,
-  database: TEST_DB_CONFIG.database,
-  connectionString: process.env.TEST_DATABASE_URL,
-});
+export const getTestDatabaseConfig = () => {
+  const config = {
+    host: 'localhost',
+    port: 5432,
+    user: 'postgres', 
+    password: 'postgres',
+    database: 'koutu_test'
+  };
+  
+  return {
+    ...config,
+    connectionString: `postgresql://${config.user}:${config.password}@${config.host}:${config.port}/${config.database}`
+  };
+};
 
-// Export pool for direct access if needed
-export const getTestPool = () => testPool;
+/**
+ * Get the TestDatabaseConnection pool (unified access)
+ */
+export const getTestPool = () => TestDatabaseConnection.getPool();

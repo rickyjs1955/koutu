@@ -107,8 +107,8 @@ Backend:
 1. /backend/src/config/index.ts                         ✅Unit ✅Integration ✅Security
 2. /backend/src/config/firebase.ts                      ✅Unit ✅Integration ✅Security
 3. /backend/src/config/oauth.ts                         ✅Unit ✅Integration ✅Security
-4. /backend/src/controllers/garmentController.ts        
-5. /backend/src/controllers/imageController.ts          
+4. /backend/src/controllers/imageController.ts        
+5. /backend/src/controllers/garmentController.ts          
 6. /backend/src/controllers/exportController.ts         
 7. /backend/src/controllers/authController.ts          
 8. /backend/src/controllers/wardrobeController.ts       
@@ -119,27 +119,27 @@ Backend:
 13. /backend/src/middlewares/validate.ts                ✅Unit ✅Integration ✅Security
 14. /backend/src/models/userModel.ts                    ✅Unit ✅Integration ✅Security
 15. /backend/src/models/db.ts                           ✅Unit ✅Integration ✅Security
-16. /backend/src/models/wardrobeModel.ts
-17. /backend/src/models/imageModel.ts
+16. /backend/src/models/imageModel.ts                   ✅Unit ✅Integration ✅Security
+17. /backend/src/models/wardrobeModel.ts
 18. /backend/src/models/garmentModel.ts
 19. /backend/src/models/polygonModel.ts
 20. /backend/src/models/exportModel.ts
-21. /backend/src/routes/authRoutes.ts
+21. /backend/src/routes/imageRoutes.ts
 22. /backend/src/routes/wardrobeRoutes.ts
 23. /backend/src/routes/garmentRoutes.ts
 24. /backend/src/routes/exportRoutes.ts
-25. /backend/src/routes/imageRoutes.ts
+25. /backend/src/routes/authRoutes.ts
 26. /backend/src/routes/fileRoutes.ts
 27. /backend/src/routes/polygonRoutes.ts
 28. /backend/src/routes/oauthRoutes.ts
-29. /backend/src/services/labelingService.ts
-30. /backend/src/services/exportService.ts
-31. /backend/src/services/imageProcessingService.ts
+29. /backend/src/services/imageService.ts
+30. /backend/src/services/imageProcessingService.ts
+31. /backend/src/services/exportService.ts
 32. /backend/src/services/storageService.ts
 33. /backend/src/services/oauthService.ts
 34. /backend/src/services/authService.ts
 35. /backend/src/services/garmentService.ts
-36. /backend/src/services/imageService.ts
+36. /backend/src/services/labelingService.ts
 37. /backend/src/services/polygonService.ts
 38. /backend/src/services/wardrobeService.ts
 39. /backend/src/services/InstagramApiService.ts

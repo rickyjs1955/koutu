@@ -24,18 +24,17 @@ module.exports = {
   maxWorkers: 1,
   verbose: true,
   forceExit: true,
-  detectOpenHandles: true,
-  
+  detectOpenHandles: true,  
   // Exclude dist folder to avoid duplicate mock conflicts
   testPathIgnorePatterns: [
     '/node_modules/',
     '/dist/'
   ],
-  
   // Module name mapping
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1'
-  }
+  },
+  silent: true, // Suppress console output during tests
   
   // Removed global setup/teardown to avoid ES module issues
 };
