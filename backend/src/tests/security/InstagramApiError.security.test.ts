@@ -202,14 +202,14 @@ describe('InstagramApiError - Security Tests', () => {
         };
 
         // Simulate an error that might contain sensitive information
-        const sensitiveError = new Error('Invalid token: sk_live_****FAKE_KEY_FOR_TESTING****');
+        const sensitiveError = new Error('Invalid token: nk_live_****FAKE_KEY_FOR_TESTING****');
         
         InstagramApiError.fromNetworkError(sensitiveError, tokenContext);
 
         const [message, code, context] = mockApiError.serviceUnavailable.mock.calls[0];
         expect(message).not.toContain('sk_live_');
         expect(message).not.toContain('abcd1234');
-        expect(context?.originalError).toBe('Invalid token: sk_live_****FAKE_KEY_FOR_TESTING****'); // Preserved for internal logging only
+        expect(context?.originalError).toBe('Invalid token: nk_live_****FAKE_KEY_FOR_TESTING****'); // Preserved for internal logging only
         });
 
         it('should not reveal user email addresses or personal info', () => {
