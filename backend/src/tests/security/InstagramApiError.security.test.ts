@@ -190,7 +190,6 @@ describe('InstagramApiError - Security Tests', () => {
         expect(message).not.toContain('db.internal');
         });
 
-        /* commented out due to potential sensitive information exposure
         it('should not expose API keys or tokens in error context', () => {
         const tokenContext: InstagramErrorContext = {
             url: 'https://instagram.com/test',
@@ -211,7 +210,7 @@ describe('InstagramApiError - Security Tests', () => {
         expect(message).not.toContain('sk_live_');
         expect(message).not.toContain('abcd1234');
         expect(context?.originalError).toBe('Invalid token: sk_live_abcd1234efgh5678ijkl9012'); // Preserved for internal logging only
-        });*/
+        });
 
         it('should not reveal user email addresses or personal info', () => {
         const personalContext: InstagramErrorContext = {
