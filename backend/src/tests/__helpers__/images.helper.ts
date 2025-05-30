@@ -1,7 +1,7 @@
 // tests/__helpers__/images.helper.ts
 import { Buffer } from 'buffer';
 import { v4 as uuidv4 } from 'uuid';
-import { createMockImage, MockImage, MockImageUpload } from '../__mocks__/images.mock';
+import { createCorruptedImageBuffer, createImageMetadataVariations, createImageProcessingErrors, createMockImage, createValidImageBuffers, MockImage, MockImageUpload } from '../__mocks__/images.mock';
 
 // Note: Sharp is optional for Jest tests - using fallback implementations
 let sharp: any;
@@ -684,6 +684,152 @@ export const imageAssertions = {
     expect(Buffer.isBuffer(upload.buffer)).toBe(true);
   }
 };
+
+// ==================== IMAGE PROCESSING SERVICE TEST HELPERS ====================
+
+/**
+ * Create mock file paths for testing
+ */
+export const createMockFilePaths = () => ({
+  input: 'uploads/input-image.jpg',
+  output: 'uploads/processed-image.jpg',
+  thumbnail: 'uploads/thumbnail.jpg',
+  srgb: 'uploads/image_srgb.jpg',
+  resized: 'uploads/image_800x600.jpg',
+  optimized: 'uploads/image_optimized.jpg',
+  absolute: '/absolute/path/uploads/input-image.jpg'
+});
+
+/**
+ * Test all image processing service methods with various scenarios
+ */
+export const createImageProcessingTestScenarios = () => ({
+  validateImageBuffer: {
+    validInputs: [
+      { buffer: createValidImageBuffers.jpeg(), expectedFormat: 'jpeg' },
+      { buffer: createValidImageBuffers.png(), expectedFormat: 'png' },
+      { buffer: createValidImageBuffers.bmp(), expectedFormat: 'bmp' }
+    ],
+    
+    invalidInputs: [
+      { buffer: createCorruptedImageBuffer(), errorType: 'corrupted' },
+      { buffer: Buffer.alloc(0), errorType: 'empty' },
+      { buffer: Buffer.from('not an image'), errorType: 'invalid_format' }
+    ],
+    
+    dimensionErrors: [
+      { metadata: createImageMetadataVariations.tooSmall, errorType: 'too_small' },
+      { metadata: createImageMetadataVariations.tooLarge, errorType: 'too_large' },
+      { metadata: createImageMetadataVariations.invalidAspectRatio, errorType: 'invalid_ratio' }
+    ]
+  },
+  
+  convertToSRGB: {
+    alreadySRGB: { space: 'srgb', shouldConvert: false },
+    needsConversion: { space: 'cmyk', shouldConvert: true },
+    unknownSpace: { space: undefined, shouldConvert: true }
+  },
+  
+  resizeImage: {
+    validResizes: [
+      { width: 400, height: 400, fit: 'contain' },
+      { width: 800, height: 600, fit: 'cover' },
+      { width: 1200, height: 800, fit: 'fill' }
+    ],
+    edgeCases: [
+      { width: 50, height: 50, fit: 'contain' }, // Very small
+      { width: 2000, height: 2000, fit: 'contain' }, // Large
+      { width: 800, height: 600, fit: 'inside' } // withoutEnlargement test
+    ]
+  }
+});
+
+/**
+ * Mock Sharp with specific behaviors for testing
+ */
+export const setupSharpMockForScenario = (scenario: string) => {
+  const { mockSharpInstance } = require('../__mocks__/images.mock');
+  
+  switch (scenario) {
+    case 'metadata_error':
+      mockSharpInstance.metadata.mockRejectedValue(createImageProcessingErrors.sharpMetadataError());
+      break;
+      
+    case 'processing_error':
+      mockSharpInstance.toFile.mockRejectedValue(createImageProcessingErrors.sharpProcessingError());
+      break;
+      
+    case 'already_srgb':
+      mockSharpInstance.metadata.mockResolvedValue({
+        ...createImageMetadataVariations.valid,
+        space: 'srgb'
+      });
+      break;
+      
+    case 'needs_conversion':
+      mockSharpInstance.metadata.mockResolvedValue({
+        ...createImageMetadataVariations.valid,
+        space: 'cmyk'
+      });
+      break;
+      
+    case 'invalid_dimensions':
+      mockSharpInstance.metadata.mockResolvedValue(createImageMetadataVariations.noDimensions);
+      break;
+      
+    case 'unsupported_format':
+      mockSharpInstance.metadata.mockResolvedValue(createImageMetadataVariations.unsupportedFormat);
+      break;
+      
+    default:
+      // Reset to default behavior
+      mockSharpInstance.metadata.mockResolvedValue(createImageMetadataVariations.valid);
+      mockSharpInstance.toFile.mockResolvedValue({ size: 204800 });
+  }
+};
+
+/**
+ * Validate image processing service error handling
+ */
+export const validateImageProcessingError = (error: any, expectedType: string) => {
+  expect(error).toBeInstanceOf(Error);
+  expect(error.message).toContain('Invalid image');
+  
+  switch (expectedType) {
+    case 'format':
+      expect(error.message).toMatch(/format|determine image format/i);
+      break;
+    case 'dimensions':
+      expect(error.message).toMatch(/dimensions|width|height/i);
+      break;
+    case 'aspect_ratio':
+      expect(error.message).toMatch(/aspect ratio|between/i);
+      break;
+    case 'size_limit':
+      expect(error.message).toMatch(/too small|too large|minimum|maximum/i);
+      break;
+  }
+};
+
+/**
+ * Test file system operations with various error conditions
+ */
+export const createFileSystemTestScenarios = () => ({
+  fileNotFound: {
+    error: createImageProcessingErrors.fileSystemError(),
+    expectedBehavior: 'should handle missing input files gracefully'
+  },
+  
+  noSpace: {
+    error: createImageProcessingErrors.diskSpaceError(),
+    expectedBehavior: 'should handle disk space errors'
+  },
+  
+  permission: {
+    error: createImageProcessingErrors.permissionError(),
+    expectedBehavior: 'should handle permission errors'
+  }
+});
 
 // ==================== EXPORT ALL HELPERS ====================
 

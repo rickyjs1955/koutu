@@ -213,25 +213,18 @@ export const mockFetchResponse = {
 
 // ==================== SHARP MOCKS ====================
 
-export const mockSharp = {
-  metadata: jest.fn().mockResolvedValue({
-    width: 800,
-    height: 600,
-    format: 'jpeg',
-    channels: 3,
-    space: 'srgb',
-    density: 72,
-    hasProfile: false,
-    hasAlpha: false
-  }),
-  resize: jest.fn().mockReturnThis(),
-  jpeg: jest.fn().mockReturnThis(),
-  png: jest.fn().mockReturnThis(),
-  toColorspace: jest.fn().mockReturnThis(),
-  toFile: jest.fn().mockResolvedValue({ size: 204800 }),
-  toBuffer: jest.fn().mockResolvedValue(Buffer.from('processed-image-data')),
-  composite: jest.fn().mockReturnThis()
-};
+export const mockSharp = jest.fn().mockImplementation((input?: any, options?: any) => {
+  // Handle different input types
+  if (Buffer.isBuffer(input)) {
+    return mockSharpInstance;
+  } else if (typeof input === 'string') {
+    return mockSharpInstance;
+  } else if (input && input.raw) {
+    // Raw pixel data
+    return mockSharpInstance;
+  }
+  return mockSharpInstance;
+});
 
 // ==================== MULTER MOCKS ====================
 
@@ -403,6 +396,38 @@ export const createPathTraversalAttempt = () => ({
   originalname: '../../../etc/passwd.jpg'
 });
 
+// ==================== SHARP-SPECIFIC RESET UTILITY ====================
+
+export const resetSharpMocks = () => {
+  // Reset the main Sharp function mock
+  mockSharp.mockReset();
+  mockSharp.mockImplementation((input?: any, options?: any) => {
+    return mockSharpInstance;
+  });
+  
+  // Reset all Sharp instance methods to their default behavior
+  mockSharpInstance.metadata.mockResolvedValue({
+    width: 800,
+    height: 600,
+    format: 'jpeg',
+    channels: 3,
+    space: 'srgb',
+    density: 72,
+    hasProfile: false,
+    hasAlpha: false
+  });
+  
+  mockSharpInstance.toFile.mockResolvedValue({ size: 204800 });
+  mockSharpInstance.toBuffer.mockResolvedValue(Buffer.from('processed-image-data'));
+  
+  // Reset all other methods to return this (for chaining)
+  ['resize', 'jpeg', 'png', 'webp', 'toColorspace', 'composite', 'extract', 'trim', 
+   'rotate', 'flip', 'flop', 'normalise', 'gamma', 'negate', 'blur', 'sharpen', 
+   'threshold', 'tint', 'grayscale', 'modulate'].forEach(method => {
+    (mockSharpInstance as any)[method].mockReturnValue(mockSharpInstance);
+  });
+};
+
 // ==================== MOCK RESET UTILITIES ====================
 
 export const resetAllMocks = () => {
@@ -426,10 +451,8 @@ export const resetAllMocks = () => {
   mockFetchResponse.text.mockReset();
   mockFetchResponse.arrayBuffer.mockReset();
   
-  // Reset Sharp mocks
-  Object.values(mockSharp).forEach(mock => {
-    if (typeof mock === 'function') mock.mockReset();
-  });
+  // Reset Sharp mocks using dedicated function
+  resetSharpMocks();
   
   // Reset other mocks
   mockNext.mockReset();
@@ -491,9 +514,259 @@ export const setupErrorMocks = () => {
   mockFetch.mockRejectedValue(new Error('Network error'));
 };
 
+export const mockSharpInstance = {
+  metadata: jest.fn().mockResolvedValue({
+    width: 800,
+    height: 600,
+    format: 'jpeg',
+    channels: 3,
+    space: 'srgb',
+    density: 72,
+    hasProfile: false,
+    hasAlpha: false
+  }),
+  resize: jest.fn().mockReturnThis(),
+  jpeg: jest.fn().mockReturnThis(),
+  png: jest.fn().mockReturnThis(),
+  webp: jest.fn().mockReturnThis(),
+  toColorspace: jest.fn().mockReturnThis(),
+  toFile: jest.fn().mockResolvedValue({ size: 204800 }),
+  toBuffer: jest.fn().mockResolvedValue(Buffer.from('processed-image-data')),
+  composite: jest.fn().mockReturnThis(),
+  extract: jest.fn().mockReturnThis(),
+  trim: jest.fn().mockReturnThis(),
+  rotate: jest.fn().mockReturnThis(),
+  flip: jest.fn().mockReturnThis(),
+  flop: jest.fn().mockReturnThis(),
+  normalise: jest.fn().mockReturnThis(),
+  gamma: jest.fn().mockReturnThis(),
+  negate: jest.fn().mockReturnThis(),
+  blur: jest.fn().mockReturnThis(),
+  sharpen: jest.fn().mockReturnThis(),
+  threshold: jest.fn().mockReturnThis(),
+  tint: jest.fn().mockReturnThis(),
+  grayscale: jest.fn().mockReturnThis(),
+  modulate: jest.fn().mockReturnThis()
+};
+
+// ==================== IMAGE PROCESSING SERVICE SPECIFIC MOCKS ====================
+
+export const createCorruptedImageBuffer = (): Buffer => {
+  // Creates a buffer that looks like an image but has corrupted data
+  return Buffer.from([
+    0xFF, 0xD8, // JPEG SOI
+    0xFF, 0xE0, // APP0
+    0x00, 0x10, // Length
+    0x4A, 0x46, 0x49, 0x46, 0x00, // "JFIF\0"
+    // Corrupted/truncated data follows
+    0x00, 0x00, 0x00, 0x00
+    // Missing EOI marker
+  ]);
+};
+
+export const createValidImageBuffers = {
+  jpeg: () => Buffer.from([
+    0xFF, 0xD8, // SOI
+    0xFF, 0xE0, 0x00, 0x10, // APP0 + length
+    0x4A, 0x46, 0x49, 0x46, 0x00, // JFIF
+    0x01, 0x01, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+    0xFF, 0xDB, 0x00, 0x43, 0x00, // Quantization table
+    ...Array(64).fill(0x10), // QT data
+    0xFF, 0xC0, 0x00, 0x11, // SOF0
+    0x08, 0x03, 0x20, 0x02, 0x58, 0x03, // Frame header
+    0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01,
+    0xFF, 0xD9 // EOI
+  ]),
+  
+  png: () => Buffer.from([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+    0x00, 0x00, 0x00, 0x0D, // IHDR length
+    0x49, 0x48, 0x44, 0x52, // IHDR
+    0x00, 0x00, 0x03, 0x20, // Width: 800
+    0x00, 0x00, 0x02, 0x58, // Height: 600
+    0x08, 0x02, 0x00, 0x00, 0x00, // Bit depth, color type, etc.
+    0x7E, 0x1A, 0x8C, 0x25, // CRC
+    0x00, 0x00, 0x00, 0x00, // IEND length
+    0x49, 0x45, 0x4E, 0x44, // IEND
+    0xAE, 0x42, 0x60, 0x82  // CRC
+  ]),
+  
+  bmp: () => Buffer.from([
+    0x42, 0x4D, // BM signature
+    0x46, 0x00, 0x00, 0x00, // File size
+    0x00, 0x00, 0x00, 0x00, // Reserved
+    0x36, 0x00, 0x00, 0x00, // Data offset
+    0x28, 0x00, 0x00, 0x00, // Header size
+    0x01, 0x00, 0x00, 0x00, // Width
+    0x01, 0x00, 0x00, 0x00, // Height
+    0x01, 0x00, 0x18, 0x00, // Planes, bit count
+    0x00, 0x00, 0x00, 0x00, // Compression
+    0x10, 0x00, 0x00, 0x00, // Image size
+    0x00, 0x00, 0x00, 0x00, // X pixels per meter
+    0x00, 0x00, 0x00, 0x00, // Y pixels per meter
+    0x00, 0x00, 0x00, 0x00, // Colors used
+    0x00, 0x00, 0x00, 0x00, // Important colors
+    0xFF, 0xFF, 0xFF, 0x00  // Pixel data
+  ])
+};
+
+export const createImageMetadataVariations = {
+  valid: {
+    width: 800,
+    height: 600,
+    format: 'jpeg' as const,
+    space: 'srgb' as const,
+    channels: 3,
+    density: 72
+  },
+  
+  tooSmall: {
+    width: 200,
+    height: 150,
+    format: 'jpeg' as const,
+    space: 'srgb' as const,
+    channels: 3,
+    density: 72
+  },
+  
+  tooLarge: {
+    width: 2000,
+    height: 1500,
+    format: 'jpeg' as const,
+    space: 'srgb' as const,
+    channels: 3,
+    density: 72
+  },
+  
+  invalidAspectRatio: {
+    width: 1000,
+    height: 100, // 10:1 ratio, too wide
+    format: 'jpeg' as const,
+    space: 'srgb' as const,
+    channels: 3,
+    density: 72
+  },
+  
+  unsupportedFormat: {
+    width: 800,
+    height: 600,
+    format: 'gif' as const,
+    space: 'srgb' as const,
+    channels: 3,
+    density: 72
+  },
+  
+  noFormat: {
+    width: 800,
+    height: 600,
+    format: undefined,
+    space: 'srgb' as const,
+    channels: 3,
+    density: 72
+  },
+  
+  noDimensions: {
+    width: undefined,
+    height: undefined,
+    format: 'jpeg' as const,
+    space: 'srgb' as const,
+    channels: 3,
+    density: 72
+  },
+  
+  differentColorSpace: {
+    width: 800,
+    height: 600,
+    format: 'jpeg' as const,
+    space: 'cmyk' as const,
+    channels: 4,
+    density: 72
+  }
+};
+
+// ==================== STORAGE SERVICE MOCKS - ENHANCED ====================
+
+export const mockStorageServiceExtended = {
+  ...mockStorageService,
+  getAbsolutePath: jest.fn().mockImplementation((relativePath: string) => {
+    return `/absolute/storage/path/${relativePath}`;
+  }),
+  ensureDirectoryExists: jest.fn().mockResolvedValue(true),
+  getFileStats: jest.fn().mockResolvedValue({
+    size: 204800,
+    mtime: new Date(),
+    isFile: () => true,
+    isDirectory: () => false
+  }),
+  fileExists: jest.fn().mockResolvedValue(true)
+};
+
+// ==================== ERROR SCENARIOS FOR IMAGE PROCESSING ====================
+
+export const createImageProcessingErrors = {
+  sharpMetadataError: () => {
+    const error = new Error('Input buffer contains unsupported image format');
+    (error as any).code = 'SHARP_UNSUPPORTED_FORMAT';
+    return error;
+  },
+  
+  sharpProcessingError: () => {
+    const error = new Error('Input image exceeds pixel limit');
+    (error as any).code = 'SHARP_PIXEL_LIMIT';
+    return error;
+  },
+  
+  fileSystemError: () => {
+    const error = new Error('ENOENT: no such file or directory');
+    (error as any).code = 'ENOENT';
+    (error as any).errno = -2;
+    return error;
+  },
+  
+  diskSpaceError: () => {
+    const error = new Error('ENOSPC: no space left on device');
+    (error as any).code = 'ENOSPC';
+    (error as any).errno = -28;
+    return error;
+  },
+  
+  permissionError: () => {
+    const error = new Error('EACCES: permission denied');
+    (error as any).code = 'EACCES';
+    (error as any).errno = -13;
+    return error;
+  }
+};
+
+// ==================== ASPECT RATIO AND DIMENSION TEST DATA ====================
+
+export const createAspectRatioTestCases = () => ({
+  validRatios: [
+    { width: 1080, height: 1350, ratio: 0.8, name: '4:5 portrait' },
+    { width: 1080, height: 1080, ratio: 1.0, name: '1:1 square' },
+    { width: 1080, height: 566, ratio: 1.91, name: '1.91:1 landscape' },
+    { width: 800, height: 900, ratio: 0.89, name: 'valid portrait' },
+    { width: 1200, height: 800, ratio: 1.5, name: 'valid landscape' }
+  ],
+  
+  invalidRatios: [
+    { width: 1000, height: 1300, ratio: 0.77, name: 'too tall' },
+    { width: 1000, height: 500, ratio: 2.0, name: 'too wide' },
+    { width: 100, height: 200, ratio: 0.5, name: 'extremely tall' },
+    { width: 200, height: 50, ratio: 4.0, name: 'extremely wide' }
+  ],
+  
+  edgeCases: [
+    { width: 320, height: 400, ratio: 0.8, name: 'minimum valid' },
+    { width: 1440, height: 754, ratio: 1.91, name: 'maximum valid' },
+    { width: 319, height: 400, ratio: 0.798, name: 'below minimum width' },
+    { width: 1441, height: 754, ratio: 1.91, name: 'above maximum width' }
+  ]
+});
+
 // Export all mocks for easy importing
 export default {
-  // Factories
+  // ==================== FACTORIES ====================
   createMockImage,
   createMockImageUpload,
   createMockInstagramMedia,
@@ -501,24 +774,50 @@ export default {
   createMockRequest,
   createMockResponse,
   
-  // Mocks
+  // ==================== SERVICE MOCKS ====================
   mockImageModelOperations,
   mockStorageService,
+  mockStorageServiceExtended,
   mockImageProcessingService,
   mockInstagramApiService,
-  mockApiError,
-  mockInstagramApiError,
+  
+  // ==================== PROCESSING MOCKS ====================
   mockSharp,
+  mockSharpInstance,
   mockMulter,
+  
+  // ==================== HTTP/API MOCKS ====================
   mockFetch,
+  mockFetchResponse,
   mockNext,
   
-  // Security
+  // ==================== ERROR MOCKS ====================
+  mockApiError,
+  mockInstagramApiError,
+  
+  // ==================== TEST DATA GENERATORS ====================
+  createCorruptedImageBuffer,
+  createValidImageBuffers,
+  createImageMetadataVariations,
+  createImageProcessingErrors,
+  createAspectRatioTestCases,
+  
+  // ==================== SECURITY TESTING ====================
   createMaliciousImageUpload,
   createPathTraversalAttempt,
   
-  // Utilities
+  // ==================== DATABASE UTILITIES ====================
+  mockDatabaseResult,
+  createMockQueryResult,
+  
+  // ==================== INSTAGRAM RESPONSE MOCKS ====================
+  mockInstagramTokenResponse,
+  mockInstagramUserResponse,
+  mockInstagramMediaResponse,
+  
+  // ==================== UTILITIES ====================
   resetAllMocks,
+  resetSharpMocks,
   setupHappyPathMocks,
   setupErrorMocks
 };

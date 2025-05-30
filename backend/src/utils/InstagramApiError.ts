@@ -129,10 +129,13 @@ export class InstagramApiError {
     context?: InstagramErrorContext
   ): ApiError {
     let message = 'Instagram services are temporarily unavailable.';
-    
+
     if (estimatedRecoveryTime) {
-      const minutes = Math.ceil((estimatedRecoveryTime.getTime() - Date.now()) / 60000);
-      message += ` Please try again in approximately ${minutes} minutes.`;
+      const now = Date.now();
+      const recoveryMs = estimatedRecoveryTime.getTime();
+      const minutesUntilRecovery = Math.max(1, Math.ceil((recoveryMs - now) / 60000));
+      
+      message += ` Please try again in approximately ${minutesUntilRecovery} minutes.`;
     } else {
       message += ' Please try again later.';
     }
@@ -198,12 +201,30 @@ export class InstagramApiError {
   }
 
   private static createRateLimitError(response?: Response, context?: InstagramErrorContext): ApiError {
-    // Extract rate limit info from headers
-    const retryAfter = response?.headers.get('retry-after');
-    const resetTime = response?.headers.get('x-ratelimit-reset');
-    const remaining = response?.headers.get('x-ratelimit-remaining');
+    // Extract rate limit info from headers with safety checks
+    let retryAfter: string | null = null;
+    let resetTime: string | null = null;
+    let remaining: string | null = null;
     
-    const waitTime = retryAfter ? parseInt(retryAfter) : 300; // Default 5 minutes
+    try {
+      if (response?.headers?.get) {
+        retryAfter = response.headers.get('retry-after');
+        resetTime = response.headers.get('x-ratelimit-reset');
+        remaining = response.headers.get('x-ratelimit-remaining');
+      }
+    } catch (error) {
+      // Headers are malformed or not accessible, use defaults
+    }
+    
+    // Parse retry-after with validation
+    let waitTime = 300; // Default 5 minutes
+    if (retryAfter) {
+      const parsed = parseInt(retryAfter, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        waitTime = parsed;
+      }
+    }
+    
     const waitMinutes = Math.ceil(waitTime / 60);
     
     const message = waitMinutes <= 5
@@ -339,13 +360,18 @@ export class InstagramApiError {
     retryable: boolean;
     context: any;
   } {
+    // Sanitize inputs to prevent log injection
+    const sanitizeString = (str: string): string => {
+      return str.replace(/[\n\r\t]/g, '_').replace(/[^\x20-\x7E]/g, '?');
+    };
+
     return {
       category: this.getErrorCategory(error),
       severity: error.getSeverity(),
       retryable: this.isRetryable(error),
       context: {
-        code: error.code,
-        message: error.message,
+        code: sanitizeString(error.code),
+        message: sanitizeString(error.message),
         userId: context?.userId,
         timestamp: new Date().toISOString(),
         retryAttempt: context?.retryAttempt
