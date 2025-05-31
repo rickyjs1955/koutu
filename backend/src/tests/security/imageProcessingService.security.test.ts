@@ -4,15 +4,15 @@
 // ==================== MOCK SETUP (MUST BE FIRST) ====================
 // Mock Sharp with proper implementation (same pattern as unit tests)
 const mockSharpInstance = {
-  metadata: jest.fn(),
-  resize: jest.fn().mockReturnThis(),
-  jpeg: jest.fn().mockReturnThis(),
-  png: jest.fn().mockReturnThis(),
-  webp: jest.fn().mockReturnThis(),
-  toColorspace: jest.fn().mockReturnThis(),
-  toFile: jest.fn(),
-  toBuffer: jest.fn(),
-  composite: jest.fn().mockReturnThis()
+    metadata: jest.fn(),
+    resize: jest.fn().mockReturnThis(),
+    jpeg: jest.fn().mockReturnThis(),
+    png: jest.fn().mockReturnThis(),
+    webp: jest.fn().mockReturnThis(),
+    toColorspace: jest.fn().mockReturnThis(),
+    toFile: jest.fn(),
+    toBuffer: jest.fn(),
+    composite: jest.fn().mockReturnThis()
 };
 
 // Create the Sharp mock function
@@ -23,21 +23,21 @@ jest.mock('sharp', () => mockSharp);
 
 // Mock other services
 jest.mock('../../../src/services/storageService', () => ({
-  storageService: {
-    getAbsolutePath: jest.fn(),
-    saveFile: jest.fn(),
-    deleteFile: jest.fn()
-  }
+    storageService: {
+        getAbsolutePath: jest.fn(),
+        saveFile: jest.fn(),
+        deleteFile: jest.fn()
+    }
 }));
 
 jest.mock('../../../src/utils/ApiError');
 jest.mock('../../../src/config/firebase', () => ({
-  default: { storage: jest.fn() }
+    default: { storage: jest.fn() }
 }));
 jest.mock('firebase-admin', () => ({
-  initializeApp: jest.fn(),
-  credential: { cert: jest.fn() },
-  storage: jest.fn()
+    initializeApp: jest.fn(),
+    credential: { cert: jest.fn() },
+    storage: jest.fn()
 }));
 
 // ==================== IMPORTS ====================
@@ -47,31 +47,31 @@ import { storageService } from '../../../src/services/storageService';
 
 // ==================== TEST DATA HELPERS ====================
 const createValidMetadata = () => ({
-  width: 800,
-  height: 600,
-  format: 'jpeg' as const,
-  space: 'srgb' as const,
-  channels: 3,
-  density: 72,
-  hasProfile: false,
-  hasAlpha: false
+    width: 800,
+    height: 600,
+    format: 'jpeg' as const,
+    space: 'srgb' as const,
+    channels: 3,
+    density: 72,
+    hasProfile: false,
+    hasAlpha: false
 });
 
 const createValidBuffer = () => Buffer.from([
-  0xFF, 0xD8, // JPEG SOI
-  0xFF, 0xE0, 0x00, 0x10, // APP0
-  0x4A, 0x46, 0x49, 0x46, 0x00, // JFIF
-  0x01, 0x01, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
-  0xFF, 0xD9 // EOI
+    0xFF, 0xD8, // JPEG SOI
+    0xFF, 0xE0, 0x00, 0x10, // APP0
+    0x4A, 0x46, 0x49, 0x46, 0x00, // JFIF
+    0x01, 0x01, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+    0xFF, 0xD9 // EOI
 ]);
 
 const createMockImageUpload = () => ({
-  fieldname: 'image',
-  originalname: 'test-image.jpg',
-  encoding: '7bit',
-  mimetype: 'image/jpeg',
-  size: 204800,
-  buffer: createValidBuffer()
+    fieldname: 'image',
+    originalname: 'test-image.jpg',
+    encoding: '7bit',
+    mimetype: 'image/jpeg',
+    size: 204800,
+    buffer: createValidBuffer()
 });
 
 // Helper to normalize paths for cross-platform testing
