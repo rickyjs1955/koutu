@@ -142,7 +142,7 @@ Backend:
 36. /backend/src/services/labelingService.ts              ❌Unit ❌Integration ❌Security
 37. /backend/src/services/polygonService.ts               ❌Unit ❌Integration ❌Security
 38. /backend/src/services/wardrobeService.ts              ❌Unit ❌Integration ❌Security
-39. /backend/src/services/InstagramApiService.ts          ✅Unit ❌Integration ✅Security
+39. /backend/src/services/InstagramApiService.ts          ✅Unit ✅Integration ✅Security
 40. /backend/src/utils/ApiError.ts                        ✅Unit ✅Integration ✅Security
 41. /backend/src/utils/sanitize.ts                        ✅Unit ✅Integration ✅Security
 42. /backend/src/utils/modelUtils.ts                      ✅Unit 🔔Integration 🔔Security
@@ -152,6 +152,8 @@ Backend:
 46. /backend/src/utils/testDatabase.ts                    🔔Unit ✅Integration 🔔Security
 47. /backend/src/utils/testDatabaseConnection.ts          ✅Unit ✅Integration 🔔Security
 48. /backend/src/utils/testUserModel.ts                   ✅Unit 🔔Integration ✅Security
-49. /backend/src/utils/InstagramApiError.ts               ✅Unit ❌Integration ✅Security
+49. /backend/src/utils/InstagramApiError.ts               ✅Unit ✅Integration ✅Security
 50. /backend/src/validators/schemas.ts                    ✅Unit ✅Integration ✅Security
 51. /backend/src/app.ts                                   ❌Unit ❌Integration ❌Security
+
+firebass.docker.int.test.ts

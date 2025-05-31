@@ -13,11 +13,15 @@
     "setup-db": "npm run migrate && npm run seed",
     
     "test": "jest --config jest.config.cjs",
+    "test:unit": "jest --config jest.config.cjs --selectProjects unit",
+    "test:integration": "jest --config jest.config.cjs --selectProjects integration --runInBand",
+    "test:integration:single": "jest --config jest.config.cjs --testPathPattern",
     "test:watch": "jest --config jest.config.cjs --watch",
     "test:coverage": "jest --config jest.config.cjs --coverage",
     "test:int": "cross-env NODE_ENV=test jest --testMatch='**/*.int.test.ts' --runInBand",
     "test:firebase": "jest --testPathPattern='firebase.*\\.test\\.(js|ts)$' --no-cache",
     "test:clean": "rimraf dist && jest --no-cache",
+    "test:image-service": "cross-env NODE_ENV=test jest --testMatch='**/imageService.int.test.ts' --runInBand --verbose",
     
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",

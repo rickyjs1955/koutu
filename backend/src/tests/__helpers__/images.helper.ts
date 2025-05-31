@@ -15,6 +15,155 @@ try {
 // ==================== IMAGE GENERATION HELPERS ====================
 
 /**
+ * Creates a valid test image buffer using Sharp
+ * This ensures the image is properly formatted and not corrupted
+ */
+export async function createTestImageBuffer(
+  width: number, 
+  height: number, 
+  format: 'jpeg' | 'png' = 'jpeg'
+): Promise<Buffer> {
+  try {
+    // Create a simple but valid image with Sharp
+    const image = sharp({
+      create: {
+        width,
+        height,
+        channels: 3,
+        background: { r: 255, g: 128, b: 0 } // Orange background
+      }
+    });
+
+    // Create a simple pattern to make it more realistic
+    const svgPattern = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <rect width="${width}" height="${height}" fill="rgb(255,128,0)"/>
+        <circle cx="${width/2}" cy="${height/2}" r="${Math.min(width, height)/6}" fill="rgb(0,128,255)"/>
+        <text x="${width/2}" y="${height/2}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="${Math.max(12, Math.min(width, height)/20)}">TEST</text>
+      </svg>
+    `;
+
+    const overlayBuffer = Buffer.from(svgPattern);
+
+    if (format === 'jpeg') {
+      return await image
+        .composite([{ input: overlayBuffer, blend: 'over' }])
+        .jpeg({ 
+          quality: 80,
+          progressive: true
+        })
+        .toBuffer();
+    } else {
+      return await image
+        .composite([{ input: overlayBuffer, blend: 'over' }])
+        .png({ 
+          compressionLevel: 6,
+          progressive: true
+        })
+        .toBuffer();
+    }
+  } catch (error) {
+    console.warn('Error creating test image with overlay, creating simple image:', error);
+    
+    // Fallback: create a simple solid color image without overlay
+    const fallbackImage = sharp({
+      create: {
+        width,
+        height,
+        channels: 3,
+        background: { r: 255, g: 0, b: 0 } // Red background
+      }
+    });
+
+    if (format === 'jpeg') {
+      return await fallbackImage.jpeg({ quality: 80 }).toBuffer();
+    } else {
+      return await fallbackImage.png({ compressionLevel: 6 }).toBuffer();
+    }
+  }
+}
+
+/**
+ * Validates that a buffer is a valid image
+ */
+export async function validateImageBuffer(buffer: Buffer): Promise<boolean> {
+  try {
+    const metadata = await sharp(buffer).metadata();
+    return !!(metadata.width && metadata.height && metadata.format);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get image metadata from buffer
+ */
+export async function getImageMetadata(buffer: Buffer) {
+  try {
+    return await sharp(buffer).metadata();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to get image metadata: ${error.message}`);
+    }
+    throw new Error(`Failed to get image metadata: Unknown error`);
+  }
+}
+
+/**
+ * Test image factory with predefined image types
+ */
+export class TestImageFactory {
+  static async createSmallImage(): Promise<Buffer> {
+    return createTestImageBuffer(100, 100, 'jpeg');
+  }
+
+  static async createLargeImage(): Promise<Buffer> {
+    return createTestImageBuffer(2000, 2000, 'jpeg');
+  }
+
+  static async createInstagramSquare(): Promise<Buffer> {
+    return createTestImageBuffer(1080, 1080, 'jpeg');
+  }
+
+  static async createInstagramPortrait(): Promise<Buffer> {
+    return createTestImageBuffer(1080, 1350, 'jpeg');
+  }
+
+  static async createInstagramLandscape(): Promise<Buffer> {
+    return createTestImageBuffer(1080, 566, 'jpeg');
+  }
+
+  static async createMinimumValidSize(): Promise<Buffer> {
+    return createTestImageBuffer(320, 320, 'jpeg');
+  }
+
+  static async createBelowMinimumSize(): Promise<Buffer> {
+    return createTestImageBuffer(200, 200, 'jpeg');
+  }
+
+  static async createPngImage(width = 800, height = 600): Promise<Buffer> {
+    return createTestImageBuffer(width, height, 'png');
+  }
+
+  static async createJpegImage(width = 800, height = 600): Promise<Buffer> {
+    return createTestImageBuffer(width, height, 'jpeg');
+  }
+
+  static async createValidUploadImage(): Promise<{ 
+    buffer: Buffer, 
+    mimetype: string, 
+    filename: string 
+  }> {
+    const buffer = await createTestImageBuffer(800, 600, 'jpeg');
+    return {
+      buffer,
+      mimetype: 'image/jpeg',
+      filename: `test-image-${Date.now()}.jpg`
+    };
+  }
+}
+
+/**
  * Generate a valid JPEG buffer for testing
  * This creates an actual image buffer that will pass Sharp validation
  */
@@ -831,6 +980,595 @@ export const createFileSystemTestScenarios = () => ({
   }
 });
 
+// ==================== SECURITY TEST HELPERS ====================
+
+/**
+ * Generate various types of malicious payloads for security testing
+ */
+export const createSecurityTestPayloads = () => ({
+  sqlInjection: {
+    basic: "'; DROP TABLE images; --",
+    union: "' UNION SELECT * FROM users WHERE '1'='1",
+    blind: "' AND (SELECT COUNT(*) FROM images) > 0 --",
+    timeBase: "'; WAITFOR DELAY '00:00:05' --"
+  },
+  
+  xssPayloads: {
+    script: '<script>alert("XSS")</script>',
+    img: '<img src="x" onerror="alert(\'XSS\')">',
+    iframe: '<iframe src="javascript:alert(\'XSS\')"></iframe>',
+    svg: '<svg onload="alert(\'XSS\')">',
+    event: 'javascript:alert("XSS")',
+    encoded: '%3Cscript%3Ealert%28%22XSS%22%29%3C%2Fscript%3E'
+  },
+  
+  pathTraversal: {
+    unix: '../../../etc/passwd',
+    windows: '..\\..\\..\\windows\\system32\\drivers\\etc\\hosts',
+    encoded: '%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd',
+    null: '../../../etc/passwd\x00.jpg',
+    unicode: '\u002e\u002e\u002f\u002e\u002e\u002f\u002e\u002e\u002fetc\u002fpasswd'
+  },
+  
+  commandInjection: {
+    basic: '; rm -rf /',
+    pipe: '| cat /etc/passwd',
+    background: '& ping google.com',
+    subshell: '$(cat /etc/passwd)',
+    backtick: '`whoami`'
+  },
+  
+  bufferOverflow: {
+    long: 'A'.repeat(10000),
+    nullBytes: 'test\x00\x00\x00\x00',
+    controlChars: '\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f',
+    unicode: '\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007'
+  }
+});
+
+/**
+ * Generate edge case inputs for boundary testing
+ */
+export const createBoundaryTestCases = () => ({
+  emptyValues: {
+    emptyString: '',
+    nullValue: null,
+    undefinedValue: undefined,
+    whitespace: '   ',
+    newlines: '\n\r\t'
+  },
+  
+  extremeNumbers: {
+    zero: 0,
+    negative: -1,
+    maxInt: Number.MAX_SAFE_INTEGER,
+    minInt: Number.MIN_SAFE_INTEGER,
+    infinity: Infinity,
+    negativeInfinity: -Infinity,
+    nan: NaN
+  },
+  
+  extremeStrings: {
+    veryLong: 'x'.repeat(100000),
+    unicodeMax: '\uFFFF'.repeat(1000),
+    mixedEncoding: 'test\u0000\u001F\u007F\u0080\u00FF',
+    rtlOverride: 'file\u202Eexe.jpg', // Right-to-Left Override
+    bidiOverride: 'safe\u202Ddangerous\u202C.jpg'
+  },
+  
+  fileSystemLimits: {
+    maxPathLength: '/'.repeat(4096),
+    reservedNames: ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'LPT1'],
+    invalidChars: '<>:"|?*\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f'
+  }
+});
+
+/**
+ * Generate authorization bypass test scenarios
+ */
+export const createAuthorizationBypassScenarios = () => {
+  const legitimateUserId = uuidv4();
+  const attackerUserId = uuidv4();
+  const adminUserId = uuidv4();
+  
+  return {
+    legitimateUserId,
+    attackerUserId,
+    adminUserId,
+    
+    // Horizontal privilege escalation attempts
+    horizontalEscalation: {
+      imageId: uuidv4(),
+      ownerId: legitimateUserId,
+      attackerId: attackerUserId,
+      scenarios: [
+        'direct_access_attempt',
+        'parameter_manipulation',
+        'session_hijacking_simulation',
+        'token_reuse_attempt'
+      ]
+    },
+    
+    // Vertical privilege escalation attempts
+    verticalEscalation: {
+      regularUserId: legitimateUserId,
+      adminUserId: adminUserId,
+      attempts: [
+        'admin_endpoint_access',
+        'bulk_operation_abuse',
+        'system_resource_access'
+      ]
+    },
+    
+    // Race condition exploitation
+    raceConditions: {
+      targetImageId: uuidv4(),
+      ownerId: legitimateUserId,
+      attackerId: attackerUserId,
+      scenarios: [
+        'concurrent_access_during_transfer',
+        'status_change_race',
+        'deletion_race_condition'
+      ]
+    },
+    
+    // IDOR (Insecure Direct Object Reference) tests
+    idorTests: [
+      { imageId: '1', description: 'Sequential ID guessing' },
+      { imageId: uuidv4(), description: 'Valid UUID format' },
+      { imageId: 'admin-image-123', description: 'Predictable admin naming' },
+      { imageId: '../system/config', description: 'Path traversal in ID' }
+    ]
+  };
+};
+
+/**
+ * Generate file upload attack vectors
+ */
+export const createFileUploadAttackVectors = () => ({
+  maliciousExtensions: [
+    'test.php.jpg',
+    'test.jsp.png',
+    'test.asp.bmp',
+    'test.exe',
+    'test.bat',
+    'test.sh',
+    'test.py',
+    'test.js'
+  ],
+  
+  mimeTypeSpoofing: [
+    { filename: 'script.php', declaredMime: 'image/jpeg', actualContent: '<?php system($_GET["cmd"]); ?>' },
+    { filename: 'payload.exe', declaredMime: 'image/png', actualContent: 'MZ\x90\x00\x03\x00\x00\x00' },
+    { filename: 'shell.jsp', declaredMime: 'image/bmp', actualContent: '<%@ page import="java.io.*" %>' }
+  ],
+  
+  polyglotFiles: [
+    {
+      name: 'jpeg_gif_polyglot.jpg',
+      description: 'Valid JPEG and GIF',
+      headers: [
+        Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]), // JPEG
+        Buffer.from('GIF89a') // GIF
+      ]
+    },
+    {
+      name: 'png_zip_polyglot.png',
+      description: 'Valid PNG and ZIP',
+      headers: [
+        Buffer.from([0x89, 0x50, 0x4E, 0x47]), // PNG
+        Buffer.from('PK\x03\x04') // ZIP
+      ]
+    }
+  ],
+  
+  zipBombs: {
+    small: {
+      compressedSize: 1024,
+      uncompressedSize: 1024 * 1024 * 100, // 100MB when decompressed
+      description: 'Small zip bomb'
+    },
+    large: {
+      compressedSize: 1024 * 10,
+      uncompressedSize: 1024 * 1024 * 1024 * 10, // 10GB when decompressed
+      description: 'Large zip bomb'
+    }
+  },
+  
+  metadataExploits: [
+    {
+      type: 'exif_xss',
+      description: 'XSS in EXIF comment',
+      payload: '<script>alert("XSS in EXIF")</script>'
+    },
+    {
+      type: 'exif_sqli',
+      description: 'SQL injection in EXIF data',
+      payload: "'; DROP TABLE images; --"
+    },
+    {
+      type: 'oversized_metadata',
+      description: 'Extremely large metadata',
+      payload: 'x'.repeat(1024 * 1024) // 1MB of metadata
+    }
+  ]
+});
+
+/**
+ * Generate denial of service attack scenarios
+ */
+export const createDoSAttackScenarios = () => ({
+  resourceExhaustion: {
+    largeFiles: Array.from({ length: 100 }, (_, i) => ({
+      filename: `large_file_${i}.jpg`,
+      size: 8 * 1024 * 1024, // 8MB each
+      description: 'Multiple large file uploads'
+    })),
+    
+    complexImages: Array.from({ length: 50 }, (_, i) => ({
+      filename: `complex_${i}.jpg`,
+      width: 5000,
+      height: 5000,
+      description: 'High resolution images requiring significant processing'
+    })),
+    
+    rapidRequests: {
+      count: 1000,
+      timeframe: 1000, // 1 second
+      description: 'Rapid fire requests'
+    }
+  },
+  
+  memoryExhaustion: {
+    scenarios: [
+      {
+        type: 'large_batch_operations',
+        description: 'Process 1000 images simultaneously',
+        imageCount: 1000
+      },
+      {
+        type: 'infinite_thumbnails',
+        description: 'Request thumbnails for non-existent images',
+        requestCount: 10000
+      },
+      {
+        type: 'concurrent_processing',
+        description: 'Multiple heavy operations simultaneously',
+        concurrency: 100
+      }
+    ]
+  },
+  
+  storageExhaustion: {
+    fillDisk: {
+      fileCount: 10000,
+      fileSize: 8 * 1024 * 1024, // 8MB each = 80GB total
+      description: 'Fill up storage space'
+    },
+    
+    inodeExhaustion: {
+      fileCount: 1000000,
+      fileSize: 1, // Many tiny files
+      description: 'Exhaust file system inodes'
+    }
+  }
+});
+
+/**
+ * Generate concurrent access attack patterns
+ */
+export const createConcurrencyAttackPatterns = () => ({
+  raceConditions: {
+    statusChange: {
+      description: 'Multiple users trying to change status simultaneously',
+      operations: [
+        { action: 'updateStatus', status: 'processed' },
+        { action: 'updateStatus', status: 'labeled' },
+        { action: 'delete' }
+      ]
+    },
+    
+    ownership: {
+      description: 'Transfer ownership during concurrent operations',
+      operations: [
+        { action: 'read' },
+        { action: 'transferOwnership' },
+        { action: 'delete' }
+      ]
+    },
+    
+    quota: {
+      description: 'Multiple uploads when near quota limit',
+      scenario: 'user_near_limit',
+      concurrentUploads: 20
+    }
+  },
+  
+  lockContention: {
+    bulkOperations: {
+      description: 'Multiple bulk operations on overlapping image sets',
+      operations: [
+        { type: 'batchUpdate', imageIds: ['1', '2', '3', '4', '5'] },
+        { type: 'batchUpdate', imageIds: ['3', '4', '5', '6', '7'] },
+        { type: 'batchDelete', imageIds: ['4', '5', '6'] }
+      ]
+    }
+  },
+  
+  timeOfCheckTimeOfUse: {
+    scenarios: [
+      {
+        description: 'Check permissions then perform operation',
+        steps: ['checkOwnership', 'delay', 'performOperation']
+      },
+      {
+        description: 'Check quota then upload',
+        steps: ['checkQuota', 'delay', 'uploadFile']
+      }
+    ]
+  }
+});
+
+/**
+ * Generate business logic abuse scenarios
+ */
+export const createBusinessLogicAbuseScenarios = () => ({
+  workflowBypass: {
+    statusTransitions: [
+      { from: 'labeled', to: 'new', description: 'Illegal backward transition' },
+      { from: 'deleted', to: 'processed', description: 'Restore deleted state' },
+      { from: 'new', to: 'labeled', description: 'Skip processing step' }
+    ],
+    
+    dependencyIgnore: [
+      {
+        scenario: 'delete_with_dependencies',
+        description: 'Force delete image with garment dependencies',
+        hasGarments: true,
+        hasPoly: true
+      }
+    ]
+  },
+  
+  limitBypass: {
+    storageLimit: {
+      description: 'Upload files to exceed storage quota',
+      currentUsage: 499 * 1024 * 1024, // 499MB
+      uploadSize: 10 * 1024 * 1024, // Try to upload 10MB more
+      limit: 500 * 1024 * 1024 // 500MB limit
+    },
+    
+    countLimit: {
+      description: 'Upload more images than allowed',
+      currentCount: 999,
+      additionalUploads: 5,
+      limit: 1000
+    },
+    
+    rateLimits: {
+      description: 'Exceed API rate limits',
+      requestsPerMinute: 1000,
+      normalLimit: 100
+    }
+  },
+  
+  privilegeAbuse: {
+    adminFunctions: [
+      'bulkDeleteAllUsers',
+      'systemConfigAccess',
+      'auditLogAccess',
+      'userImpersonation'
+    ],
+    
+    crossTenantAccess: {
+      description: 'Access resources from different tenant/organization',
+      scenarios: ['guessOtherTenantIds', 'manipulateHeaders', 'sessionReuse']
+    }
+  }
+});
+
+/**
+ * Generate data validation bypass attempts
+ */
+export const createValidationBypassAttempts = () => ({
+  typeConfusion: [
+    { input: '123', expectedType: 'string', actualType: 'number' },
+    { input: 'true', expectedType: 'boolean', actualType: 'string' },
+    { input: [], expectedType: 'string', actualType: 'array' },
+    { input: {}, expectedType: 'string', actualType: 'object' }
+  ],
+  
+  encodingManipulation: [
+    {
+      description: 'Double URL encoding',
+      original: '../etc/passwd',
+      encoded: '%252e%252e%252fetc%252fpasswd'
+    },
+    {
+      description: 'Unicode normalization bypass',
+      original: 'script',
+      encoded: '\u0073\u0063\u0072\u0069\u0070\u0074'
+    },
+    {
+      description: 'HTML entity encoding',
+      original: '<script>',
+      encoded: '&lt;script&gt;'
+    }
+  ],
+  
+  lengthConstraintBypass: [
+    {
+      field: 'filename',
+      maxLength: 255,
+      bypassAttempt: 'x'.repeat(1000),
+      technique: 'overflow'
+    },
+    {
+      field: 'description',
+      maxLength: 500,
+      bypassAttempt: 'a'.repeat(10000),
+      technique: 'memory_exhaustion'
+    }
+  ],
+  
+  formatStringAttacks: [
+    '%s%s%s%s%s%s%s%s%s%s',
+    '%x%x%x%x%x%x%x%x%x%x',
+    '%n%n%n%n%n%n%n%n%n%n',
+    '\\x41\\x41\\x41\\x41'
+  ]
+});
+
+/**
+ * Generate session and authentication attack vectors
+ */
+export const createAuthenticationAttackVectors = () => ({
+  sessionManipulation: {
+    fixation: {
+      description: 'Session fixation attack',
+      steps: ['obtainSessionId', 'forceSessionId', 'authenticateVictim', 'hijackSession']
+    },
+    
+    hijacking: {
+      description: 'Session hijacking attempts',
+      techniques: ['cookieTheft', 'sessionPrediction', 'manInTheMiddle']
+    },
+    
+    replay: {
+      description: 'Session replay attacks',
+      scenarios: ['reusedTokens', 'timestampManipulation', 'nonceReuse']
+    }
+  },
+  
+  tokenManipulation: {
+    jwtAttacks: [
+      'algorithmConfusion',
+      'signatureStripping',
+      'claimManipulation',
+      'keyConfusion'
+    ],
+    
+    bearerTokenAbuse: [
+      'tokenLeakage',
+      'crossOriginRequests',
+      'tokenInjection'
+    ]
+  },
+  
+  authenticationBypass: {
+    techniques: [
+      'nullByteInjection',
+      'sqlInjectionInAuth',
+      'ldapInjection',
+      'timingAttacks',
+      'bruteForce'
+    ]
+  }
+});
+
+/**
+ * Helper to simulate timing attacks
+ */
+export const simulateTimingAttack = async (
+  operation: () => Promise<any>,
+  iterations: number = 100
+): Promise<{ averageTime: number; times: number[]; variance: number }> => {
+  const times: number[] = [];
+  
+  for (let i = 0; i < iterations; i++) {
+    const start = performance.now();
+    try {
+      await operation();
+    } catch (error) {
+      // Continue timing even on errors
+    }
+    const end = performance.now();
+    times.push(end - start);
+  }
+  
+  const averageTime = times.reduce((sum, time) => sum + time, 0) / times.length;
+  const variance = times.reduce((sum, time) => sum + Math.pow(time - averageTime, 2), 0) / times.length;
+  
+  return { averageTime, times, variance };
+};
+
+/**
+ * Helper to detect information leakage in error messages
+ */
+export const analyzeErrorMessages = (errors: Error[]): {
+  leaksInternalPaths: boolean;
+  leaksCredentials: boolean;
+  leaksSystemInfo: boolean;
+  leaksUserData: boolean;
+  suspiciousPatterns: string[];
+} => {
+  const allMessages = errors.map(e => e.message).join(' ');
+  
+  const patterns = {
+    internalPaths: [/\/var\//, /\/opt\//, /\/usr\//, /\/home\//, /C:\\/, /Program Files/],
+    credentials: [/password/i, /secret/i, /key/i, /token/i, /auth/i],
+    systemInfo: [/mysql/i, /postgres/i, /mongodb/i, /redis/i, /version/i],
+    userData: [/user_id/i, /email/i, /phone/i, /address/i]
+  };
+  
+  const suspiciousPatterns: string[] = [];
+  
+  const leaksInternalPaths = patterns.internalPaths.some(pattern => {
+    if (pattern.test(allMessages)) {
+      suspiciousPatterns.push(`Internal path pattern: ${pattern}`);
+      return true;
+    }
+    return false;
+  });
+  
+  const leaksCredentials = patterns.credentials.some(pattern => {
+    if (pattern.test(allMessages)) {
+      suspiciousPatterns.push(`Credential pattern: ${pattern}`);
+      return true;
+    }
+    return false;
+  });
+  
+  const leaksSystemInfo = patterns.systemInfo.some(pattern => {
+    if (pattern.test(allMessages)) {
+      suspiciousPatterns.push(`System info pattern: ${pattern}`);
+      return true;
+    }
+    return false;
+  });
+  
+  const leaksUserData = patterns.userData.some(pattern => {
+    if (pattern.test(allMessages)) {
+      suspiciousPatterns.push(`User data pattern: ${pattern}`);
+      return true;
+    }
+    return false;
+  });
+  
+  return {
+    leaksInternalPaths,
+    leaksCredentials,
+    leaksSystemInfo,
+    leaksUserData,
+    suspiciousPatterns
+  };
+};
+
+/**
+ * Generate comprehensive security test suite data
+ */
+export const generateSecurityTestSuite = () => ({
+  payloads: createSecurityTestPayloads(),
+  boundaries: createBoundaryTestCases(),
+  authorization: createAuthorizationBypassScenarios(),
+  fileAttacks: createFileUploadAttackVectors(),
+  dosAttacks: createDoSAttackScenarios(),
+  concurrency: createConcurrencyAttackPatterns(),
+  businessLogic: createBusinessLogicAbuseScenarios(),
+  validation: createValidationBypassAttempts(),
+  authentication: createAuthenticationAttackVectors()
+});
+
 // ==================== EXPORT ALL HELPERS ====================
 
 export default {
@@ -875,5 +1613,19 @@ export default {
   cleanupTestData,
   
   // Assertions
-  imageAssertions
+  imageAssertions,
+
+  createTestImageBuffer,  // Added this export
+  createSecurityTestPayloads,
+  createBoundaryTestCases,
+  createAuthorizationBypassScenarios,
+  createFileUploadAttackVectors,
+  createDoSAttackScenarios,
+  createConcurrencyAttackPatterns,
+  createBusinessLogicAbuseScenarios,
+  createValidationBypassAttempts,
+  createAuthenticationAttackVectors,
+  simulateTimingAttack,
+  analyzeErrorMessages,
+  generateSecurityTestSuite
 };
