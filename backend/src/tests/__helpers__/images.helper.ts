@@ -1569,6 +1569,330 @@ export const generateSecurityTestSuite = () => ({
   authentication: createAuthenticationAttackVectors()
 });
 
+// ==================== ENHANCED SHARP MOCK SCENARIOS ====================
+
+export const createSharpMockScenarios = () => ({
+  // Color space scenarios
+  colorSpaceConversion: {
+    alreadySRGB: {
+      metadata: { space: 'srgb', width: 800, height: 600, format: 'jpeg' },
+      shouldConvert: false
+    },
+    needsConversion: {
+      metadata: { space: 'cmyk', width: 800, height: 600, format: 'jpeg' },
+      shouldConvert: true
+    },
+    unknownColorSpace: {
+      metadata: { space: undefined, width: 800, height: 600, format: 'jpeg' },
+      shouldConvert: true
+    }
+  },
+
+  // Processing errors
+  processingErrors: {
+    invalidInput: () => {
+      const error = new Error('Input buffer contains unsupported image format');
+      (error as any).code = 'SHARP_UNSUPPORTED_FORMAT';
+      return error;
+    },
+    pixelLimit: () => {
+      const error = new Error('Input image exceeds pixel limit');
+      (error as any).code = 'SHARP_PIXEL_LIMIT';
+      return error;
+    },
+    memoryLimit: () => {
+      const error = new Error('Input image exceeds memory limit');
+      (error as any).code = 'SHARP_MEMORY_LIMIT';
+      return error;
+    }
+  },
+
+  // Resize scenarios
+  resizeScenarios: {
+    validResize: {
+      input: { width: 1600, height: 1200 },
+      target: { width: 800, height: 600 },
+      expected: { width: 800, height: 600 }
+    },
+    withoutEnlargement: {
+      input: { width: 400, height: 300 },
+      target: { width: 800, height: 600 },
+      expected: { width: 400, height: 300 } // Should not enlarge
+    },
+    aspectRatioPreservation: {
+      input: { width: 1000, height: 500 },
+      target: { width: 800, height: 800 },
+      fit: 'contain',
+      expected: { width: 800, height: 400 }
+    }
+  }
+});
+
+// ==================== FILE SYSTEM MOCK SCENARIOS ====================
+
+export const createFileSystemMockScenarios = () => ({
+  diskErrors: {
+    noSpace: {
+      error: new Error('ENOSPC: no space left on device'),
+      code: 'ENOSPC',
+      errno: -28
+    },
+    permission: {
+      error: new Error('EACCES: permission denied'),
+      code: 'EACCES', 
+      errno: -13
+    },
+    fileNotFound: {
+      error: new Error('ENOENT: no such file or directory'),
+      code: 'ENOENT',
+      errno: -2
+    }
+  },
+
+  pathTraversal: {
+    basic: '../../../etc/passwd',
+    encoded: '%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd',
+    nullByte: '../../../etc/passwd\x00.jpg',
+    unicode: '\u002e\u002e\u002f\u002e\u002e\u002f\u002e\u002e\u002fetc\u002fpasswd'
+  }
+});
+
+// ==================== ENHANCED IMAGE METADATA VARIATIONS ====================
+
+export const createAdvancedImageMetadata = () => ({
+  extremeDimensions: {
+    tinyImage: { width: 1, height: 1, format: 'jpeg' },
+    massiveImage: { width: 50000, height: 50000, format: 'jpeg' },
+    extremelyWide: { width: 10000, height: 100, format: 'jpeg' },
+    extremelyTall: { width: 100, height: 10000, format: 'jpeg' }
+  },
+
+  corruptedMetadata: {
+    negativeWidth: { width: -800, height: 600, format: 'jpeg' },
+    negativeHeight: { width: 800, height: -600, format: 'jpeg' },
+    zeroWidth: { width: 0, height: 600, format: 'jpeg' },
+    zeroHeight: { width: 800, height: 0, format: 'jpeg' },
+    infiniteWidth: { width: Infinity, height: 600, format: 'jpeg' },
+    nanDimensions: { width: NaN, height: NaN, format: 'jpeg' }
+  },
+
+  edgeFormats: {
+    unknownFormat: { width: 800, height: 600, format: 'unknown' },
+    emptyFormat: { width: 800, height: 600, format: '' },
+    nullFormat: { width: 800, height: 600, format: null }
+  }
+});
+
+// ==================== PROCESSING PERFORMANCE TEST SCENARIOS ====================
+
+export const createPerformanceTestScenarios = () => ({
+  loadTesting: {
+    smallBatch: { imageCount: 10, concurrency: 2 },
+    mediumBatch: { imageCount: 50, concurrency: 5 },
+    largeBatch: { imageCount: 100, concurrency: 10 },
+    stressBatch: { imageCount: 500, concurrency: 20 }
+  },
+
+  imageSizes: {
+    thumbnail: { width: 150, height: 150, expectedTime: 100 },
+    small: { width: 400, height: 300, expectedTime: 200 },
+    medium: { width: 800, height: 600, expectedTime: 500 },
+    large: { width: 1600, height: 1200, expectedTime: 1000 },
+    xlarge: { width: 3200, height: 2400, expectedTime: 2000 }
+  }
+});
+
+// ==================== ENHANCED VALIDATION HELPERS ====================
+
+export const createValidationHelpers = () => ({
+  validateMetadata: (metadata: any) => {
+    const errors: string[] = [];
+    
+    if (!metadata.width || metadata.width <= 0) {
+      errors.push('Invalid width');
+    }
+    if (!metadata.height || metadata.height <= 0) {
+      errors.push('Invalid height');
+    }
+    if (!metadata.format || typeof metadata.format !== 'string') {
+      errors.push('Invalid format');
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  },
+
+  validateAspectRatio: (width: number, height: number) => {
+    const ratio = width / height;
+    return {
+      ratio,
+      isValid: ratio >= 0.8 && ratio <= 1.91,
+      type: ratio < 0.8 ? 'too_tall' : ratio > 1.91 ? 'too_wide' : 'valid'
+    };
+  },
+
+  validateDimensions: (width: number, height: number) => {
+    return {
+      width: {
+        value: width,
+        isValid: width >= 320 && width <= 1440,
+        error: width < 320 ? 'too_small' : width > 1440 ? 'too_large' : null
+      },
+      height: {
+        value: height,
+        isValid: height >= 168 && height <= 1800,
+        error: height < 168 ? 'too_small' : height > 1800 ? 'too_large' : null
+      }
+    };
+  }
+});
+
+// ==================== CONCURRENT OPERATION HELPERS ====================
+
+export const createConcurrencyHelpers = () => ({
+  async runConcurrentValidations(
+    buffers: Buffer[],
+    validateFunction: (buffer: Buffer) => Promise<any>
+  ) {
+    const results = await Promise.allSettled(
+      buffers.map(buffer => validateFunction(buffer))
+    );
+    
+    return {
+      successful: results.filter(r => r.status === 'fulfilled').length,
+      failed: results.filter(r => r.status === 'rejected').length,
+      results: results.map((r, index) => ({
+        index,
+        status: r.status,
+        result: r.status === 'fulfilled' ? r.value : null,
+        error: r.status === 'rejected' ? r.reason : null
+      }))
+    };
+  },
+
+  async simulateRaceCondition(
+    operation: () => Promise<any>,
+    attempts: number = 10
+  ) {
+    const promises = Array.from({ length: attempts }, () => operation());
+    const results = await Promise.allSettled(promises);
+    
+    return {
+      totalAttempts: attempts,
+      successful: results.filter(r => r.status === 'fulfilled').length,
+      failed: results.filter(r => r.status === 'rejected').length,
+      uniqueResults: [...new Set(
+        results
+          .filter(r => r.status === 'fulfilled')
+          .map(r => JSON.stringify((r as any).value))
+      )].length
+    };
+  }
+});
+
+// ==================== MEMORY LEAK DETECTION HELPERS ====================
+
+export const createMemoryTestHelpers = () => ({
+  async detectMemoryLeaks(
+    operation: () => Promise<any>,
+    iterations: number = 100
+  ) {
+    const initialMemory = process.memoryUsage();
+    
+    for (let i = 0; i < iterations; i++) {
+      await operation();
+      
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc();
+      }
+    }
+    
+    const finalMemory = process.memoryUsage();
+    
+    return {
+      initial: initialMemory,
+      final: finalMemory,
+      growth: {
+        heapUsed: finalMemory.heapUsed - initialMemory.heapUsed,
+        heapTotal: finalMemory.heapTotal - initialMemory.heapTotal,
+        external: finalMemory.external - initialMemory.external
+      },
+      hasLeak: (finalMemory.heapUsed - initialMemory.heapUsed) > (10 * 1024 * 1024) // 10MB threshold
+    };
+  }
+});
+
+// ==================== ERROR MESSAGE VALIDATION ====================
+
+export const createErrorValidationHelpers = () => ({
+  validateErrorStructure: (error: any) => {
+    const checks = {
+      hasMessage: typeof error.message === 'string',
+      messageNotEmpty: error.message && error.message.trim().length > 0,
+      noInternalPaths: !error.message?.match(/\/var\/|\/opt\/|\/usr\/|C:\\/),
+      noCredentials: !error.message?.match(/password|secret|key|token/i),
+      noStackTrace: !error.message?.includes('at '),
+      isUserFriendly: error.message?.length < 200
+    };
+    
+    return {
+      ...checks,
+      isValid: Object.values(checks).every(Boolean),
+      score: Object.values(checks).filter(Boolean).length / Object.keys(checks).length
+    };
+  },
+
+  categorizeError: (error: Error) => {
+    const message = error.message.toLowerCase();
+    
+    if (message.includes('format') || message.includes('unsupported')) {
+      return 'FORMAT_ERROR';
+    }
+    if (message.includes('dimension') || message.includes('size')) {
+      return 'DIMENSION_ERROR';
+    }
+    if (message.includes('aspect ratio')) {
+      return 'ASPECT_RATIO_ERROR';
+    }
+    if (message.includes('space') || message.includes('permission')) {
+      return 'FILESYSTEM_ERROR';
+    }
+    if (message.includes('memory') || message.includes('limit')) {
+      return 'RESOURCE_ERROR';
+    }
+    
+    return 'UNKNOWN_ERROR';
+  }
+});
+
+// ==================== TEST DATA GENERATORS ====================
+
+export const createTestDataGenerators = () => ({
+  generateImageBuffers: (count: number) => {
+    return Array.from({ length: count }, (_, i) => ({
+      id: `test-image-${i}`,
+      buffer: createValidImageBuffers.jpeg(),
+      metadata: {
+        width: 800 + (i * 100),
+        height: 600 + (i * 75),
+        format: i % 2 === 0 ? 'jpeg' : 'png'
+      }
+    }));
+  },
+
+  generatePathVariations: (basePath: string) => ({
+    normal: basePath,
+    withSpaces: basePath.replace(/([^\/\\]+)/, 'file with spaces'),
+    withUnicode: basePath.replace(/([^\/\\]+)/, 'файл测试🖼️'),
+    withDots: basePath.replace(/([^\/\\]+)/, '..hidden.file'),
+    veryLong: basePath + 'x'.repeat(500),
+    withNullByte: basePath + '\x00.hidden'
+  })
+});
+
 // ==================== EXPORT ALL HELPERS ====================
 
 export default {
@@ -1627,5 +1951,15 @@ export default {
   createAuthenticationAttackVectors,
   simulateTimingAttack,
   analyzeErrorMessages,
-  generateSecurityTestSuite
+  generateSecurityTestSuite,
+
+  createSharpMockScenarios,
+  createFileSystemMockScenarios,
+  createAdvancedImageMetadata,
+  createPerformanceTestScenarios,
+  createValidationHelpers,
+  createConcurrencyHelpers,
+  createMemoryTestHelpers,
+  createErrorValidationHelpers,
+  createTestDataGenerators
 };
