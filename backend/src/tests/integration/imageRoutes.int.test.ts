@@ -20,13 +20,15 @@
  * - File upload testing capabilities
  */
 
-import { jest, describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
+import { jest, describe, it, expect, beforeAll, beforeEach, afterEach } from '@jest/globals';
 import request from 'supertest';
 import express, { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
-import { config } from '../../config';
-import { Readable } from 'stream';
+import { getTestConfig } from '../../config';
+
+// At the top of your test file, get test configuration
+const testConfig = getTestConfig();
 
 // Mock all external dependencies
 jest.mock('../../config/firebase', () => ({
@@ -528,7 +530,8 @@ const mockAuthenticate = (req: any, res: any, next: any) => {
 
   try {
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, config.jwtSecret) as any;
+    // Use test-specific JWT secret
+    const decoded = jwt.verify(token, testConfig.jwtSecret) as any;
     req.user = decoded;
     next();
   } catch (error) {
@@ -575,7 +578,15 @@ describe('Expanded HTTP Stack Integration Tests', () => {
   beforeAll(() => {
     console.log('🔧 Setting up expanded HTTP integration test suite...');
     
-    testUserId = 'test-user-1';
+    //Set testUserId FIRST
+    testUserId = 'test-user-1'; 
+    
+    //Create valid JWT token AFTER testUserId is set
+    validToken = jwt.sign(
+      { id: testUserId, email: 'test@example.com' },
+      testConfig.jwtSecret,
+      { expiresIn: '24h' }
+    );
     
     // Create comprehensive Express app
     app = express();
@@ -635,7 +646,7 @@ describe('Expanded HTTP Stack Integration Tests', () => {
         
         const token = jwt.sign(
           { id: user.id, email: user.email },
-          config.jwtSecret,
+          testConfig.jwtSecret, // ✅ FIX: Use test secret
           { expiresIn: '24h' }
         );
         
@@ -697,7 +708,7 @@ describe('Expanded HTTP Stack Integration Tests', () => {
         
         const token = jwt.sign(
           { id: newUser.id, email: newUser.email },
-          config.jwtSecret,
+          testConfig.jwtSecret, // ✅ FIX: Use test secret
           { expiresIn: '24h' }
         );
         
@@ -1000,13 +1011,6 @@ describe('Expanded HTTP Stack Integration Tests', () => {
       });
     });
     
-    // Create valid JWT token for testing
-    validToken = jwt.sign(
-      { id: testUserId, email: 'test@example.com' },
-      config.jwtSecret,
-      { expiresIn: '24h' }
-    );
-    
     console.log('✅ Expanded HTTP integration test setup complete');
   });
 
@@ -1236,7 +1240,7 @@ describe('Expanded HTTP Stack Integration Tests', () => {
       // Create another user's token
       const otherUserToken = jwt.sign(
         { id: 'other-user-id', email: 'other@example.com' },
-        config.jwtSecret,
+        testConfig.jwtSecret,
         { expiresIn: '1h' }
       );
       
@@ -1302,7 +1306,7 @@ describe('Expanded HTTP Stack Integration Tests', () => {
     it('should return empty stats for new user', async () => {
       const newUserToken = jwt.sign(
         { id: 'new-user-id', email: 'newuser@example.com' },
-        config.jwtSecret,
+        testConfig.jwtSecret,
         { expiresIn: '1h' }
       );
       
@@ -1705,7 +1709,7 @@ describe('Expanded HTTP Stack Integration Tests', () => {
       
       // Verify the token is valid
       const token = response.body.data.token;
-      const decoded = jwt.verify(token, config.jwtSecret) as any;
+      const decoded = jwt.verify(token, testConfig.jwtSecret) as any;
       expect(decoded.email).toBe('test@example.com');
     });
     
@@ -1794,7 +1798,7 @@ describe('Expanded HTTP Stack Integration Tests', () => {
       // Test with admin token
       const adminToken = jwt.sign(
         { id: 'admin-id', email: 'admin@example.com' },
-        config.jwtSecret,
+        testConfig.jwtSecret,
         { expiresIn: '1h' }
       );
       
@@ -1809,7 +1813,7 @@ describe('Expanded HTTP Stack Integration Tests', () => {
     it('should handle expired tokens', async () => {
       const expiredToken = jwt.sign(
         { id: 'test-user', email: 'test@example.com' },
-        config.jwtSecret,
+        testConfig.jwtSecret,
         { expiresIn: '-1h' } // Expired 1 hour ago
       );
       
@@ -1828,7 +1832,7 @@ export const expandedHttpTestUtils = {
   createValidToken(userId = 'test-user', email = 'test@example.com'): string {
     return jwt.sign(
       { id: userId, email: email },
-      config.jwtSecret,
+      testConfig.jwtSecret, // Use test secret
       { expiresIn: '24h' }
     );
   },
@@ -1836,7 +1840,7 @@ export const expandedHttpTestUtils = {
   createExpiredToken(userId = 'test-user', email = 'test@example.com'): string {
     return jwt.sign(
       { id: userId, email: email },
-      config.jwtSecret,
+      testConfig.jwtSecret, // Use test secret
       { expiresIn: '-1h' }
     );
   },
@@ -1844,7 +1848,7 @@ export const expandedHttpTestUtils = {
   createAdminToken(): string {
     return jwt.sign(
       { id: 'admin-id', email: 'admin@example.com' },
-      config.jwtSecret,
+      testConfig.jwtSecret, // Use test secret
       { expiresIn: '24h' }
     );
   },
