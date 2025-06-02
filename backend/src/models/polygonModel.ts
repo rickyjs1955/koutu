@@ -3,6 +3,19 @@ import { query } from './db';
 import { v4 as uuidv4 } from 'uuid';
 import { CreatePolygonInput, UpdatePolygonInput, Polygon } from '../../../shared/src/schemas/polygon';
 
+// Helper function to safely parse JSON or return the value if already parsed
+const safeJsonParse = (value: any): any => {
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch (e) {
+      return value;
+    }
+  }
+  // If it's already an object (as JSONB returns), return as-is
+  return value;
+};
+
 export const polygonModel = {
     /**
      * Create a new polygon
@@ -30,8 +43,8 @@ export const polygonModel = {
         const polygon = result.rows[0];
         return {
         ...polygon,
-        points: JSON.parse(polygon.points),
-        metadata: JSON.parse(polygon.metadata)
+        points: safeJsonParse(polygon.points),
+        metadata: safeJsonParse(polygon.metadata)
         };
     },
     
@@ -52,8 +65,8 @@ export const polygonModel = {
         const polygon = result.rows[0];
         return {
         ...polygon,
-        points: JSON.parse(polygon.points),
-        metadata: JSON.parse(polygon.metadata)
+        points: safeJsonParse(polygon.points),
+        metadata: safeJsonParse(polygon.metadata)
         };
     },
     
@@ -69,8 +82,8 @@ export const polygonModel = {
         // Transform the database records to match the schema
         return result.rows.map(polygon => ({
         ...polygon,
-        points: JSON.parse(polygon.points),
-        metadata: JSON.parse(polygon.metadata)
+        points: safeJsonParse(polygon.points),
+        metadata: safeJsonParse(polygon.metadata)
         }));
     },
     
@@ -86,8 +99,8 @@ export const polygonModel = {
         // Transform the database records to match the schema
         return result.rows.map(polygon => ({
         ...polygon,
-        points: JSON.parse(polygon.points),
-        metadata: JSON.parse(polygon.metadata)
+        points: safeJsonParse(polygon.points),
+        metadata: safeJsonParse(polygon.metadata)
         }));
     },
     
@@ -122,7 +135,7 @@ export const polygonModel = {
         updates.push(`updated_at = NOW()`);
         
         // If no updates, return existing polygon
-        if (updates.length === 0) {
+        if (updates.length === 1) { // Only updated_at was added
         return this.findById(id);
         }
         
@@ -145,8 +158,8 @@ export const polygonModel = {
         const polygon = result.rows[0];
         return {
         ...polygon,
-        points: JSON.parse(polygon.points),
-        metadata: JSON.parse(polygon.metadata)
+        points: safeJsonParse(polygon.points),
+        metadata: safeJsonParse(polygon.metadata)
         };
     },
     
