@@ -4,20 +4,12 @@ import { polygonModel } from '../../models/polygonModel';
 import { imageModel } from '../../models/imageModel';
 import { storageService } from '../../services/storageService';
 import { PolygonServiceUtils } from '../../utils/PolygonServiceUtils';
-import { ApiError } from '../../utils/ApiError';
 
 // Import comprehensive mocks and helpers
 import {
   createMockPolygon,
   createValidPolygonPoints,
-  createInvalidPolygonPoints,
-  createPolygonMetadataVariations,
-  createPolygonErrorScenarios,
-  setupPolygonHappyPathMocks,
-  setupPolygonErrorMocks,
-  resetPolygonMocks,
-  MockPolygon
-} from '../__mocks__/polygons.mock';
+  resetPolygonMocks} from '../__mocks__/polygons.mock';
 
 import { createMockImage } from '../__mocks__/images.mock';
 

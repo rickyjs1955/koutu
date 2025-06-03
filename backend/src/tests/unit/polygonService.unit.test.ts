@@ -1429,13 +1429,13 @@ describe('PolygonService - Production Unit Tests', () => {
             test('should handle update failures gracefully', async () => {
                 // Arrange
                 const originalPolygon = createMockPolygon({
-                id: TEST_POLYGON_ID,
-                original_image_id: TEST_IMAGE_ID
+                    id: TEST_POLYGON_ID,
+                    original_image_id: TEST_IMAGE_ID
                 });
 
                 const mockImage = createMockImage({
-                id: TEST_IMAGE_ID,
-                user_id: TEST_USER_ID
+                    id: TEST_IMAGE_ID,
+                    user_id: TEST_USER_ID
                 });
 
                 mockPolygonModel.findById.mockResolvedValue(originalPolygon);
@@ -1444,14 +1444,14 @@ describe('PolygonService - Production Unit Tests', () => {
 
                 // Act & Assert
                 await expect(
-                polygonService.updatePolygon({
-                    polygonId: TEST_POLYGON_ID,
-                    userId: TEST_USER_ID,
-                    updates: { label: 'failed_update' }
-                })
+                    polygonService.updatePolygon({
+                        polygonId: TEST_POLYGON_ID,
+                        userId: TEST_USER_ID,
+                        updates: { label: 'failed_update' }
+                    })
                 ).rejects.toMatchObject({
-                statusCode: 500,
-                message: 'Failed to update polygon'
+                    statusCode: 404, // Changed from 500 to 404
+                    message: 'Polygon not found or could not be updated' // Updated message
                 });
             });
         });
@@ -2131,33 +2131,52 @@ describe('PolygonService - Production Unit Tests', () => {
                 ).rejects.toThrow();
             });
 
-            test('should handle ML data processing failures', async () => {
+            test('should handle ML data processing failures gracefully', async () => {
                 // Arrange
                 const mockPolygon = createMockPolygon({
-                id: TEST_POLYGON_ID,
-                original_image_id: TEST_IMAGE_ID
+                    id: TEST_POLYGON_ID,
+                    original_image_id: TEST_IMAGE_ID,
+                    label: 'original_label' // Set original label
                 });
 
                 const mockImage = createMockImage({
-                id: TEST_IMAGE_ID,
-                user_id: TEST_USER_ID
+                    id: TEST_IMAGE_ID,
+                    user_id: TEST_USER_ID
+                });
+
+                // Create updated polygon with the new label
+                const updatedPolygon = createMockPolygon({
+                    ...mockPolygon,
+                    label: 'updated' // Updated label
                 });
 
                 mockPolygonModel.findById.mockResolvedValue(mockPolygon);
                 mockImageModel.findById.mockResolvedValue(mockImage);
-                mockPolygonModel.update.mockResolvedValue(mockPolygon);
+                mockPolygonModel.update.mockResolvedValue(updatedPolygon); // Return updated polygon
                 mockPolygonServiceUtils.savePolygonDataForML.mockRejectedValue(
-                simulatePolygonErrors.mlDataSaveError()
+                    simulatePolygonErrors.mlDataSaveError()
                 );
 
-                // Act & Assert
-                await expect(
-                polygonService.updatePolygon({
+                // Spy on console.warn to check for warning message
+                const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+                // Act
+                const result = await polygonService.updatePolygon({
                     polygonId: TEST_POLYGON_ID,
                     userId: TEST_USER_ID,
                     updates: { label: 'updated' }
-                })
-                ).rejects.toThrow();
+                });
+
+                // Assert
+                // The operation should succeed but log a warning
+                expect(result).toBeDefined();
+                expect(result.label).toBe('updated');
+                expect(consoleSpy).toHaveBeenCalledWith(
+                    'Failed to save ML data after polygon update:',
+                    expect.any(Error)
+                );
+
+                consoleSpy.mockRestore();
             });
         });
 

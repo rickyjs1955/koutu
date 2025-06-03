@@ -22,38 +22,70 @@ export class PolygonServiceUtils {
   /**
    * Douglas-Peucker polygon simplification algorithm
    */
-  static douglasPeucker(
-    points: Array<{ x: number; y: number }>, 
-    tolerance: number
-  ): Array<{ x: number; y: number }> {
-    if (points.length <= 2) return points;
+  static douglasPeucker(points: Array<{ x: number; y: number }>, tolerance: number): Array<{ x: number; y: number }> {
+    if (points.length <= 2) {
+        return points;
+    }
 
-    // Find the point with maximum distance from the line between first and last points
+    // Find the point with the maximum distance from the line segment
     let maxDistance = 0;
     let maxIndex = 0;
-    
-    const first = points[0];
-    const last = points[points.length - 1];
+    const start = points[0];
+    const end = points[points.length - 1];
 
     for (let i = 1; i < points.length - 1; i++) {
-      const distance = this.pointToLineDistance(points[i], first, last);
-      if (distance > maxDistance) {
-        maxDistance = distance;
-        maxIndex = i;
-      }
+        const distance = this.perpendicularDistance(points[i], start, end);
+        if (distance > maxDistance) {
+            maxDistance = distance;
+            maxIndex = i;
+        }
     }
 
     // If the maximum distance is greater than tolerance, recursively simplify
     if (maxDistance > tolerance) {
-      const leftPoints = this.douglasPeucker(points.slice(0, maxIndex + 1), tolerance);
-      const rightPoints = this.douglasPeucker(points.slice(maxIndex), tolerance);
-      
-      // Combine results, avoiding duplicate point at the junction
-      return leftPoints.slice(0, -1).concat(rightPoints);
+        const leftSide = this.douglasPeucker(points.slice(0, maxIndex + 1), tolerance);
+        const rightSide = this.douglasPeucker(points.slice(maxIndex), tolerance);
+        
+        // Combine results (remove duplicate point at the join)
+        return leftSide.slice(0, -1).concat(rightSide);
     } else {
-      // All points between first and last can be removed
-      return [first, last];
+        // If no point is further than tolerance, return just the endpoints
+        return [start, end];
     }
+  }
+
+  static perpendicularDistance(
+      point: { x: number; y: number },
+      lineStart: { x: number; y: number },
+      lineEnd: { x: number; y: number }
+  ): number {
+      const dx = lineEnd.x - lineStart.x;
+      const dy = lineEnd.y - lineStart.y;
+      
+      if (dx === 0 && dy === 0) {
+          // Line segment is actually a point
+          return Math.sqrt(
+              Math.pow(point.x - lineStart.x, 2) + Math.pow(point.y - lineStart.y, 2)
+          );
+      }
+      
+      const t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / (dx * dx + dy * dy);
+      
+      let closestPoint;
+      if (t < 0) {
+          closestPoint = lineStart;
+      } else if (t > 1) {
+          closestPoint = lineEnd;
+      } else {
+          closestPoint = {
+              x: lineStart.x + t * dx,
+              y: lineStart.y + t * dy
+          };
+      }
+      
+      return Math.sqrt(
+          Math.pow(point.x - closestPoint.x, 2) + Math.pow(point.y - closestPoint.y, 2)
+      );
   }
 
   /**

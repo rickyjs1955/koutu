@@ -107,60 +107,66 @@ export const polygonModel = {
     /**
      * Update a polygon
      */
-    async update(id: string, data: UpdatePolygonInput): Promise<Polygon | null> {
-        const updates: string[] = [];
-        const values: any[] = [];
-        let paramIndex = 1;
-        
-        // Build update query based on provided fields
-        if (data.points !== undefined) {
-        updates.push(`points = $${paramIndex}`);
-        values.push(JSON.stringify(data.points));
-        paramIndex++;
+    async update(id: string, updates: UpdatePolygonInput): Promise<Polygon | null> {
+        try {
+            // Build the SET clause dynamically based on what's being updated
+            const setClauses = [];
+            const values = [];
+            let paramIndex = 1;
+
+            if (updates.points !== undefined) {
+                setClauses.push(`points = $${paramIndex}`);
+                values.push(JSON.stringify(updates.points));
+                paramIndex++;
+            }
+
+            if (updates.label !== undefined) {
+                setClauses.push(`label = $${paramIndex}`);
+                values.push(updates.label);
+                paramIndex++;
+            }
+
+            if (updates.metadata !== undefined) {
+                setClauses.push(`metadata = $${paramIndex}`);
+                values.push(JSON.stringify(updates.metadata));
+                paramIndex++;
+            }
+
+            // Always update the updated_at timestamp
+            setClauses.push(`updated_at = NOW()`);
+
+            if (setClauses.length === 1) {
+                // Only updated_at would be set, meaning no actual updates
+                // Just return the current polygon
+                return await this.findById(id);
+            }
+
+            // Add the id parameter for the WHERE clause
+            values.push(id);
+
+            const result = await query(
+                `UPDATE polygons 
+                 SET ${setClauses.join(', ')} 
+                 WHERE id = $${paramIndex} 
+                 RETURNING *`,
+                values
+            );
+
+            if (result.rows.length === 0) {
+                return null;
+            }
+
+            // Transform the database record to match the schema
+            const polygon = result.rows[0];
+            return {
+                ...polygon,
+                points: safeJsonParse(polygon.points),
+                metadata: safeJsonParse(polygon.metadata)
+            };
+        } catch (error) {
+            console.error('Error updating polygon:', error);
+            throw error;
         }
-        
-        if (data.label !== undefined) {
-        updates.push(`label = $${paramIndex}`);
-        values.push(data.label);
-        paramIndex++;
-        }
-        
-        if (data.metadata !== undefined) {
-        updates.push(`metadata = $${paramIndex}`);
-        values.push(JSON.stringify(data.metadata));
-        paramIndex++;
-        }
-        
-        // Add updated_at
-        updates.push(`updated_at = NOW()`);
-        
-        // If no updates, return existing polygon
-        if (updates.length === 1) { // Only updated_at was added
-        return this.findById(id);
-        }
-        
-        // Add id to values
-        values.push(id);
-        
-        const result = await query(
-        `UPDATE polygons 
-        SET ${updates.join(', ')} 
-        WHERE id = $${paramIndex} 
-        RETURNING *`,
-        values
-        );
-        
-        if (result.rows.length === 0) {
-        return null;
-        }
-        
-        // Transform the database record to match the schema
-        const polygon = result.rows[0];
-        return {
-        ...polygon,
-        points: safeJsonParse(polygon.points),
-        metadata: safeJsonParse(polygon.metadata)
-        };
     },
     
     /**
