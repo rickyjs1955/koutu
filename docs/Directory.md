@@ -46,7 +46,7 @@ Backend:
 2.  /backend/src/config/firebase.ts                         ✅Unit ✅Integration ✅Security
 3.  /backend/src/config/oauth.ts                            ✅Unit ✅Integration ✅Security
 4.  /backend/src/controllers/imageController.ts             ✅Unit ✅Integration ✅Security 
-5.  /backend/src/controllers/polygonController.ts           🛠️Unit 🛠️Integration 🛠️Security  
+5.  /backend/src/controllers/polygonController.ts           ✅Unit 🛠️Integration 🔔Security  
 6.  /backend/src/controllers/garmentController.ts           ❌Unit ❌Integration ❌Security
 7.  /backend/src/controllers/wardrobeController.ts          ❌Unit ❌Integration ❌Security
 8.  /backend/src/controllers/exportController.ts            ❌Unit ❌Integration ❌Security
@@ -72,7 +72,7 @@ Backend:
 28. /backend/src/routes/oauthRoutes.ts                      ❌Unit ❌Integration ❌Security
 29. /backend/src/services/imageService.ts                   ✅Unit ✅Integration ✅Security
 30. /backend/src/services/imageProcessingService.ts         ✅Unit ✅Integration ✅Security
-31. /backend/src/services/polygonService.ts                 ✅Unit 🛠️Integration ✅Security
+31. /backend/src/services/polygonService.ts                 ✅Unit ✅Integration ✅Security
 32. /backend/src/services/garmentService.ts                 ❌Unit ❌Integration ❌Security
 33. /backend/src/services/wardrobeService.ts                ❌Unit ❌Integration ❌Security
 34. /backend/src/services/exportService.ts                  ❌Unit ❌Integration ❌Security

@@ -1510,7 +1510,7 @@ describe('PolygonModel - Production Unit Tests', () => {
     describe('Memory Usage Tests', () => {
       test('should handle large polygon datasets without memory leaks', async () => {
         // Arrange
-        const largeDataset = createPerformanceTestData.scalability.largeBatch;
+        const largeDataset = createPerformanceTestData().scalability.largeBatch;
         const polygons = Array.from({ length: largeDataset.polygonCount }, (_, i) =>
           createMockPolygon({
             points: createValidPolygonPoints.circle(200, 200, 50, 20),

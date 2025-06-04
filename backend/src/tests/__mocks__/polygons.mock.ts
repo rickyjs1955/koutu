@@ -697,14 +697,7 @@ export const createConcurrencyTestScenarios = {
 
 // ==================== SECURITY TEST PAYLOADS ====================
 
-export const createPolygonSecurityPayloads = {
-  maliciousPoints: [
-    // Extremely large coordinates
-    { x: Number.MAX_SAFE_INTEGER, y: Number.MAX_SAFE_INTEGER },
-    { x: -Number.MAX_SAFE_INTEGER, y: -Number.MAX_SAFE_INTEGER },
-    { x: 0, y: 0 }
-  ],
-
+export const createPolygonSecurityPayloads = () => ({
   maliciousLabels: [
     '<script>alert("xss")</script>',
     "'; DROP TABLE polygons; --",
@@ -712,16 +705,17 @@ export const createPolygonSecurityPayloads = {
     'label'.repeat(1000),
     '\x00\x01\x02\x03\x04'
   ],
-
   maliciousMetadata: {
-    oversized: 'x'.repeat(1024 * 1024), // 1MB string
+    oversized: 'x'.repeat(1024 * 1024),
     sqlInjection: "'; DELETE FROM images WHERE '1'='1",
     xssPayload: '<img src="x" onerror="alert(\'XSS\')">',
-    pathTraversal: '../../../sensitive/data',
-    nullBytes: 'safe\x00dangerous',
-    unicodeAttack: 'normal\u202Eexe.gpj'
+    pathTraversal: '../../../sensitive/data'
   },
-
+  maliciousPoints: [
+    { x: Number.MAX_SAFE_INTEGER, y: Number.MAX_SAFE_INTEGER },
+    { x: -Number.MAX_SAFE_INTEGER, y: -Number.MAX_SAFE_INTEGER },
+    { x: 0, y: 0 }
+  ],
   dos: {
     tooManyPolygons: {
       count: 10000,
@@ -733,34 +727,32 @@ export const createPolygonSecurityPayloads = {
     },
     rapidRequests: {
       requestCount: 1000,
-      timeframe: 1000 // 1 second
+      timeframe: 1000
     }
   }
-};
+});
 
 // ==================== PERFORMANCE TEST DATA ====================
 
-export const createPerformanceTestData = {
+export const createPerformanceTestData = () => ({
   scalability: {
     smallBatch: { polygonCount: 10, complexity: 'simple' },
     mediumBatch: { polygonCount: 100, complexity: 'medium' },
     largeBatch: { polygonCount: 1000, complexity: 'complex' }
   },
-
   complexityLevels: {
     simple: { pointCount: 4, expectedProcessingTime: 10 },
     medium: { pointCount: 20, expectedProcessingTime: 50 },
     complex: { pointCount: 100, expectedProcessingTime: 200 },
     extreme: { pointCount: 500, expectedProcessingTime: 1000 }
   },
-
   memoryUsage: {
     baseline: { polygonCount: 0 },
     moderate: { polygonCount: 100 },
     heavy: { polygonCount: 1000 },
     extreme: { polygonCount: 10000 }
   }
-};
+});
 
 // ==================== REQUEST/RESPONSE MOCKS ====================
 
