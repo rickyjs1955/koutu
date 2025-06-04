@@ -40,9 +40,6 @@ import {
   cleanupPolygonTestData,
   polygonAssertions
 } from '../__helpers__/polygons.helper';
-import { mockNext } from '../__mocks__/images.mock';
-import { createTestImage, setupApiErrorMocks } from '../integration/mini.int.test';
-import { createTestUser } from '../testUtils';
 
 // ==================== MOCK SETUP ====================
 
