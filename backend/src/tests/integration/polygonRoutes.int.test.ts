@@ -161,9 +161,10 @@ async function createProductionPolygonSchema() {
     await TestDatabaseConnection.query('DROP TABLE IF EXISTS garment_items CASCADE');
     await TestDatabaseConnection.query('DROP TABLE IF EXISTS polygons CASCADE');
     console.log('🧹 Existing polygon-related tables dropped');
-  } catch (error) {
-    console.log('⚠️ No existing tables to drop:', error.message);
-  }
+} catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log('⚠️ No existing tables to drop:', errorMessage);
+}
   
   // Complete polygon table with all production features
   await TestDatabaseConnection.query(`
@@ -503,158 +504,49 @@ describe('Polygon Routes - Production Integration Tests', () => {
     
     describe('Complete CRUD Operations', () => {
         describe('Polygon Creation', () => {
-        it('should create polygon with complete request-to-database flow', async () => {
-            console.log('🔍 Testing complete polygon creation flow...');
-            
-            const polygonData = createMockPolygonCreate({
-            original_image_id: testData.primaryImage.id,
-            points: createValidPolygonPoints.garmentSuitable(),
-            label: 'integration_test_polygon',
-            metadata: createPolygonMetadataVariations.detailed
-            });
-            
-            console.log('📤 Creating polygon via HTTP API...');
-            const response = await request(app)
-            .post('/api/v1/polygons')
-            .set('Authorization', `Bearer ${testData.getPrimaryUserToken()}`)
-            .send(polygonData)
-            .expect(201);
-            
-            console.log('✅ Polygon created successfully');
-            
-            // Verify response structure
-            expect(response.body.status).toBe('success');
-            expect(response.body.data.polygon.label).toBe('updated_polygon_label');
-            
-            // Verify in database
-            const dbResult = await TestDatabaseConnection.query(
-            'SELECT * FROM polygons WHERE id = $1',
-            [testPolygonId]
-            );
-            
-            expect(dbResult.rows).toHaveLength(1);
-            const dbPolygon = dbResult.rows[0];
-            expect(dbPolygon.label).toBe('updated_polygon_label');
-            expect(dbPolygon.version).toBe(2); // Version should increment
-            
-            const metadata = JSON.parse(dbPolygon.metadata);
-            expect(metadata.version).toBe(2);
-            expect(metadata.updated_by).toBe('integration_test');
-            
-            console.log('✅ Polygon updates working');
-        });
-
-        it('should update polygon geometry with validation', async () => {
-            console.log('🔍 Testing polygon geometry updates...');
-            
-            const newPoints = createValidPolygonPoints.garmentSuitable();
-            const updateData = {
-            points: newPoints,
-            metadata: { geometry_updated: true }
-            };
-            
-            const response = await request(app)
-            .put(`/api/v1/polygons/${testPolygonId}`)
-            .set('Authorization', `Bearer ${testData.getPrimaryUserToken()}`)
-            .send(updateData)
-            .expect(200);
-            
-            expect(response.body.status).toBe('success');
-            
-            // Verify points updated in database
-            const dbResult = await TestDatabaseConnection.query(
-            'SELECT points FROM polygons WHERE id = $1',
-            [testPolygonId]
-            );
-            
-            const storedPoints = JSON.parse(dbResult.rows[0].points);
-            expect(storedPoints).toEqual(newPoints);
-            
-            console.log('✅ Polygon geometry updates working');
-        });
-
-        it('should prevent unauthorized updates', async () => {
-            console.log('🔍 Testing unauthorized update prevention...');
-            
-            const updateData = { label: 'hacked_label' };
-            
-            const response = await request(app)
-            .put(`/api/v1/polygons/${testPolygonId}`)
-            .set('Authorization', `Bearer ${testData.getSecondaryUserToken()}`)
-            .send(updateData)
-            .expect(403);
-            
-            expect(response.body.status).toBe('error');
-            expect(response.body.message).toContain('permission');
-            
-            // Verify polygon was not updated
-            const dbResult = await TestDatabaseConnection.query(
-            'SELECT label FROM polygons WHERE id = $1',
-            [testPolygonId]
-            );
-            
-            expect(dbResult.rows[0].label).toBe('update_test_polygon');
-            
-            console.log('✅ Unauthorized update prevention working');
-        });
-
-        it('should validate geometry on update', async () => {
-            console.log('🔍 Testing geometry validation on update...');
-            
-            const invalidUpdateData = {
-            points: createInvalidPolygonPoints.selfIntersecting()
-            };
-            
-            const response = await request(app)
-            .put(`/api/v1/polygons/${testPolygonId}`)
-            .set('Authorization', `Bearer ${testData.getPrimaryUserToken()}`)
-            .send(invalidUpdateData)
-            .expect(422);
-            
-            expect(response.body.status).toBe('error');
-            expect(response.body.message).toContain('intersect');
-            
-            console.log('✅ Geometry validation on update working');
-        });
-
-        it('should handle partial updates correctly', async () => {
-            console.log('🔍 Testing partial polygon updates...');
-            
-            // Update only label
-            const labelResponse = await request(app)
-            .put(`/api/v1/polygons/${testPolygonId}`)
-            .set('Authorization', `Bearer ${testData.getPrimaryUserToken()}`)
-            .send({ label: 'partial_update_label' })
-            .expect(200);
-            
-            expect(labelResponse.body.data.polygon.label).toBe('partial_update_label');
-            
-            // Update only metadata
-            const metadataResponse = await request(app)
-            .put(`/api/v1/polygons/${testPolygonId}`)
-            .set('Authorization', `Bearer ${testData.getPrimaryUserToken()}`)
-            .send({ 
-                metadata: { 
-                partial_update: true,
-                timestamp: new Date().toISOString()
-                }
-            })
-            .expect(200);
-            
-            // Verify both updates persisted
-            const dbResult = await TestDatabaseConnection.query(
-            'SELECT * FROM polygons WHERE id = $1',
-            [testPolygonId]
-            );
-            
-            const dbPolygon = dbResult.rows[0];
-            expect(dbPolygon.label).toBe('partial_update_label');
-            
-            const metadata = JSON.parse(dbPolygon.metadata);
-            expect(metadata.partial_update).toBe(true);
-            
-            console.log('✅ Partial updates working');
-        });
+            it('should create polygon with complete request-to-database flow', async () => {
+                console.log('🔍 Testing complete polygon creation flow...');
+                
+                const polygonData = createMockPolygonCreate({
+                    original_image_id: testData.primaryImage.id,
+                    points: createValidPolygonPoints.garmentSuitable(),
+                    label: 'integration_test_polygon',
+                    metadata: createPolygonMetadataVariations.detailed
+                });
+                
+                console.log('📤 Creating polygon via HTTP API...');
+                const response = await request(app)
+                    .post('/api/v1/polygons')
+                    .set('Authorization', `Bearer ${testData.getPrimaryUserToken()}`)
+                    .send(polygonData)
+                    .expect(201);
+                
+                console.log('✅ Polygon created successfully');
+                
+                // Get the polygon ID from the response
+                const polygonId = response.body.data.polygon.id;
+                testData.trackPolygon(polygonId);
+                
+                // Verify response structure
+                expect(response.body.status).toBe('success');
+                expect(response.body.data.polygon.label).toBe('integration_test_polygon');
+                
+                // Verify in database
+                const dbResult = await TestDatabaseConnection.query(
+                    'SELECT * FROM polygons WHERE id = $1',
+                    [polygonId] // Use polygonId instead of testPolygonId
+                );
+                
+                expect(dbResult.rows).toHaveLength(1);
+                const dbPolygon = dbResult.rows[0];
+                expect(dbPolygon.label).toBe('integration_test_polygon');
+                expect(dbPolygon.version).toBe(1);
+                
+                const metadata = JSON.parse(dbPolygon.metadata);
+                expect(metadata.type).toBe('garment');
+                
+                console.log('✅ Complete polygon creation flow verified');
+            });        
         });
 
         describe('Polygon Retrieval', () => {
@@ -788,58 +680,6 @@ describe('Polygon Routes - Production Integration Tests', () => {
             testData.trackPolygon(testPolygonId);
         });
 
-        it('should update polygon label and metadata', async () => {
-            console.log('🔍 Testing polygon updates...');
-            
-            const updateData = {
-            label: 'updated_polygon_label',
-            metadata: {
-                category: 'clothing',
-                version: 2,
-                updated_by: 'integration_test',
-                update_reason: 'testing'
-            }
-            };
-            
-            const response = await request(app)
-            .put(`/api/v1/polygons/${testPolygonId}`)
-            .set('Authorization', `Bearer ${testData.getPrimaryUserToken()}`)
-            .send(updateData)
-            .expect(200);
-            
-            expect(response.body.status).toBe('success');
-            expect(response.body.data.polygon).toBeDefined();
-            expect(response.body.data.polygon.id).toBeDefined();
-            
-            const polygonId = response.body.data.polygon.id;
-            testData.trackPolygon(polygonId);
-            
-            // Verify in database
-            const dbResult = await TestDatabaseConnection.query(
-            'SELECT * FROM polygons WHERE id = $1',
-            [polygonId]
-            );
-            
-            expect(dbResult.rows).toHaveLength(1);
-            const dbPolygon = dbResult.rows[0];
-            
-            expect(dbPolygon.user_id).toBe(testData.primaryUser.id);
-            expect(dbPolygon.original_image_id).toBe(testData.primaryImage.id);
-            expect(dbPolygon.label).toBe('integration_test_polygon');
-            expect(dbPolygon.status).toBe('active');
-            expect(dbPolygon.version).toBe(1);
-            
-            // Verify points are stored correctly
-            const storedPoints = JSON.parse(dbPolygon.points);
-            expect(storedPoints).toEqual(polygonData.points);
-            
-            // Verify metadata is stored correctly
-            const storedMetadata = JSON.parse(dbPolygon.metadata);
-            expect(storedMetadata.type).toBe('garment');
-            
-            console.log('✅ Complete polygon creation flow verified');
-        });
-
         it('should validate complex polygon geometry in real service layer', async () => {
             console.log('🔍 Testing polygon geometry validation...');
             
@@ -895,10 +735,10 @@ describe('Polygon Routes - Production Integration Tests', () => {
             console.log('🔍 Testing polygon metadata variations...');
             
             const metadataVariations = [
-            createPolygonMetadataVariations.minimal,
-            createPolygonMetadataVariations.detailed,
-            createPolygonMetadataVariations.nested,
-            createPolygonMetadataVariations.withArrays
+                createPolygonMetadataVariations.basic,
+                createPolygonMetadataVariations.detailed,
+                createPolygonMetadataVariations.aiGenerated,
+                createPolygonMetadataVariations.garmentSpecific
             ];
             
             for (const [index, metadata] of metadataVariations.entries()) {
@@ -928,6 +768,164 @@ describe('Polygon Routes - Production Integration Tests', () => {
             }
             
             console.log('✅ Polygon metadata variations working');
+        });
+
+        it('should update polygon geometry with validation', async () => {
+            console.log('🔍 Testing polygon geometry updates...');
+            
+            const newPoints = createValidPolygonPoints.garmentSuitable();
+            const updateData = {
+            points: newPoints,
+            metadata: { geometry_updated: true }
+            };
+            
+            const response = await request(app)
+            .put(`/api/v1/polygons/${testPolygonId}`)
+            .set('Authorization', `Bearer ${testData.getPrimaryUserToken()}`)
+            .send(updateData)
+            .expect(200);
+            
+            expect(response.body.status).toBe('success');
+            
+            // Verify points updated in database
+            const dbResult = await TestDatabaseConnection.query(
+            'SELECT points FROM polygons WHERE id = $1',
+            [testPolygonId]
+            );
+            
+            const storedPoints = JSON.parse(dbResult.rows[0].points);
+            expect(storedPoints).toEqual(newPoints);
+            
+            console.log('✅ Polygon geometry updates working');
+        });
+
+        it('should update polygon label and metadata', async () => {
+            console.log('🔍 Testing polygon updates...');
+            
+            const updateData = {
+            label: 'updated_polygon_label',
+            metadata: {
+                category: 'clothing',
+                version: 2,
+                updated_by: 'integration_test',
+                update_reason: 'testing'
+            }
+            };
+            
+            const response = await request(app)
+            .put(`/api/v1/polygons/${testPolygonId}`)
+            .set('Authorization', `Bearer ${testData.getPrimaryUserToken()}`)
+            .send(updateData)
+            .expect(200);
+            
+            expect(response.body.status).toBe('success');
+            expect(response.body.data.polygon).toBeDefined();
+            expect(response.body.data.polygon.label).toBe('updated_polygon_label');
+            
+            // Verify in database
+            const dbResult = await TestDatabaseConnection.query(
+            'SELECT * FROM polygons WHERE id = $1',
+            [testPolygonId]
+            );
+            
+            expect(dbResult.rows).toHaveLength(1);
+            const dbPolygon = dbResult.rows[0];
+            
+            expect(dbPolygon.user_id).toBe(testData.primaryUser.id);
+            expect(dbPolygon.original_image_id).toBe(testData.primaryImage.id);
+            expect(dbPolygon.label).toBe('updated_polygon_label');
+            expect(dbPolygon.status).toBe('active');
+            
+            // Verify metadata is stored correctly
+            const storedMetadata = JSON.parse(dbPolygon.metadata);
+            expect(storedMetadata.category).toBe('clothing');
+            expect(storedMetadata.version).toBe(2);
+            expect(storedMetadata.updated_by).toBe('integration_test');
+            
+            console.log('✅ Polygon update flow verified');
+        });
+
+        it('should prevent unauthorized updates', async () => {
+            console.log('🔍 Testing unauthorized update prevention...');
+            
+            const updateData = { label: 'hacked_label' };
+            
+            const response = await request(app)
+            .put(`/api/v1/polygons/${testPolygonId}`)
+            .set('Authorization', `Bearer ${testData.getSecondaryUserToken()}`)
+            .send(updateData)
+            .expect(403);
+            
+            expect(response.body.status).toBe('error');
+            expect(response.body.message).toContain('permission');
+            
+            // Verify polygon was not updated
+            const dbResult = await TestDatabaseConnection.query(
+            'SELECT label FROM polygons WHERE id = $1',
+            [testPolygonId]
+            );
+            
+            expect(dbResult.rows[0].label).toBe('update_test_polygon');
+            
+            console.log('✅ Unauthorized update prevention working');
+        });
+
+        it('should validate geometry on update', async () => {
+            console.log('🔍 Testing geometry validation on update...');
+            
+            const invalidUpdateData = {
+            points: createInvalidPolygonPoints.selfIntersecting()
+            };
+            
+            const response = await request(app)
+            .put(`/api/v1/polygons/${testPolygonId}`)
+            .set('Authorization', `Bearer ${testData.getPrimaryUserToken()}`)
+            .send(invalidUpdateData)
+            .expect(422);
+            
+            expect(response.body.status).toBe('error');
+            expect(response.body.message).toContain('intersect');
+            
+            console.log('✅ Geometry validation on update working');
+        });
+
+        it('should handle partial updates correctly', async () => {
+            console.log('🔍 Testing partial polygon updates...');
+            
+            // Update only label
+            const labelResponse = await request(app)
+            .put(`/api/v1/polygons/${testPolygonId}`)
+            .set('Authorization', `Bearer ${testData.getPrimaryUserToken()}`)
+            .send({ label: 'partial_update_label' })
+            .expect(200);
+            
+            expect(labelResponse.body.data.polygon.label).toBe('partial_update_label');
+            
+            // Update only metadata
+            const metadataResponse = await request(app)
+            .put(`/api/v1/polygons/${testPolygonId}`)
+            .set('Authorization', `Bearer ${testData.getPrimaryUserToken()}`)
+            .send({ 
+                metadata: { 
+                partial_update: true,
+                timestamp: new Date().toISOString()
+                }
+            })
+            .expect(200);
+            
+            // Verify both updates persisted
+            const dbResult = await TestDatabaseConnection.query(
+            'SELECT * FROM polygons WHERE id = $1',
+            [testPolygonId]
+            );
+            
+            const dbPolygon = dbResult.rows[0];
+            expect(dbPolygon.label).toBe('partial_update_label');
+            
+            const metadata = JSON.parse(dbPolygon.metadata);
+            expect(metadata.partial_update).toBe(true);
+            
+            console.log('✅ Partial updates working');
         });
         });
 
@@ -2347,84 +2345,3 @@ describe('Polygon Routes - Production Integration Tests', () => {
         });
     });    
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
