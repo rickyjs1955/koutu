@@ -46,8 +46,8 @@ Backend:
 2.  /backend/src/config/firebase.ts                         ✅Unit ✅Integration ✅Security
 3.  /backend/src/config/oauth.ts                            ✅Unit ✅Integration ✅Security
 4.  /backend/src/controllers/imageController.ts             ✅Unit ✅Integration ✅Security 
-5.  /backend/src/controllers/polygonController.ts           ✅Unit 🛠️Integration 🔔Security  
-6.  /backend/src/controllers/garmentController.ts           ❌Unit ❌Integration ❌Security
+5.  /backend/src/controllers/polygonController.ts           ✅Unit ✅Integration 🔔Security  
+6.  /backend/src/controllers/garmentController.ts           🛠️Unit 🛠️Integration 🛠️Security
 7.  /backend/src/controllers/wardrobeController.ts          ❌Unit ❌Integration ❌Security
 8.  /backend/src/controllers/exportController.ts            ❌Unit ❌Integration ❌Security
 9.  /backend/src/controllers/authController.ts              ❌Unit ❌Integration ❌Security
@@ -59,12 +59,12 @@ Backend:
 15. /backend/src/models/db.ts                               ✅Unit ✅Integration ✅Security
 16. /backend/src/models/imageModel.ts                       ✅Unit ✅Integration ✅Security
 17. /backend/src/models/polygonModel.ts                     ✅Unit ✅Integration 🔔Security
-18. /backend/src/models/garmentModel.ts                     ❌Unit ❌Integration ❌Security
+18. /backend/src/models/garmentModel.ts                     🛠️Unit 🛠️Integration 🛠️Security
 19. /backend/src/models/wardrobeModel.ts                    ❌Unit ❌Integration ❌Security
 20. /backend/src/models/exportModel.ts                      ❌Unit ❌Integration ❌Security
 21. /backend/src/routes/imageRoutes.ts                      ✅Unit ✅Integration ✅Security
-22. /backend/src/routes/polygonRoutes.ts                    🛠️Unit 🛠️Integration 🛠️Security
-23. /backend/src/routes/garmentRoutes.ts                    ❌Unit ❌Integration ❌Security
+22. /backend/src/routes/polygonRoutes.ts                    ✅Unit ✅Integration 🔔Security
+23. /backend/src/routes/garmentRoutes.ts                    🛠️Unit 🛠️Integration 🛠️Security
 24. /backend/src/routes/wardrobeRoutes.ts                   ❌Unit ❌Integration ❌Security
 25. /backend/src/routes/exportRoutes.ts                     ❌Unit ❌Integration ❌Security
 26. /backend/src/routes/fileRoutes.ts                       ❌Unit ❌Integration ❌Security
@@ -73,7 +73,7 @@ Backend:
 29. /backend/src/services/imageService.ts                   ✅Unit ✅Integration ✅Security
 30. /backend/src/services/imageProcessingService.ts         ✅Unit ✅Integration ✅Security
 31. /backend/src/services/polygonService.ts                 ✅Unit ✅Integration ✅Security
-32. /backend/src/services/garmentService.ts                 ❌Unit ❌Integration ❌Security
+32. /backend/src/services/garmentService.ts                 🛠️Unit 🛠️Integration 🛠️Security
 33. /backend/src/services/wardrobeService.ts                ❌Unit ❌Integration ❌Security
 34. /backend/src/services/exportService.ts                  ❌Unit ❌Integration ❌Security
 35. /backend/src/services/labelingService.ts                ❌Unit ❌Integration ❌Security
