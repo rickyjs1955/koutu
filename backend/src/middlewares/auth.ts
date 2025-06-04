@@ -9,6 +9,7 @@ import { imageModel } from '../models/imageModel';
 import { garmentModel } from '../models/garmentModel';
 import { polygonModel } from '../models/polygonModel';
 import { wardrobeModel } from '../models/wardrobeModel';
+import { TestDatabaseConnection } from '@/utils/testDatabaseConnection';
 
 // Rate limiting cache
 export const rateLimitCache = new Map<string, { count: number; resetTime: number }>();
@@ -293,3 +294,39 @@ export const stopCleanup = () => {
 if (process.env.NODE_ENV !== 'test') {
   initializeCleanup();
 }
+
+/**
+ * Authorize polygon ownership middleware
+ */
+export const authorizePolygonOwnership = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.user) {
+            return next(ApiError.unauthorized('Authentication required', 'AUTH_REQUIRED'));
+        }
+
+        const polygonId = req.params.id;
+        if (!polygonId) {
+            return next(ApiError.badRequest('Polygon ID is required'));
+        }
+
+        // Query to check if polygon belongs to the authenticated user
+        const result = await TestDatabaseConnection.query(
+            'SELECT user_id FROM polygons WHERE id = $1 AND status != $2',
+            [polygonId, 'deleted']
+        );
+
+        if (result.rows.length === 0) {
+            return next(ApiError.notFound('Polygon not found'));
+        }
+
+        const polygon = result.rows[0];
+        if (polygon.user_id !== req.user.id) {
+            return next(ApiError.forbidden('You do not have permission to access this polygon', 'INSUFFICIENT_PERMISSIONS'));
+        }
+
+        next();
+    } catch (error: any) {
+        console.error('Polygon authorization error:', error);
+        return next(ApiError.internal('Authorization check failed'));
+    }
+};
