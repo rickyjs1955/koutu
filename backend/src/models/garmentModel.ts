@@ -1,4 +1,4 @@
-// /backend/src/models/garmentModel.ts
+// /backend/src/models/garmentModel.ts - UPDATED for nullable fields
 import { v4 as uuidv4, validate as isUuid } from 'uuid';
 import { getQueryFunction } from '../utils/modelUtils';
 
@@ -32,12 +32,15 @@ export const garmentModel = {
     const id = uuidv4();
     
     const db = getQueryFunction();
+    
+    // UPDATED: Handle the case where original_image_id might need to be nullable
+    // and provide defaults for data_version
     const result = await db(
       `INSERT INTO garment_items 
-       (id, user_id, original_image_id, file_path, mask_path, metadata, created_at, updated_at, data_version) 
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), 1) 
+       (id, user_id, original_image_id, file_path, mask_path, metadata, data_version, created_at, updated_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 1), NOW(), NOW()) 
        RETURNING *`,
-      [id, user_id, original_image_id, file_path, mask_path, JSON.stringify(metadata)]
+      [id, user_id, original_image_id, file_path, mask_path, JSON.stringify(metadata), 1]
     );
     
     return result.rows[0];
@@ -93,14 +96,16 @@ export const garmentModel = {
     }
     
     // Either merge or replace based on options
+    // UPDATED: Handle case where existing metadata might be null
+    const existingMetadata = garment.metadata || {};
     const updatedMetadata = options.replace 
       ? { ...data.metadata }
-      : { ...garment.metadata, ...data.metadata };
+      : { ...existingMetadata, ...data.metadata };
     
     const db = getQueryFunction();
     const result = await db(
       `UPDATE garment_items 
-      SET metadata = $1, updated_at = NOW(), data_version = data_version + 1 
+      SET metadata = $1, updated_at = NOW(), data_version = COALESCE(data_version, 1) + 1 
       WHERE id = $2 
       RETURNING *`,
       [JSON.stringify(updatedMetadata), id]

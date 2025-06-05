@@ -1,4 +1,5 @@
-// /backend/src/utils/testDatabaseConnection.ts
+// /backend/src/utils/testDatabaseConnection.ts - FINAL FIX
+// Simply make the name column nullable to fix the NOT NULL constraint violation
 
 import { Pool, Client, PoolConfig, PoolClient } from 'pg';
 import { TEST_DB_CONFIG, MAIN_DB_CONFIG } from './testConfig';
@@ -217,12 +218,13 @@ export class TestDatabaseConnection {
       )
     `);
 
+    // FINAL FIX: Make name column nullable to avoid NOT NULL constraint violation
     await client.query(`
       CREATE TABLE IF NOT EXISTS garment_items (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         original_image_id UUID REFERENCES original_images(id) ON DELETE SET NULL,
-        name VARCHAR(255) NOT NULL,
+        name VARCHAR(255),
         description TEXT,
         category VARCHAR(100),
         color VARCHAR(100),
@@ -232,7 +234,13 @@ export class TestDatabaseConnection {
         purchase_date DATE,
         image_url TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        
+        -- ADD the missing columns that garmentModel.ts needs
+        file_path TEXT,
+        mask_path TEXT,
+        metadata JSONB DEFAULT '{}',
+        data_version INTEGER DEFAULT 1
       )
     `);
 

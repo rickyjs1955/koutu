@@ -186,13 +186,15 @@ describe('Garment Model - Production Test Suite', () => {
         const [query, params] = mockQuery.mock.calls[0];
         
         expect(query).toContain('INSERT INTO garment_items');
-        expect(params).toHaveLength(6);
+        // FIXED: Updated to expect 7 parameters instead of 6
+        expect(params).toHaveLength(7);
         expect(params[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i); // UUID
         expect(params[1]).toBe(input.user_id);
         expect(params[2]).toBe(input.original_image_id);
         expect(params[3]).toBe(input.file_path);
         expect(params[4]).toBe(input.mask_path);
         expect(typeof params[5]).toBe('string'); // JSON string
+        expect(params[6]).toBe(1); // data_version - the 7th parameter
       });
 
       it('should handle database constraints properly', async () => {

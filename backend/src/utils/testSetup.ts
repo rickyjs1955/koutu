@@ -1,10 +1,7 @@
-// /backend/src/utils/testSetup.ts
+// /backend/src/utils/testSetup.ts - RESTORED TO ORIGINAL
 
 import { cleanupTestFirebase, initializeTestFirebase, resetFirebaseEmulator } from '@/tests/__helpers__/firebase.helper';
 import { TestDatabaseConnection } from './testDatabaseConnection';
-
-// REMOVE the separate pool - use TestDatabaseConnection instead
-// const testPool = new Pool(TEST_DB_CONFIG); // ❌ DELETE THIS
 
 /**
  * Use TestDatabaseConnection for all queries - this ensures unified connection management
@@ -187,7 +184,6 @@ export const setupFirebaseEmulator = async () => {
 
 /**
  * Clean up test database and Firebase resources
- * FIXED: Use TestDatabaseConnection.cleanup() instead of separate pool
  */
 export const teardownTestDatabase = async () => {
   try {
@@ -206,8 +202,6 @@ export const teardownTestDatabase = async () => {
     console.error('Failed to clean up test data:', error);
   }
 
-  // CRITICAL FIX: Don't create a separate cleanup process
-  // Let TestDatabaseConnection handle ALL connection cleanup
   console.log('Test database connections closed');
 
   try {
