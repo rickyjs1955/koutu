@@ -218,6 +218,19 @@ export const garmentService = {
      * Validate garment-specific metadata rules
      */
     validateGarmentMetadata(metadata: Record<string, any>): void {
+        // Handle null/undefined metadata first
+        if (!metadata || typeof metadata !== 'object') {
+            return; // Allow null/undefined metadata - it's optional
+        }
+
+        // Business rules for garment metadata
+        if (metadata.category && typeof metadata.category !== 'string') {
+            throw ApiError.businessLogic(
+                'Garment category must be a string',
+                'invalid_category_type',
+            );
+        }
+
         // Business rules for garment metadata
         if (metadata.category && typeof metadata.category !== 'string') {
             throw ApiError.businessLogic(
