@@ -3,7 +3,7 @@ import { polygonModel } from '../models/polygonModel';
 import { imageModel } from '../models/imageModel';
 import { storageService } from './storageService';
 import { ApiError } from '../utils/ApiError';
-import { CreatePolygonInput, UpdatePolygonInput, Polygon } from '../../../shared/src/schemas/polygon';
+import { UpdatePolygonInput, Polygon } from '../../../shared/src/schemas/polygon';
 import { PolygonServiceUtils } from '../utils/PolygonServiceUtils';
 
 interface CreatePolygonParams {

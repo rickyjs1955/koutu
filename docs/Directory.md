@@ -59,7 +59,7 @@ Backend:
 15. /backend/src/models/db.ts                               ✅Unit ✅Integration ✅Security
 16. /backend/src/models/imageModel.ts                       ✅Unit ✅Integration ✅Security
 17. /backend/src/models/polygonModel.ts                     ✅Unit ✅Integration 🔔Security
-18. /backend/src/models/garmentModel.ts                     🛠️Unit 🛠️Integration 🛠️Security
+18. /backend/src/models/garmentModel.ts                     ✅Unit ✅Integration ✅Security
 19. /backend/src/models/wardrobeModel.ts                    ❌Unit ❌Integration ❌Security
 20. /backend/src/models/exportModel.ts                      ❌Unit ❌Integration ❌Security
 21. /backend/src/routes/imageRoutes.ts                      ✅Unit ✅Integration ✅Security
@@ -73,7 +73,7 @@ Backend:
 29. /backend/src/services/imageService.ts                   ✅Unit ✅Integration ✅Security
 30. /backend/src/services/imageProcessingService.ts         ✅Unit ✅Integration ✅Security
 31. /backend/src/services/polygonService.ts                 ✅Unit ✅Integration ✅Security
-32. /backend/src/services/garmentService.ts                 🛠️Unit 🛠️Integration 🛠️Security
+32. /backend/src/services/garmentService.ts                 ✅Unit ✅Integration ✅Security
 33. /backend/src/services/wardrobeService.ts                ❌Unit ❌Integration ❌Security
 34. /backend/src/services/exportService.ts                  ❌Unit ❌Integration ❌Security
 35. /backend/src/services/labelingService.ts                ❌Unit ❌Integration ❌Security
