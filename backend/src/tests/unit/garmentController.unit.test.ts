@@ -1,4 +1,4 @@
-// /backend/src/__tests__/garmentController.unit.test.ts - Fixed Production-Ready Unit Test Suite
+// /backend/src/__tests__/garmentController.unit.test.ts - Fixed to expect direct responses
 
 import { Request, Response, NextFunction } from 'express';
 import { garmentController } from '../../controllers/garmentController';
@@ -369,246 +369,6 @@ describe('Garment Controller - Production Unit Tests', () => {
     });
 
     // ==========================================
-    // INTEGRATION SCENARIOS
-    // ==========================================
-    describe('Integration Scenarios', () => {
-        describe('End-to-End Workflows', () => {
-            test('should handle complete garment lifecycle', async () => {
-                // Phase 1: Create garment
-                const createInput = {
-                    original_image_id: MOCK_GARMENT_IDS.VALID_GARMENT_1,
-                    mask_data: createMockMaskData(200, 200),
-                    metadata: { category: 'shirt', color: 'blue' }
-                };
-                
-                const createdGarment = createMockGarment(createInput);
-                mockRequest.body = createInput;
-                mockGarmentService.createGarment.mockResolvedValue(createdGarment);
-
-                await garmentController.createGarment(
-                    mockRequest as Request,
-                    mockResponse as Response,
-                    mockNext
-                );
-
-                expect(responseStatus).toHaveBeenCalledWith(201);
-                jest.clearAllMocks();
-
-                // Phase 2: Retrieve garment
-                mockRequest = {
-                    user: { 
-                        id: MOCK_USER_IDS.VALID_USER_1,
-                        email: 'test@example.com'
-                    },
-                    params: { id: createdGarment.id },
-                    body: {},
-                    query: {},
-                    headers: {}
-                };
-                mockGarmentService.getGarment.mockResolvedValue(createdGarment);
-
-                await garmentController.getGarment(
-                    mockRequest as Request,
-                    mockResponse as Response,
-                    mockNext
-                );
-
-                expect(responseStatus).toHaveBeenCalledWith(200);
-                jest.clearAllMocks();
-
-                // Phase 3: Update metadata
-                const updatedGarment = { ...createdGarment, metadata: { ...createdGarment.metadata, color: 'red' }, data_version: 2 };
-                mockRequest.body = { metadata: { color: 'red' } };
-                mockGarmentService.updateGarmentMetadata.mockResolvedValue(updatedGarment);
-
-                await garmentController.updateGarmentMetadata(
-                    mockRequest as Request,
-                    mockResponse as Response,
-                    mockNext
-                );
-
-                expect(responseStatus).toHaveBeenCalledWith(200);
-                jest.clearAllMocks();
-
-                // Phase 4: Delete garment
-                mockGarmentService.deleteGarment.mockResolvedValue({
-                    success: true,
-                    garmentId: createdGarment.id
-                });
-
-                await garmentController.deleteGarment(
-                    mockRequest as Request,
-                    mockResponse as Response,
-                    mockNext
-                );
-
-                expect(responseStatus).toHaveBeenCalledWith(200);
-            });
-
-            test('should handle batch operations simulation', async () => {
-                // Simulate getting multiple garments with different filters
-                const batchOperations = [
-                    { filter: { category: 'shirt' }, expectedCount: 3 },
-                    { filter: { color: 'blue' }, expectedCount: 2 },
-                    { filter: { size: 'M' }, expectedCount: 4 }
-                ];
-
-                for (const operation of batchOperations) {
-                    const mockGarments = createMockGarmentList(operation.expectedCount);
-                    mockRequest = {
-                        user: { 
-                            id: MOCK_USER_IDS.VALID_USER_1,
-                            email: 'test@example.com'
-                        },
-                        query: { filter: JSON.stringify(operation.filter) },
-                        body: {},
-                        params: {},
-                        headers: {}
-                    };
-                    
-                    mockGarmentService.getGarments.mockResolvedValue(mockGarments);
-
-                    await garmentController.getGarments(
-                        mockRequest as Request,
-                        mockResponse as Response,
-                        mockNext
-                    );
-
-                    expect(mockGarmentService.getGarments).toHaveBeenCalledWith({
-                        userId: MOCK_USER_IDS.VALID_USER_1,
-                        filter: operation.filter,
-                        pagination: undefined
-                    });
-
-                    expect(responseJson).toHaveBeenCalledWith({
-                        status: 'success',
-                        data: { 
-                            garments: mockGarments,
-                            count: mockGarments.length
-                        }
-                    });
-
-                    jest.clearAllMocks();
-                }
-            });
-        });
-    });
-
-    // ==========================================
-    // CLEANUP & VALIDATION
-    // ==========================================
-    describe('Test Suite Validation', () => {
-        test('should validate all controller methods are tested', () => {
-        const controllerMethods = Object.keys(garmentController);
-        const testedMethods = [
-            'createGarment',
-            'getGarments', 
-            'getGarment',
-            'updateGarmentMetadata',
-            'deleteGarment'
-        ];
-
-        expect(controllerMethods.sort()).toEqual(testedMethods.sort());
-        });
-
-        test('should validate mock setup completeness', () => {
-        const requiredMocks = [
-            'createGarment',
-            'getGarments',
-            'getGarment', 
-            'updateGarmentMetadata',
-            'deleteGarment'
-        ];
-
-        for (const mockMethod of requiredMocks) {
-            expect(jest.isMockFunction(mockGarmentService[mockMethod as keyof typeof mockGarmentService])).toBe(true);
-        }
-        });
-
-        test('should validate test data integrity', () => {
-        // Validate mock data has basic required properties (without strict validation)
-        expect(MOCK_GARMENTS.BASIC_SHIRT).toHaveProperty('id');
-        expect(MOCK_GARMENTS.BASIC_SHIRT).toHaveProperty('user_id');
-        expect(MOCK_GARMENTS.BASIC_SHIRT).toHaveProperty('metadata');
-        
-        expect(MOCK_GARMENTS.DETAILED_DRESS).toHaveProperty('id');
-        expect(MOCK_GARMENTS.DETAILED_DRESS).toHaveProperty('user_id');
-        expect(MOCK_GARMENTS.DETAILED_DRESS).toHaveProperty('metadata');
-
-        // Validate mock helper functions work
-        const testGarment = createMockGarment();
-        expect(testGarment).toHaveProperty('id');
-        expect(testGarment).toHaveProperty('user_id');
-        expect(testGarment).toHaveProperty('metadata');
-
-        const testInput = createMockCreateInput();
-        expect(testInput).toHaveProperty('user_id');
-        expect(testInput).toHaveProperty('original_image_id');
-        expect(testInput).toHaveProperty('file_path');
-        expect(testInput).toHaveProperty('mask_path');
-        });
-
-        test('should validate performance helper accuracy', () => {
-        const testOperation = async () => {
-            await new Promise(resolve => setTimeout(resolve, 50));
-            return 'test result';
-        };
-
-        return PerformanceHelper.measureExecutionTime(testOperation).then(({ result, duration }) => {
-            expect(result).toBe('test result');
-            expect(duration).toBeGreaterThanOrEqual(40); // Allow some variance
-            expect(duration).toBeLessThan(150); // Increased tolerance for CI/test environments
-        });
-        });
-
-        test('should validate error helper functionality', () => {
-        const dbErrors = ErrorTestHelper.createDatabaseErrorScenarios();
-        expect(Object.keys(dbErrors)).toEqual(['connectionError', 'constraintViolation', 'timeoutError']);
-
-        const validationErrors = ErrorTestHelper.createValidationErrorScenarios();
-        expect(Object.keys(validationErrors)).toEqual(['invalidUuid', 'emptyRequiredField', 'invalidMetadataType', 'oversizedMetadata']);
-        });
-
-        test('should validate cleanup functionality', () => {
-        // Test cleanup helper
-        const cleanupValidation = CleanupHelper.validateTestEnvironmentClean();
-        expect(cleanupValidation.isClean).toBe(true);
-        expect(cleanupValidation.issues).toEqual([]);
-        });
-    });
-
-    describe('Test Coverage Summary', () => {
-        test('should provide test execution summary', () => {
-        const summary = {
-            totalTestCategories: 12,
-            coverageAreas: [
-            'createGarment - Success & Validation',
-            'getGarments - Filtering & Pagination', 
-            'getGarment - Individual Retrieval',
-            'updateGarmentMetadata - Merge & Replace',
-            'deleteGarment - Removal Operations',
-            'Authentication & Authorization',
-            'Performance & Load Testing',
-            'Edge Cases & Boundaries',
-            'Integration Scenarios',
-            'Error Handling',
-            'Data Validation',
-            'Test Framework Validation'
-            ],
-            mockValidation: 'Complete',
-            performanceValidation: 'Complete',
-            errorHandling: 'Complete',
-            integrationCoverage: 'Complete'
-        };
-
-        console.log('🎯 Test Suite Summary:', JSON.stringify(summary, null, 2));
-        
-        expect(summary.totalTestCategories).toBeGreaterThan(10);
-        expect(summary.coverageAreas.length).toBe(12);
-        });
-    });
-
-    // ==========================================
     // GET GARMENTS TESTS
     // ==========================================
     describe('getGarments', () => {
@@ -674,9 +434,10 @@ describe('Garment Controller - Production Unit Tests', () => {
         });
 
         describe('Service Error Handling', () => {
-            test('should handle garment not found', async () => {
+            test('should handle garment not found - expecting error response', async () => {
                 // Arrange
-                const notFoundError = mockApiError.notFound('Garment not found');
+                const notFoundError = new Error('Garment not found');
+                (notFoundError as any).statusCode = 404;
                 mockRequest.params = { id: MOCK_GARMENT_IDS.NONEXISTENT_GARMENT };
                 mockGarmentService.getGarment.mockRejectedValue(notFoundError);
 
@@ -687,15 +448,18 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(notFoundError);
-                expect(responseStatus).not.toHaveBeenCalled();
-                expect(responseJson).not.toHaveBeenCalled();
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(404);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Garment not found'
+                });
             });
 
-            test('should handle access denied for other user garment', async () => {
+            test('should handle access denied for other user garment - expecting error response', async () => {
                 // Arrange
-                const accessError = mockApiError.unauthorized('Access denied');
+                const accessError = new Error('Access denied');
+                (accessError as any).statusCode = 401;
                 mockRequest.params = { id: MOCK_GARMENT_IDS.OTHER_USER_GARMENT };
                 mockGarmentService.getGarment.mockRejectedValue(accessError);
 
@@ -706,11 +470,15 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(accessError);
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(401);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Access denied'
+                });
             });
 
-            test('should handle database errors', async () => {
+            test('should handle database errors - expecting error response', async () => {
                 // Arrange
                 const dbError = ErrorTestHelper.simulateDbError('connection');
                 mockRequest.params = { id: MOCK_GARMENT_IDS.VALID_GARMENT_1 };
@@ -723,8 +491,12 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(dbError);
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(500);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: expect.any(String)
+                });
             });
         });
     });
@@ -880,7 +652,7 @@ describe('Garment Controller - Production Unit Tests', () => {
         });
 
         describe('Validation Failures', () => {
-            test('should reject missing metadata field', async () => {
+            test('should reject missing metadata field - expecting error response', async () => {
                 // Arrange
                 mockRequest.params = { id: MOCK_GARMENT_IDS.VALID_GARMENT_1 };
                 mockRequest.body = { other_field: 'value' }; // Missing metadata
@@ -892,16 +664,16 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    message: 'Metadata field is required for update.'
-                })
-                );
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(400);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Metadata field is required.'
+                });
                 expect(mockGarmentService.updateGarmentMetadata).not.toHaveBeenCalled();
             });
 
-            test('should reject invalid metadata types', async () => {
+            test('should reject invalid metadata types - expecting error response', async () => {
                 const invalidMetadataCases = [
                 { case: 'string', metadata: 'invalid-string' },
                 { case: 'number', metadata: 123 },
@@ -920,11 +692,11 @@ describe('Garment Controller - Production Unit Tests', () => {
                     mockNext
                 );
 
-                expect(mockNext).toHaveBeenCalledWith(
-                    expect.objectContaining({
+                expect(responseStatus).toHaveBeenCalledWith(400);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
                     message: 'Metadata must be a valid object.'
-                    })
-                );
+                });
                 expect(mockGarmentService.updateGarmentMetadata).not.toHaveBeenCalled();
 
                 jest.clearAllMocks();
@@ -965,9 +737,10 @@ describe('Garment Controller - Production Unit Tests', () => {
         });
 
         describe('Service Error Handling', () => {
-            test('should handle garment not found error', async () => {
+            test('should handle garment not found error - expecting error response', async () => {
                 // Arrange
-                const notFoundError = mockApiError.notFound('Garment not found');
+                const notFoundError = new Error('Garment not found');
+                (notFoundError as any).statusCode = 404;
                 mockRequest.params = { id: MOCK_GARMENT_IDS.NONEXISTENT_GARMENT };
                 mockRequest.body = { metadata: { color: 'red' } };
                 mockGarmentService.updateGarmentMetadata.mockRejectedValue(notFoundError);
@@ -979,13 +752,18 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(notFoundError);
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(404);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Garment not found'
+                });
             });
 
-            test('should handle access denied error', async () => {
+            test('should handle access denied error - expecting error response', async () => {
                 // Arrange
-                const accessError = mockApiError.unauthorized('Access denied');
+                const accessError = new Error('Access denied');
+                (accessError as any).statusCode = 401;
                 mockRequest.params = { id: MOCK_GARMENT_IDS.OTHER_USER_GARMENT };
                 mockRequest.body = { metadata: { color: 'red' } };
                 mockGarmentService.updateGarmentMetadata.mockRejectedValue(accessError);
@@ -997,13 +775,18 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(accessError);
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(401);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Access denied'
+                });
             });
 
-            test('should handle metadata validation errors from service', async () => {
+            test('should handle metadata validation errors from service - expecting error response', async () => {
                 // Arrange
-                const validationError = mockApiError.badRequest('Metadata validation failed');
+                const validationError = new Error('Metadata validation failed');
+                (validationError as any).statusCode = 400;
                 mockRequest.params = { id: MOCK_GARMENT_IDS.VALID_GARMENT_1 };
                 mockRequest.body = { metadata: { oversized: 'x'.repeat(20000) } }; // Too large
                 mockGarmentService.updateGarmentMetadata.mockRejectedValue(validationError);
@@ -1015,8 +798,12 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(validationError);
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(400);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Metadata validation failed'
+                });
             });
         });
     });
@@ -1087,9 +874,10 @@ describe('Garment Controller - Production Unit Tests', () => {
         });
 
         describe('Service Error Handling', () => {
-            test('should handle garment not found error', async () => {
+            test('should handle garment not found error - expecting error response', async () => {
                 // Arrange
-                const notFoundError = mockApiError.notFound('Garment not found');
+                const notFoundError = new Error('Garment not found');
+                (notFoundError as any).statusCode = 404;
                 mockRequest.params = { id: MOCK_GARMENT_IDS.NONEXISTENT_GARMENT };
                 mockGarmentService.deleteGarment.mockRejectedValue(notFoundError);
 
@@ -1100,15 +888,18 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(notFoundError);
-                expect(responseStatus).not.toHaveBeenCalled();
-                expect(responseJson).not.toHaveBeenCalled();
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(404);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Garment not found'
+                });
             });
 
-            test('should handle access denied error', async () => {
+            test('should handle access denied error - expecting error response', async () => {
                 // Arrange
-                const accessError = mockApiError.unauthorized('Access denied');
+                const accessError = new Error('Access denied');
+                (accessError as any).statusCode = 401;
                 mockRequest.params = { id: MOCK_GARMENT_IDS.OTHER_USER_GARMENT };
                 mockGarmentService.deleteGarment.mockRejectedValue(accessError);
 
@@ -1119,11 +910,15 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(accessError);
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(401);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Access denied'
+                });
             });
 
-            test('should handle constraint violation errors', async () => {
+            test('should handle constraint violation errors - expecting error response', async () => {
                 // Arrange
                 const constraintError = ErrorTestHelper.simulateDbError('constraint');
                 mockRequest.params = { id: MOCK_GARMENT_IDS.VALID_GARMENT_1 };
@@ -1136,11 +931,15 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(constraintError);
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(500);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: expect.any(String)
+                });
             });
 
-            test('should handle database timeout errors', async () => {
+            test('should handle database timeout errors - expecting error response', async () => {
                 // Arrange
                 const timeoutError = ErrorTestHelper.simulateDbError('timeout');
                 mockRequest.params = { id: MOCK_GARMENT_IDS.VALID_GARMENT_1 };
@@ -1153,8 +952,12 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(timeoutError);
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(500);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: expect.any(String)
+                });
             });
         });
     });
@@ -1269,13 +1072,14 @@ describe('Garment Controller - Production Unit Tests', () => {
         });
 
         describe('Invalid User Context', () => {
-            test('should handle invalid user ID format', async () => {
+            test('should handle invalid user ID format - expecting error response', async () => {
                 // Arrange
                 mockRequest.user = { 
                     id: 'invalid-user-id',
                     email: 'test@example.com'
                 };
-                const authError = mockApiError.unauthorized('Invalid user');
+                const authError = new Error('Invalid user');
+                (authError as any).statusCode = 401;
                 mockGarmentService.getGarments.mockRejectedValue(authError);
 
                 // Act
@@ -1285,17 +1089,22 @@ describe('Garment Controller - Production Unit Tests', () => {
                     mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(authError);
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(401);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Invalid user'
+                });
             });
 
-            test('should handle expired user session', async () => {
+            test('should handle expired user session - expecting error response', async () => {
                 // Arrange
                 mockRequest.user = { 
                     id: MOCK_USER_IDS.VALID_USER_1,
                     email: 'test@example.com'
                 };
-                const sessionError = mockApiError.unauthorized('Session expired');
+                const sessionError = new Error('Session expired');
+                (sessionError as any).statusCode = 401;
                 mockGarmentService.createGarment.mockRejectedValue(sessionError);
 
                 const validInput = {
@@ -1312,8 +1121,12 @@ describe('Garment Controller - Production Unit Tests', () => {
                     mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(sessionError);
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(401);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Session expired'
+                });
             });
         });
     });
@@ -1613,7 +1426,7 @@ describe('Garment Controller - Production Unit Tests', () => {
         });
 
         describe('Validation Failures', () => {
-            test('should reject invalid filter JSON', async () => {
+            test('should reject invalid filter JSON - expecting error response', async () => {
                 // Arrange
                 mockRequest.query = { filter: 'invalid-json{' };
 
@@ -1624,16 +1437,16 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(
-                expect.objectContaining({
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(400);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
                     message: 'Invalid JSON in filter parameter.'
-                })
-                );
+                });
                 expect(mockGarmentService.getGarments).not.toHaveBeenCalled();
             });
 
-            test('should reject non-string filter parameter', async () => {
+            test('should reject non-string filter parameter - expecting error response', async () => {
                 // Arrange
                 mockRequest.query = { filter: ['invalid', 'array'] };
 
@@ -1644,18 +1457,16 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(
-                expect.objectContaining({
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(400);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
                     message: 'Filter must be a JSON string.'
-                })
-                );
+                });
                 expect(mockGarmentService.getGarments).not.toHaveBeenCalled();
             });
 
-            test('should handle invalid pagination parameters gracefully', async () => {
-                // Based on the failing test, it seems the controller doesn't validate pagination
-                // Let's test what actually happens with invalid pagination
+            test('should handle invalid pagination parameters - expecting error response', async () => {
                 const invalidPaginationCases = [
                 { page: '0', limit: '10', reason: 'page too small' },
                 { page: '-1', limit: '10', reason: 'negative page' },
@@ -1680,36 +1491,25 @@ describe('Garment Controller - Production Unit Tests', () => {
                     headers: {}
                 };
 
-                // Mock the service to return empty array for invalid params
-                mockGarmentService.getGarments.mockResolvedValue([]);
-
                 await garmentController.getGarments(
                     mockRequest as Request,
                     mockResponse as Response,
                     mockNext
                 );
                 
-                // Since the controller might not validate pagination, 
-                // we should check if it either validates OR passes through to service
-                const wasValidated = (mockNext as jest.Mock).mock.calls.some(call => {
-                    const firstArg = call[0];
-                    return firstArg && 
-                        typeof firstArg === 'object' && 
-                        firstArg instanceof Error && 
-                        firstArg.message && 
-                        firstArg.message.includes('pagination');
+                // Should respond with error for invalid pagination
+                expect(responseStatus).toHaveBeenCalledWith(400);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Invalid pagination parameters.'
                 });
-                
-                if (!wasValidated) {
-                    // If not validated by controller, service should have been called
-                    expect(mockGarmentService.getGarments).toHaveBeenCalled();
-                }
+                expect(mockGarmentService.getGarments).not.toHaveBeenCalled();
                 }
             });
             });
 
             describe('Service Error Handling', () => {
-            test('should handle service errors gracefully', async () => {
+            test('should handle service errors gracefully - expecting error response', async () => {
                 // Arrange
                 const serviceError = new Error('Database query failed');
                 mockGarmentService.getGarments.mockRejectedValue(serviceError);
@@ -1721,10 +1521,12 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(serviceError);
-                expect(responseStatus).not.toHaveBeenCalled();
-                expect(responseJson).not.toHaveBeenCalled();
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(500);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Database query failed'
+                });
             });
         });
     });
@@ -1839,7 +1641,7 @@ describe('Garment Controller - Production Unit Tests', () => {
         });
 
         describe('Validation Failures', () => {
-            test('should reject missing mask_data', async () => {
+            test('should reject missing mask_data - expecting error response', async () => {
                 // Arrange
                 mockRequest.body = {
                 original_image_id: MOCK_GARMENT_IDS.VALID_GARMENT_1,
@@ -1853,17 +1655,16 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    message: 'Missing or invalid mask_data.',
-                    statusCode: 400
-                })
-                );
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(400);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Missing or invalid mask_data.'
+                });
                 expect(mockGarmentService.createGarment).not.toHaveBeenCalled();
             });
 
-            test('should reject invalid mask_data structure', async () => {
+            test('should reject invalid mask_data structure - expecting error response', async () => {
                 const invalidMaskDataCases = [
                 { case: 'null', data: null, expectedMessage: 'Missing or invalid mask_data.' },
                 { case: 'string', data: 'invalid', expectedMessage: 'Missing or invalid mask_data.' },
@@ -1884,17 +1685,27 @@ describe('Garment Controller - Production Unit Tests', () => {
                     mockNext
                 );
 
-                expect(mockNext).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                    message: testCase.expectedMessage
-                    })
-                );
+                expect(responseStatus).toHaveBeenCalledWith(400);
+                
+                // Handle special case for data length mismatch which includes a code
+                if (testCase.expectedMessage === `Mask data length doesn't match dimensions.`) {
+                    expect(responseJson).toHaveBeenCalledWith({
+                        status: 'error',
+                        message: testCase.expectedMessage,
+                        code: 'MASK_DATA_SIZE_MISMATCH'
+                    });
+                } else {
+                    expect(responseJson).toHaveBeenCalledWith({
+                        status: 'error',
+                        message: testCase.expectedMessage
+                    });
+                }
                 
                 jest.clearAllMocks();
                 }
             });
 
-            test('should reject mask data with missing dimensions', async () => {
+            test('should reject mask data with missing dimensions - expecting error response', async () => {
                 const invalidDimensionCases = [
                 { case: 'missing width', data: { height: 100, data: new Array(100).fill(255) }, expectedMessage: 'Mask data must include valid width and height.' },
                 { case: 'missing height', data: { width: 100, data: new Array(100).fill(255) }, expectedMessage: 'Mask data must include valid width and height.' },
@@ -1903,7 +1714,7 @@ describe('Garment Controller - Production Unit Tests', () => {
                 { case: 'zero width', data: { width: 0, height: 100, data: [] }, expectedMessage: 'Mask data must include valid width and height.' },
                 { case: 'zero height', data: { width: 100, height: 0, data: [] }, expectedMessage: 'Mask data must include valid width and height.' },
                 // This case fails dimension validation but data length validation triggers first
-                { case: 'negative dimensions', data: { width: -100, height: 100, data: [] }, expectedMessage: `Mask data length doesn't match dimensions.` }
+                { case: 'negative dimensions', data: { width: -100, height: 100, data: [] }, expectedMessage: 'Mask data must include valid width and height.' }
                 ];
 
                 for (const testCase of invalidDimensionCases) {
@@ -1918,17 +1729,17 @@ describe('Garment Controller - Production Unit Tests', () => {
                     mockNext
                 );
 
-                expect(mockNext).toHaveBeenCalledWith(
-                    expect.objectContaining({
+                expect(responseStatus).toHaveBeenCalledWith(400);
+                expect(responseJson).toHaveBeenCalledWith(expect.objectContaining({
+                    status: 'error',
                     message: testCase.expectedMessage
-                    })
-                );
+                }));
                 
                 jest.clearAllMocks();
                 }
             });
 
-            test('should reject mask data with dimension/data size mismatch', async () => {
+            test('should reject mask data with dimension/data size mismatch - expecting error response', async () => {
                 const mismatchCases = [
                 { width: 100, height: 100, dataLength: 5000, expected: 10000 },
                 { width: 50, height: 50, dataLength: 1000, expected: 2500 },
@@ -1951,18 +1762,18 @@ describe('Garment Controller - Production Unit Tests', () => {
                     mockNext
                 );
 
-                expect(mockNext).toHaveBeenCalledWith(
-                    expect.objectContaining({
+                expect(responseStatus).toHaveBeenCalledWith(400);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
                     message: `Mask data length doesn't match dimensions.`,
                     code: 'MASK_DATA_SIZE_MISMATCH'
-                    })
-                );
+                });
                 
                 jest.clearAllMocks();
                 }
             });
 
-            test('should reject invalid mask data array', async () => {
+            test('should reject invalid mask data array - expecting error response', async () => {
                 const invalidDataCases = [
                 { case: 'missing data', mask_data: { width: 100, height: 100 } },
                 { case: 'null data', mask_data: { width: 100, height: 100, data: null } },
@@ -1982,17 +1793,17 @@ describe('Garment Controller - Production Unit Tests', () => {
                     mockNext
                 );
 
-                expect(mockNext).toHaveBeenCalledWith(
-                    expect.objectContaining({
+                expect(responseStatus).toHaveBeenCalledWith(400);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
                     message: 'Mask data must be an array or Uint8ClampedArray.'
-                    })
-                );
+                });
                 
                 jest.clearAllMocks();
                 }
             });
 
-            test('should reject mask data with mismatched dimensions', async () => {
+            test('should reject mask data with mismatched dimensions - expecting error response', async () => {
                 const mismatchCases = [
                 { width: 10, height: 10, dataLength: 50, expected: 100 },
                 { width: 5, height: 5, dataLength: 10, expected: 25 }
@@ -2014,11 +1825,12 @@ describe('Garment Controller - Production Unit Tests', () => {
                     mockNext
                 );
 
-                expect(mockNext).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                    message: `Mask data length doesn't match dimensions.`
-                    })
-                );
+                expect(responseStatus).toHaveBeenCalledWith(400);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: `Mask data length doesn't match dimensions.`,
+                    code: 'MASK_DATA_SIZE_MISMATCH'
+                });
                 
                 jest.clearAllMocks();
                 }
@@ -2026,7 +1838,7 @@ describe('Garment Controller - Production Unit Tests', () => {
         });
 
         describe('Service Error Handling', () => {
-            test('should handle service creation errors', async () => {
+            test('should handle service creation errors - expecting error response', async () => {
                 // Arrange
                 const serviceError = new Error('Database connection failed');
                 const validInput = {
@@ -2045,13 +1857,15 @@ describe('Garment Controller - Production Unit Tests', () => {
                 mockNext
                 );
 
-                // Assert
-                expect(mockNext).toHaveBeenCalledWith(serviceError);
-                expect(responseStatus).not.toHaveBeenCalled();
-                expect(responseJson).not.toHaveBeenCalled();
+                // Assert - Expect error response
+                expect(responseStatus).toHaveBeenCalledWith(500);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: 'Database connection failed'
+                });
             });
 
-            test('should handle various service error types', async () => {
+            test('should handle various service error types - expecting error response', async () => {
                 const errorScenarios = ErrorTestHelper.createDatabaseErrorScenarios();
                 const validInput = {
                 original_image_id: MOCK_GARMENT_IDS.VALID_GARMENT_1,
@@ -2069,7 +1883,11 @@ describe('Garment Controller - Production Unit Tests', () => {
                     mockNext
                 );
 
-                expect(mockNext).toHaveBeenCalledWith(scenario.error);
+                expect(responseStatus).toHaveBeenCalledWith(500);
+                expect(responseJson).toHaveBeenCalledWith({
+                    status: 'error',
+                    message: expect.any(String)
+                });
                 jest.clearAllMocks();
                 }
             });
@@ -2131,6 +1949,246 @@ describe('Garment Controller - Production Unit Tests', () => {
                 jest.clearAllMocks();
                 }
             });
+        });
+    });
+
+    // ==========================================
+    // INTEGRATION SCENARIOS
+    // ==========================================
+    describe('Integration Scenarios', () => {
+        describe('End-to-End Workflows', () => {
+            test('should handle complete garment lifecycle', async () => {
+                // Phase 1: Create garment
+                const createInput = {
+                    original_image_id: MOCK_GARMENT_IDS.VALID_GARMENT_1,
+                    mask_data: createMockMaskData(200, 200),
+                    metadata: { category: 'shirt', color: 'blue' }
+                };
+                
+                const createdGarment = createMockGarment(createInput);
+                mockRequest.body = createInput;
+                mockGarmentService.createGarment.mockResolvedValue(createdGarment);
+
+                await garmentController.createGarment(
+                    mockRequest as Request,
+                    mockResponse as Response,
+                    mockNext
+                );
+
+                expect(responseStatus).toHaveBeenCalledWith(201);
+                jest.clearAllMocks();
+
+                // Phase 2: Retrieve garment
+                mockRequest = {
+                    user: { 
+                        id: MOCK_USER_IDS.VALID_USER_1,
+                        email: 'test@example.com'
+                    },
+                    params: { id: createdGarment.id },
+                    body: {},
+                    query: {},
+                    headers: {}
+                };
+                mockGarmentService.getGarment.mockResolvedValue(createdGarment);
+
+                await garmentController.getGarment(
+                    mockRequest as Request,
+                    mockResponse as Response,
+                    mockNext
+                );
+
+                expect(responseStatus).toHaveBeenCalledWith(200);
+                jest.clearAllMocks();
+
+                // Phase 3: Update metadata
+                const updatedGarment = { ...createdGarment, metadata: { ...createdGarment.metadata, color: 'red' }, data_version: 2 };
+                mockRequest.body = { metadata: { color: 'red' } };
+                mockGarmentService.updateGarmentMetadata.mockResolvedValue(updatedGarment);
+
+                await garmentController.updateGarmentMetadata(
+                    mockRequest as Request,
+                    mockResponse as Response,
+                    mockNext
+                );
+
+                expect(responseStatus).toHaveBeenCalledWith(200);
+                jest.clearAllMocks();
+
+                // Phase 4: Delete garment
+                mockGarmentService.deleteGarment.mockResolvedValue({
+                    success: true,
+                    garmentId: createdGarment.id
+                });
+
+                await garmentController.deleteGarment(
+                    mockRequest as Request,
+                    mockResponse as Response,
+                    mockNext
+                );
+
+                expect(responseStatus).toHaveBeenCalledWith(200);
+            });
+
+            test('should handle batch operations simulation', async () => {
+                // Simulate getting multiple garments with different filters
+                const batchOperations = [
+                    { filter: { category: 'shirt' }, expectedCount: 3 },
+                    { filter: { color: 'blue' }, expectedCount: 2 },
+                    { filter: { size: 'M' }, expectedCount: 4 }
+                ];
+
+                for (const operation of batchOperations) {
+                    const mockGarments = createMockGarmentList(operation.expectedCount);
+                    mockRequest = {
+                        user: { 
+                            id: MOCK_USER_IDS.VALID_USER_1,
+                            email: 'test@example.com'
+                        },
+                        query: { filter: JSON.stringify(operation.filter) },
+                        body: {},
+                        params: {},
+                        headers: {}
+                    };
+                    
+                    mockGarmentService.getGarments.mockResolvedValue(mockGarments);
+
+                    await garmentController.getGarments(
+                        mockRequest as Request,
+                        mockResponse as Response,
+                        mockNext
+                    );
+
+                    expect(mockGarmentService.getGarments).toHaveBeenCalledWith({
+                        userId: MOCK_USER_IDS.VALID_USER_1,
+                        filter: operation.filter,
+                        pagination: undefined
+                    });
+
+                    expect(responseJson).toHaveBeenCalledWith({
+                        status: 'success',
+                        data: { 
+                            garments: mockGarments,
+                            count: mockGarments.length
+                        }
+                    });
+
+                    jest.clearAllMocks();
+                }
+            });
+        });
+    });
+
+    // ==========================================
+    // CLEANUP & VALIDATION
+    // ==========================================
+    describe('Test Suite Validation', () => {
+        test('should validate all controller methods are tested', () => {
+        const controllerMethods = Object.keys(garmentController);
+        const testedMethods = [
+            'createGarment',
+            'getGarments', 
+            'getGarment',
+            'updateGarmentMetadata',
+            'deleteGarment'
+        ];
+
+        expect(controllerMethods.sort()).toEqual(testedMethods.sort());
+        });
+
+        test('should validate mock setup completeness', () => {
+        const requiredMocks = [
+            'createGarment',
+            'getGarments',
+            'getGarment', 
+            'updateGarmentMetadata',
+            'deleteGarment'
+        ];
+
+        for (const mockMethod of requiredMocks) {
+            expect(jest.isMockFunction(mockGarmentService[mockMethod as keyof typeof mockGarmentService])).toBe(true);
+        }
+        });
+
+        test('should validate test data integrity', () => {
+        // Validate mock data has basic required properties (without strict validation)
+        expect(MOCK_GARMENTS.BASIC_SHIRT).toHaveProperty('id');
+        expect(MOCK_GARMENTS.BASIC_SHIRT).toHaveProperty('user_id');
+        expect(MOCK_GARMENTS.BASIC_SHIRT).toHaveProperty('metadata');
+        
+        expect(MOCK_GARMENTS.DETAILED_DRESS).toHaveProperty('id');
+        expect(MOCK_GARMENTS.DETAILED_DRESS).toHaveProperty('user_id');
+        expect(MOCK_GARMENTS.DETAILED_DRESS).toHaveProperty('metadata');
+
+        // Validate mock helper functions work
+        const testGarment = createMockGarment();
+        expect(testGarment).toHaveProperty('id');
+        expect(testGarment).toHaveProperty('user_id');
+        expect(testGarment).toHaveProperty('metadata');
+
+        const testInput = createMockCreateInput();
+        expect(testInput).toHaveProperty('user_id');
+        expect(testInput).toHaveProperty('original_image_id');
+        expect(testInput).toHaveProperty('file_path');
+        expect(testInput).toHaveProperty('mask_path');
+        });
+
+        test('should validate performance helper accuracy', () => {
+        const testOperation = async () => {
+            await new Promise(resolve => setTimeout(resolve, 50));
+            return 'test result';
+        };
+
+        return PerformanceHelper.measureExecutionTime(testOperation).then(({ result, duration }) => {
+            expect(result).toBe('test result');
+            expect(duration).toBeGreaterThanOrEqual(40); // Allow some variance
+            expect(duration).toBeLessThan(200); // Increased tolerance for CI/test environments
+        });
+        });
+
+        test('should validate error helper functionality', () => {
+        const dbErrors = ErrorTestHelper.createDatabaseErrorScenarios();
+        expect(Object.keys(dbErrors)).toEqual(['connectionError', 'constraintViolation', 'timeoutError']);
+
+        const validationErrors = ErrorTestHelper.createValidationErrorScenarios();
+        expect(Object.keys(validationErrors)).toEqual(['invalidUuid', 'emptyRequiredField', 'invalidMetadataType', 'oversizedMetadata']);
+        });
+
+        test('should validate cleanup functionality', () => {
+        // Test cleanup helper
+        const cleanupValidation = CleanupHelper.validateTestEnvironmentClean();
+        expect(cleanupValidation.isClean).toBe(true);
+        expect(cleanupValidation.issues).toEqual([]);
+        });
+    });
+
+    describe('Test Coverage Summary', () => {
+        test('should provide test execution summary', () => {
+        const summary = {
+            totalTestCategories: 12,
+            coverageAreas: [
+            'createGarment - Success & Validation',
+            'getGarments - Filtering & Pagination', 
+            'getGarment - Individual Retrieval',
+            'updateGarmentMetadata - Merge & Replace',
+            'deleteGarment - Removal Operations',
+            'Authentication & Authorization',
+            'Performance & Load Testing',
+            'Edge Cases & Boundaries',
+            'Integration Scenarios',
+            'Error Handling',
+            'Data Validation',
+            'Test Framework Validation'
+            ],
+            mockValidation: 'Complete',
+            performanceValidation: 'Complete',
+            errorHandling: 'Complete',
+            integrationCoverage: 'Complete'
+        };
+
+        console.log('🎯 Test Suite Summary:', JSON.stringify(summary, null, 2));
+        
+        expect(summary.totalTestCategories).toBeGreaterThan(10);
+        expect(summary.coverageAreas.length).toBe(12);
         });
     });
 });

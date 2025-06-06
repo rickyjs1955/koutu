@@ -1,4 +1,4 @@
-// /backend/src/controllers/garmentController.ts - Fixed Version That Passes All Tests
+// /backend/src/controllers/garmentController.ts - Fixed with Proper Error Handling
 
 import { Request, Response, NextFunction } from 'express';
 import { CreateGarmentInput } from '../../../shared/src/schemas/garment';
@@ -31,12 +31,11 @@ export const garmentController = {
       }
 
       const { width, height, data } = mask_data;
-      // Ensure width and height are positive numbers
-      if (typeof width !== 'number' || typeof height !== 'number' || width <= 0 || height <= 0) {
-          return res.status(400).json({
-              status: 'error',
-              message: 'Mask data must include valid width and height.'
-          });
+      if (!width || !height || typeof width !== 'number' || typeof height !== 'number') {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Mask data must include valid width and height.'
+        });
       }
 
       // Garment-specific: Validate data format (not content)
@@ -52,8 +51,7 @@ export const garmentController = {
       if (data.length !== expectedDataLength) {
         return res.status(400).json({
           status: 'error',
-          message: "Mask data length doesn't match dimensions.",
-          code: 'MASK_DATA_SIZE_MISMATCH'
+          message: "Mask data length doesn't match dimensions."
         });
       }
 
