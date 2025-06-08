@@ -9,6 +9,12 @@ const poolOptions: PoolConfig = {
   connectionString: config.databaseUrl,
 };
 
+// --- ADD THESE CONSOLE.LOGS ---
+console.log(`[DB_DEBUG] NODE_ENV: ${config.nodeEnv}`);
+console.log(`[DB_DEBUG] Raw TEST_DATABASE_URL env var: ${process.env.TEST_DATABASE_URL}`);
+console.log(`[DB_DEBUG] Final config.databaseUrl being used: ${config.databaseUrl}`);
+// --- END CONSOLE.LOGS ---
+
 if (config.dbPoolMax !== undefined) {
   poolOptions.max = config.dbPoolMax;
 }

@@ -52,7 +52,7 @@ services:
       - NODE_ENV=test
       - FIREBASE_PROJECT_ID=demo-test-project
     ports:
-      - "4000:4000"   # Firebase UI
+      - "4001:4001"   # Firebase UI
       - "9099:9099"   # Auth Emulator
       - "9100:9100"   # Firestore Emulator
       - "9199:9199"   # Storage Emulator

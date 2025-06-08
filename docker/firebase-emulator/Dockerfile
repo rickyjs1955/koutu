@@ -25,7 +25,7 @@ COPY firestore.indexes.json .
 RUN mkdir -p /firebase/data
 
 # Expose ports
-EXPOSE 4000 9099 9100 9199
+EXPOSE 4001 9099 9100 9199
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

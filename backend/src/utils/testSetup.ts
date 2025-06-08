@@ -217,7 +217,7 @@ export const teardownTestDatabase = async () => {
 export const getTestDatabaseConfig = () => {
   const config = {
     host: 'localhost',
-    port: 5432,
+    port: 5433,
     user: 'postgres', 
     password: 'postgres',
     database: 'koutu_test'
