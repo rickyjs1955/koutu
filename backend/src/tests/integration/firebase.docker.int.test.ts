@@ -147,16 +147,26 @@ describe('Firebase Docker Integration Tests', () => {
         
         const checkEmulator = async (host: string, name: string, timeout = 45000) => {
             return retryOperation(async () => {
-                const response = await fetch(`http://${host}`, { 
-                    method: 'GET',
-                    signal: AbortSignal.timeout(5000)
-                });
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
                 
-                if (response.ok || response.status === 404 || response.status === 501) {
-                    return true;
+                try {
+                    const response = await fetch(`http://${host}`, { 
+                        method: 'GET',
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (response.ok || response.status === 404 || response.status === 501) {
+                        return true;
+                    }
+                    
+                    throw new Error(`Emulator responded with status ${response.status}`);
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    throw error;
                 }
-                
-                throw new Error(`Emulator responded with status ${response.status}`);
             }, 15, 2000, `${name} emulator check`);
         };
 
@@ -313,19 +323,29 @@ describe('Firebase Docker Integration Tests', () => {
         const fileContent = content || `Test content ${Date.now()}`;
         
         const uploadFile = async () => {
-            const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(testFileName)}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: fileContent,
-                signal: AbortSignal.timeout(30000) // Increased timeout
-            });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+            
+            try {
+                const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(testFileName)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: fileContent,
+                    signal: controller.signal
+                });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`);
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`);
+                }
+
+                return response;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                throw error;
             }
-
-            return response;
         };
 
         await retryOperation(uploadFile, 3, 2000, `File upload for ${testFileName}`);
@@ -362,10 +382,19 @@ describe('Firebase Docker Integration Tests', () => {
             ];
 
             for (const check of healthChecks) {
-                const response = await fetch(check.url, { 
-                    signal: AbortSignal.timeout(5000) 
-                });
-                expect([200, 404, 501].includes(response.status)).toBe(true);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
+                try {
+                    const response = await fetch(check.url, { 
+                        signal: controller.signal 
+                    });
+                    clearTimeout(timeoutId);
+                    expect([200, 404, 501].includes(response.status)).toBe(true);
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    throw error;
+                }
             }
         });
     });
@@ -451,15 +480,25 @@ describe('Firebase Docker Integration Tests', () => {
             
             // Download and verify
             const downloadResponse = await retryOperation(async () => {
-                const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/download/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}?alt=media`, {
-                    signal: AbortSignal.timeout(10000)
-                });
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
                 
-                if (!response.ok) {
-                    throw new Error(`Download failed: ${response.status}`);
+                try {
+                    const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/download/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}?alt=media`, {
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Download failed: ${response.status}`);
+                    }
+                    
+                    return response;
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    throw error;
                 }
-                
-                return response;
             }, 3, 1000, 'File download');
             
             const downloadedContent = await downloadResponse.text();
@@ -514,18 +553,28 @@ describe('Firebase Docker Integration Tests', () => {
                 const fileName = `content-type-test-${Date.now()}.${fileType.extension}`;
                 
                 const uploadResponse = await retryOperation(async () => {
-                    const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(fileName)}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': fileType.contentType },
-                        body: fileType.content,
-                        signal: AbortSignal.timeout(20000)
-                    });
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 20000);
                     
-                    if (!response.ok) {
-                        throw new Error(`Upload failed for ${fileType.extension}: ${response.status}`);
+                    try {
+                        const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(fileName)}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': fileType.contentType },
+                            body: fileType.content,
+                            signal: controller.signal
+                        });
+                        
+                        clearTimeout(timeoutId);
+                        
+                        if (!response.ok) {
+                            throw new Error(`Upload failed for ${fileType.extension}: ${response.status}`);
+                        }
+                        
+                        return response;
+                    } catch (error) {
+                        clearTimeout(timeoutId);
+                        throw error;
                     }
-                    
-                    return response;
                 }, 3, 1500, `${fileType.extension} file upload`);
                 
                 expect(uploadResponse.ok).toBe(true);
@@ -540,18 +589,28 @@ describe('Firebase Docker Integration Tests', () => {
             const start = Date.now();
             
             await retryOperation(async () => {
-                const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(fileName)}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: largeContent,
-                    signal: AbortSignal.timeout(30000)
-                });
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 30000);
                 
-                if (!response.ok) {
-                    throw new Error(`Large file upload failed: ${response.status}`);
+                try {
+                    const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(fileName)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: largeContent,
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Large file upload failed: ${response.status}`);
+                    }
+                    
+                    return response;
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    throw error;
                 }
-                
-                return response;
             }, 3, 2000, 'Large file upload');
             
             createdFileNames.push(fileName);
@@ -563,15 +622,25 @@ describe('Firebase Docker Integration Tests', () => {
             await new Promise(resolve => setTimeout(resolve, 1000));
             
             const metadataResponse = await retryOperation(async () => {
-                const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}`, {
-                    signal: AbortSignal.timeout(10000)
-                });
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
                 
-                if (!response.ok) {
-                    throw new Error(`Metadata request failed: ${response.status}`);
+                try {
+                    const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}`, {
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Metadata request failed: ${response.status}`);
+                    }
+                    
+                    return response;
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    throw error;
                 }
-                
-                return response;
             }, 3, 1000, 'File metadata retrieval');
             
             const metadata = await metadataResponse.json();
@@ -589,16 +658,26 @@ describe('Firebase Docker Integration Tests', () => {
             
             // Delete file
             const deleteResponse = await retryOperation(async () => {
-                const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}`, {
-                    method: 'DELETE',
-                    signal: AbortSignal.timeout(10000)
-                });
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
                 
-                if (!response.ok && response.status !== 404) {
-                    throw new Error(`Delete failed: ${response.status}`);
+                try {
+                    const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}`, {
+                        method: 'DELETE',
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok && response.status !== 404) {
+                        throw new Error(`Delete failed: ${response.status}`);
+                    }
+                    
+                    return response;
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    throw error;
                 }
-                
-                return response;
             }, 3, 1000, 'File deletion');
             
             expect([200, 204, 404].includes(deleteResponse.status)).toBe(true);
@@ -610,10 +689,19 @@ describe('Firebase Docker Integration Tests', () => {
             }
             
             // Verify file is deleted
-            const checkResponse = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}`, {
-                signal: AbortSignal.timeout(5000)
-            });
-            expect(checkResponse.status).toBe(404);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            try {
+                const checkResponse = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}`, {
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                expect(checkResponse.status).toBe(404);
+            } catch (error) {
+                clearTimeout(timeoutId);
+                throw error;
+            }
         });
     });
 
@@ -628,18 +716,28 @@ describe('Firebase Docker Integration Tests', () => {
             const imageData = 'fake-image-data-' + Date.now();
             
             await retryOperation(async () => {
-                const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(profileImageName)}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'image/jpeg' },
-                    body: imageData,
-                    signal: AbortSignal.timeout(15000)
-                });
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
                 
-                if (!response.ok) {
-                    throw new Error(`Profile image upload failed: ${response.status}`);
+                try {
+                    const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(profileImageName)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'image/jpeg' },
+                        body: imageData,
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Profile image upload failed: ${response.status}`);
+                    }
+                    
+                    return response;
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    throw error;
                 }
-                
-                return response;
             }, 3, 2000, 'Profile image upload');
             
             createdFileNames.push(profileImageName);
@@ -658,11 +756,19 @@ describe('Firebase Docker Integration Tests', () => {
                 expect(updatedUser.rows[0].display_name).toBe('Profile User with Image');
             }
 
-            const fileCheckResponse = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(profileImageName)}`, {
-                signal: AbortSignal.timeout(5000)
-            });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
             
-            expect(fileCheckResponse.ok).toBe(true);
+            try {
+                const fileCheckResponse = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(profileImageName)}`, {
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                expect(fileCheckResponse.ok).toBe(true);
+            } catch (error) {
+                clearTimeout(timeoutId);
+                throw error;
+            }
         });
 
         it('should handle user document workflow with file attachments', async () => {
@@ -680,19 +786,29 @@ describe('Firebase Docker Integration Tests', () => {
 
             const uploadPromises = documentFiles.map(doc => 
                 retryOperation(async () => {
-                    const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(doc.name)}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/octet-stream' },
-                        body: doc.content,
-                        signal: AbortSignal.timeout(15000)
-                    });
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
                     
-                    if (!response.ok) {
-                        throw new Error(`Document upload failed: ${response.status}`);
+                    try {
+                        const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(doc.name)}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/octet-stream' },
+                            body: doc.content,
+                            signal: controller.signal
+                        });
+                        
+                        clearTimeout(timeoutId);
+                        
+                        if (!response.ok) {
+                            throw new Error(`Document upload failed: ${response.status}`);
+                        }
+                        
+                        createdFileNames.push(doc.name);
+                        return response;
+                    } catch (error) {
+                        clearTimeout(timeoutId);
+                        throw error;
                     }
-                    
-                    createdFileNames.push(doc.name);
-                    return response;
                 }, 2, 1500, `Document upload: ${doc.name}`)
             );
 
@@ -700,10 +816,19 @@ describe('Firebase Docker Integration Tests', () => {
 
             // Verify all documents exist
             for (const doc of documentFiles) {
-                const checkResponse = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(doc.name)}`, {
-                    signal: AbortSignal.timeout(5000)
-                });
-                expect(checkResponse.ok).toBe(true);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
+                try {
+                    const checkResponse = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(doc.name)}`, {
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+                    expect(checkResponse.ok).toBe(true);
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    throw error;
+                }
             }
         });
     });
@@ -713,15 +838,24 @@ describe('Firebase Docker Integration Tests', () => {
             const fileName = `timeout-test-${Date.now()}.txt`;
             
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10); // Very short timeout
+                
                 await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(fileName)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
                     body: 'timeout test',
-                    signal: AbortSignal.timeout(10) // Very short timeout
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
             } catch (error) {
                 expect(error).toBeDefined();
-                expect(error instanceof Error && error.name === 'TimeoutError').toBe(true);
+                // Check for abort-related errors instead of specific TimeoutError
+                expect(
+                    error instanceof Error && 
+                    (error.name === 'AbortError' || error.message.includes('abort'))
+                ).toBe(true);
             }
         });
 
@@ -729,11 +863,20 @@ describe('Firebase Docker Integration Tests', () => {
             // Try to download non-existent file
             const nonExistentFile = `non-existent-${Date.now()}.txt`;
             
-            const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/download/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(nonExistentFile)}?alt=media`, {
-                signal: AbortSignal.timeout(5000)
-            });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
             
-            expect(response.status).toBe(404);
+            try {
+                const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/download/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(nonExistentFile)}?alt=media`, {
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                expect(response.status).toBe(404);
+            } catch (error) {
+                clearTimeout(timeoutId);
+                throw error;
+            }
         });
 
         it('should recover from temporary service interruptions', async () => {
@@ -765,19 +908,29 @@ describe('Firebase Docker Integration Tests', () => {
                 const content = `Concurrent content ${i}`;
                 
                 return retryOperation(async () => {
-                    const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(fileName)}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'text/plain' },
-                        body: content,
-                        signal: AbortSignal.timeout(20000)
-                    });
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 20000);
                     
-                    if (!response.ok) {
-                        throw new Error(`Concurrent upload failed: ${response.status}`);
+                    try {
+                        const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/upload/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o?uploadType=media&name=${encodeURIComponent(fileName)}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain' },
+                            body: content,
+                            signal: controller.signal
+                        });
+                        
+                        clearTimeout(timeoutId);
+                        
+                        if (!response.ok) {
+                            throw new Error(`Concurrent upload failed: ${response.status}`);
+                        }
+                        
+                        createdFileNames.push(fileName);
+                        return { fileName, success: true };
+                    } catch (error) {
+                        clearTimeout(timeoutId);
+                        throw error;
                     }
-                    
-                    createdFileNames.push(fileName);
-                    return { fileName, success: true };
                 }, 2, 1000, `Concurrent operation ${i}`);
             });
             
@@ -805,9 +958,21 @@ describe('Firebase Docker Integration Tests', () => {
             // Perform mixed operations concurrently
             const operations = [
                 auth.getUser(firebaseUser.uid),
-                fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}`, {
-                    signal: AbortSignal.timeout(10000)
-                }),
+                (async () => {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000);
+                    
+                    try {
+                        const response = await fetch(`http://${EMULATOR_CONFIG.storageEmulator}/storage/v1/b/${EMULATOR_CONFIG.storageBucket}/o/${encodeURIComponent(fileName)}`, {
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+                        return response;
+                    } catch (error) {
+                        clearTimeout(timeoutId);
+                        throw error;
+                    }
+                })(),
                 TestDatabaseConnection.query('SELECT version()')
             ];
             
