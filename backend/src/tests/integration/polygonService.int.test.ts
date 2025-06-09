@@ -2846,7 +2846,11 @@ describe('Polygon Service Full Integration Tests', () => {
 describe('Test Framework Validation', () => {
   beforeAll(async () => {
     console.log('🚀 Setting up framework validation tests...');
-    // Initialize test database for framework validation tests
+    
+    // Initialize test database connection FIRST
+    await TestDatabaseConnection.initialize();
+    
+    // Then set up the test database schema
     await setupTestDatabase();
     
     // Check what tables exist before framework setup
@@ -2873,18 +2877,35 @@ describe('Test Framework Validation', () => {
     `);
     console.log('📋 Tables after framework setup:', tablesAfterFramework.rows.map((r: TableRow) => r.table_name));
     console.log('✅ Framework validation tests initialized');
-  }, 30000);
+  }, 60000); // Increase timeout for initialization
 
   afterAll(async () => {
     try {
+      // Clean up all test data in dependency order
+      await TestDatabaseConnection.query('TRUNCATE TABLE wardrobes CASCADE');
+      await TestDatabaseConnection.query('TRUNCATE TABLE garment_items CASCADE');
+      await TestDatabaseConnection.query('TRUNCATE TABLE polygons CASCADE');
+      await TestDatabaseConnection.clearAllTables();
+      
+      // Drop test tables in reverse dependency order
+      await TestDatabaseConnection.query('DROP TABLE IF EXISTS wardrobes CASCADE');
+      await TestDatabaseConnection.query('DROP TABLE IF EXISTS garment_items CASCADE');
+      await TestDatabaseConnection.query('DROP TABLE IF EXISTS polygons CASCADE');
+      
+      // Cleanup database connections
       await TestDatabaseConnection.cleanup();
+      console.log('✅ Framework validation tests cleaned up');
     } catch (error) {
-      console.warn('Framework validation cleanup error:', error);
+      console.warn('⚠️ Framework validation cleanup had issues:', error);
     }
-  }, 30000);
+  }, 60000);
 
   beforeEach(async () => {
     console.log('🧽 Framework validation beforeEach cleanup...');
+    
+    // Don't call setupTestDatabase() here - just clean the data
+    // The database connection is already initialized in beforeAll
+    
     // Clean test data but preserve table structure
     try {
       await TestDatabaseConnection.query('TRUNCATE TABLE wardrobes CASCADE');
@@ -2939,21 +2960,40 @@ describe('Test Framework Validation', () => {
     // This test ensures the test suite itself performs well
     const testStartTime = Date.now();
     
-    // Run a subset of operations to benchmark test performance
-    await createTestUsersAndImages();
+    // Create test users and images for this specific test
+    const userData = {
+      email: `benchmark-${Date.now()}@example.com`,
+      password: 'testpassword123'
+    };
+    const user = await testUserModel.create(userData);
+    const userId = user.id;
+
+    const imageData = {
+      user_id: userId,
+      file_path: '/test/images/benchmark-test.jpg',
+      original_metadata: {
+        width: 1200,
+        height: 800,
+        format: 'jpeg',
+        size: 245760
+      }
+    };
+    const image = await testImageModel.create(imageData);
+    const imageId = image.id;
     
+    // Run a subset of operations to benchmark test performance
     const polygon = await polygonService.createPolygon({
-      userId: testUserId,
-      originalImageId: testImageId,
+      userId: userId,
+      originalImageId: imageId,
       points: createValidPolygonPoints.triangle(),
       label: 'benchmark_test'
     });
 
     // Use helper function to safely extract and validate polygon ID
-    const polygonId = addPolygonToTestCleanup(polygon, testPolygonIds);
+    const polygonId = addPolygonToTestCleanup(polygon, []);
 
-    await polygonService.getPolygonById(polygonId, testUserId);
-    await polygonService.deletePolygon(polygonId, testUserId);
+    await polygonService.getPolygonById(polygonId, userId);
+    await polygonService.deletePolygon(polygonId, userId);
     
     const testDuration = Date.now() - testStartTime;
     
