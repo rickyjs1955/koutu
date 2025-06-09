@@ -1,6 +1,6 @@
-// /backend/src/models/wardrobeModel.ts
+// /backend/src/models/wardrobeModel.ts - FIXED with UUID validation
 import { query } from './db';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4, validate as isUuid } from 'uuid';
 
 export interface Wardrobe {
   id: string;
@@ -39,6 +39,11 @@ export const wardrobeModel = {
   },
   
   async findById(id: string): Promise<Wardrobe | null> {
+    // Add UUID validation - return null for invalid UUIDs without querying DB
+    if (!id || !isUuid(id)) {
+      return null;
+    }
+    
     const result = await query(
       'SELECT * FROM wardrobes WHERE id = $1',
       [id]

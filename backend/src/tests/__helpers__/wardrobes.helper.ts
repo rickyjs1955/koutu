@@ -532,13 +532,11 @@ export const wardrobeMockQueryHelpers = {
       }
       
       if (queryText.includes('INSERT INTO wardrobe_items')) {
-        return Promise.resolve(scenarios.addGarment || wardrobeMocks.queryResults.insertSuccess(
-          wardrobeMocks.createValidWardrobe()
-        ));
+        return Promise.resolve(scenarios.addGarment || wardrobeMocks.queryResults.genericSuccess([], 'INSERT'));
       }
       
       if (queryText.includes('DELETE FROM wardrobe_items')) {
-        return Promise.resolve(scenarios.removeGarment || wardrobeMocks.queryResults.deleteSuccess());
+        return Promise.resolve(scenarios.removeGarment || wardrobeMocks.queryResults.genericSuccess([], 'DELETE'));
       }
       
       if (queryText.includes('SELECT g.*, wi.position')) {
@@ -548,7 +546,7 @@ export const wardrobeMockQueryHelpers = {
       }
       
       // Default fallback
-      return Promise.resolve({ rows: [], rowCount: 0 });
+      return Promise.resolve(wardrobeMocks.queryResults.genericSuccess([], 'SELECT'));
     });
   },
 

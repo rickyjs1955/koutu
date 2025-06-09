@@ -269,61 +269,91 @@ export const wardrobeMocks = {
   },
 
   /**
-   * Database query result mocks
+   * Database query result mocks - Complete QueryResult interface
    */
   queryResults: {
     // Successful insert result
     insertSuccess: (wardrobe: Wardrobe) => ({
       rows: [wardrobe],
       rowCount: 1,
-      command: 'INSERT',
+      command: 'INSERT' as const,
       oid: 0,
-      fields: []
+      fields: [],
+      _types: undefined as any,
+      _parsers: undefined as any,
+      notice: undefined as any
     }),
 
     // Successful select result with multiple wardrobes
     selectMultiple: (wardrobes: Wardrobe[]) => ({
       rows: wardrobes,
       rowCount: wardrobes.length,
-      command: 'SELECT',
+      command: 'SELECT' as const,
       oid: 0,
-      fields: []
+      fields: [],
+      _types: undefined as any,
+      _parsers: undefined as any,
+      notice: undefined as any
     }),
 
     // Successful select result with single wardrobe
     selectSingle: (wardrobe: Wardrobe | null) => ({
       rows: wardrobe ? [wardrobe] : [],
       rowCount: wardrobe ? 1 : 0,
-      command: 'SELECT',
+      command: 'SELECT' as const,
       oid: 0,
-      fields: []
+      fields: [],
+      _types: undefined as any,
+      _parsers: undefined as any,
+      notice: undefined as any
     }),
 
     // Successful update result
     updateSuccess: (wardrobe: Wardrobe) => ({
       rows: [wardrobe],
       rowCount: 1,
-      command: 'UPDATE',
+      command: 'UPDATE' as const,
       oid: 0,
-      fields: []
+      fields: [],
+      _types: undefined as any,
+      _parsers: undefined as any,
+      notice: undefined as any
     }),
 
     // Successful delete result
     deleteSuccess: () => ({
       rows: [],
       rowCount: 1,
-      command: 'DELETE',
+      command: 'DELETE' as const,
       oid: 0,
-      fields: []
+      fields: [],
+      _types: undefined as any,
+      _parsers: undefined as any,
+      notice: undefined as any
     }),
 
     // No rows affected (not found)
     notFound: () => ({
       rows: [],
       rowCount: 0,
-      command: 'SELECT',
+      command: 'SELECT' as const,
       oid: 0,
-      fields: []
+      fields: [],
+      _types: undefined as any,
+      _parsers: undefined as any,
+      notice: undefined as any
+    }),
+
+    // Generic success result for any operation
+    genericSuccess: (rows: any[] = [], command: 'INSERT' | 'SELECT' | 'UPDATE' | 'DELETE' = 'SELECT') => ({
+      rows,
+      rowCount: rows.length,
+      command,
+      oid: 0,
+      fields: [],
+      _types: undefined as any,
+      _parsers: undefined as any,
+      notice: undefined as any
     })
   },
 
