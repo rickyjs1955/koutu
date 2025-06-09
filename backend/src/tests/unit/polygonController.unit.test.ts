@@ -41,11 +41,33 @@ import {
   polygonAssertions
 } from '../__helpers__/polygons.helper';
 
+// ==================== INTERFACES ====================
+
+interface TypedPolygonModel {
+  create: jest.MockedFunction<(data: any) => Promise<any>>;
+  findById: jest.MockedFunction<(id: string) => Promise<any>>;
+  findByImageId: jest.MockedFunction<(imageId: string) => Promise<any>>;
+  update: jest.MockedFunction<(id: string, data: any) => Promise<any>>;
+  delete: jest.MockedFunction<(id: string) => Promise<boolean>>;
+  findByUserId: jest.MockedFunction<(userId: string) => Promise<any>>;
+  deleteByImageId: jest.MockedFunction<(imageId: string) => Promise<number>>;
+}
+
+interface TypedImageModel {
+  findById: jest.MockedFunction<(id: string) => Promise<any>>;
+  updateStatus: jest.MockedFunction<(id: string, status: string) => Promise<any>>;
+}
+
+interface TypedStorageService {
+  saveFile: jest.MockedFunction<(buffer: Buffer, path: string) => Promise<void>>;
+  deleteFile: jest.MockedFunction<(path: string) => Promise<void>>;
+}
+
 // ==================== MOCK SETUP ====================
 
 // Mock Firebase - requires real credentials otherwise
 jest.mock('../../config/firebase', () => ({
-  default: { storage: jest.fn() }
+    default: { storage: jest.fn() }
 }));
 
 // Mock all dependencies
@@ -54,9 +76,12 @@ jest.mock('../../models/imageModel');
 jest.mock('../../services/storageService');
 jest.mock('../../utils/ApiError');
 
-const mockPolygonModel = polygonModel as jest.Mocked<typeof polygonModel>;
-const mockImageModel = imageModel as jest.Mocked<typeof imageModel>;
-const mockStorageService = storageService as jest.Mocked<typeof storageService>;
+const mockPolygonModel = polygonModel as jest.Mocked<TypedPolygonModel>;
+const mockImageModel = imageModel as unknown as jest.Mocked<TypedImageModel>;
+const mockStorageService = storageService as unknown as jest.Mocked<TypedStorageService>;
+
+const mockResolvedValue = <T>(value: T) => Promise.resolve(value);
+const mockRejectedValue = (error: Error) => Promise.reject(error);
 
 // ==================== TEST CONSTANTS ====================
 
@@ -71,7 +96,7 @@ const TEST_TIMEOUT = 30000; // 30 seconds for complex tests
 describe('PolygonController - Comprehensive Unit Tests', () => {
     let mockRequest: Partial<Request>;
     let mockResponse: Partial<Response>;
-    let mockNext: NextFunction;
+    let mockNext: jest.MockedFunction<NextFunction>;
 
     // ==================== SETUP AND TEARDOWN ====================
 
@@ -156,9 +181,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 label: 'simple_triangle'
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -195,9 +220,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 metadata
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -230,9 +255,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -260,8 +285,8 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
                 mockStorageService.saveFile.mockRejectedValue(simulatePolygonErrors.mlDataSaveError());
 
                 await polygonController.createPolygon(
@@ -308,7 +333,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 original_image_id: image.id
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -364,7 +389,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -394,7 +419,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: outOfBoundsPoints
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -430,9 +455,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -458,7 +483,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 original_image_id: image.id
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -494,9 +519,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -545,7 +570,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.create.mockRejectedValue(new Error('Database constraint violation'));
 
                 await polygonController.createPolygon(
@@ -580,7 +605,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockRequest.user = user;
                 mockRequest.params = { imageId: image.id };
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.findByImageId.mockResolvedValue(polygons);
 
                 await polygonController.getImagePolygons(
@@ -607,7 +632,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockRequest.user = user;
                 mockRequest.params = { imageId: image.id };
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.findByImageId.mockResolvedValue([]);
 
                 await polygonController.getImagePolygons(
@@ -682,7 +707,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockRequest.user = user;
                 mockRequest.params = { imageId: image.id };
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.getImagePolygons(
                 mockRequest as Request,
@@ -716,7 +741,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockRequest.params = { id: polygon.id };
 
                 mockPolygonModel.findById.mockResolvedValue(polygon);
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.delete.mockResolvedValue(true);
                 mockStorageService.deleteFile.mockResolvedValue(undefined);
 
@@ -748,7 +773,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockRequest.params = { id: polygon.id };
 
                 mockPolygonModel.findById.mockResolvedValue(polygon);
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.delete.mockResolvedValue(true);
                 mockStorageService.deleteFile.mockRejectedValue(new Error('Storage cleanup failed'));
 
@@ -777,7 +802,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockRequest.params = { id: polygon.id };
 
                 mockPolygonModel.findById.mockResolvedValue(polygon);
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.getPolygon(
                 mockRequest as Request,
@@ -822,9 +847,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockRequest.body = updateData;
 
                 mockPolygonModel.findById.mockResolvedValue(polygon);
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.update.mockResolvedValue(updatedPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.updatePolygon(
                 mockRequest as Request,
@@ -864,9 +889,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockRequest.body = updateData;
 
                 mockPolygonModel.findById.mockResolvedValue(polygon);
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.update.mockResolvedValue(updatedPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.updatePolygon(
                 mockRequest as Request,
@@ -896,7 +921,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockRequest.body = updateData;
 
                 mockPolygonModel.findById.mockResolvedValue(polygon);
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.updatePolygon(
                 mockRequest as Request,
@@ -931,7 +956,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockRequest.body = updateData;
 
                 mockPolygonModel.findById.mockResolvedValue(polygon);
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.updatePolygon(
                 mockRequest as Request,
@@ -966,7 +991,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockRequest.params = { id: polygon.id };
 
                 mockPolygonModel.findById.mockResolvedValue(polygon);
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.delete.mockResolvedValue(true);
                 mockStorageService.deleteFile.mockResolvedValue(undefined);
 
@@ -1003,7 +1028,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockRequest.params = { id: polygon.id };
     
                 mockPolygonModel.findById.mockResolvedValue(polygon);
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.delete.mockResolvedValue(true);
                 mockStorageService.deleteFile.mockRejectedValue(new Error('Storage cleanup failed'));
     
@@ -1031,7 +1056,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockRequest.params = { id: polygon.id };
 
                 mockPolygonModel.findById.mockResolvedValue(polygon);
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.delete.mockResolvedValue(false);
 
                 await polygonController.deletePolygon(
@@ -1071,9 +1096,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: minPoints
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1102,9 +1127,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: maxPoints
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1130,7 +1155,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: twoPoints
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1160,7 +1185,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: tooManyPoints
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1195,9 +1220,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: precisionPoints
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1219,7 +1244,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: nanPoints
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1242,7 +1267,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: infinitePoints
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1276,9 +1301,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                     label: unicodeLabel
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                     mockRequest as Request,
@@ -1310,9 +1335,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 metadata: unicodeMetadata
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1350,9 +1375,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                     label: maliciousLabel
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                     mockRequest as Request,
@@ -1392,9 +1417,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 metadata: maliciousMetadata
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1417,7 +1442,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: maliciousPoints
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1505,9 +1530,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 })
                 }));
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.create.mockResolvedValue(createMockPolygon());
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 // Simulate rapid sequential requests
                 for (const request of requests.slice(0, 10)) { // Test first 10
@@ -1547,9 +1572,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: complexPoints
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             const startTime = performance.now();
 
@@ -1582,9 +1607,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: maxPoints
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             const { result, duration } = await measurePolygonOperation(async () => {
                 await polygonController.createPolygon(
@@ -1617,9 +1642,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 label: `concurrent_polygon_${i}`
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1664,9 +1689,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 label: 'lifecycle_test'
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1682,7 +1707,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
 
                 mockRequest.params = { id: mockPolygon.id };
                 mockPolygonModel.findById.mockResolvedValue(mockPolygon);
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 await polygonController.getPolygon(
                 mockRequest as Request,
@@ -1709,9 +1734,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 });
 
                 mockPolygonModel.findById.mockResolvedValue(mockPolygon);
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.update.mockResolvedValue(updatedPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.updatePolygon(
                 mockRequest as Request,
@@ -1726,7 +1751,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 setupApiErrorMocks();
 
                 mockPolygonModel.findById.mockResolvedValue(updatedPolygon);
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.delete.mockResolvedValue(true);
                 mockStorageService.deleteFile.mockResolvedValue(undefined);
 
@@ -1789,8 +1814,8 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 });
 
                 // Polygon creation succeeds but ML data save fails
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
                 mockStorageService.saveFile.mockRejectedValue(new Error('ML service unavailable'));
 
                 await polygonController.createPolygon(
@@ -1817,7 +1842,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: createValidPolygonPoints.triangle()
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 mockPolygonModel.create.mockRejectedValue(
                 simulatePolygonErrors.databaseConnection()
                 );
@@ -1852,7 +1877,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: collinearPoints
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1885,7 +1910,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                     points: tinyPoints
                 });
             
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
             
                 await polygonController.createPolygon(
                     mockRequest as Request,
@@ -1922,9 +1947,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             });
 
             mockPolygonModel.findById.mockResolvedValue(polygon);
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
             mockPolygonModel.update.mockResolvedValue(updatedPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.updatePolygon(
                 mockRequest as Request,
@@ -1947,7 +1972,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: selfIntersectingPoints
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -1956,7 +1981,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             );
 
             // Should either accept (if self-intersection allowed) or reject gracefully
-            const wasAccepted = mockResponse.status.mock.calls.some(call => call[0] === 201);
+            const wasAccepted: boolean = (mockResponse.status as unknown as jest.MockedFunction<any>)?.mock?.calls?.some((call: any[]) => call[0] === 201) || false;
             const wasRejected = mockNext.mock.calls.length > 0;
 
             expect(wasAccepted || wasRejected).toBe(true);
@@ -1986,9 +2011,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 metadata: createPolygonMetadataVariations.garmentSpecific
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -2011,7 +2036,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: tooSmallPoints
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -2051,9 +2076,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 metadata
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -2088,9 +2113,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: complexGarmentPoints
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -2126,9 +2151,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: elongatedPoints
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -2164,9 +2189,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -2202,9 +2227,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             mockRequest.body = updateData;
 
             mockPolygonModel.findById.mockResolvedValue(polygon);
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
             mockPolygonModel.update.mockResolvedValue(updatedPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.updatePolygon(
                 mockRequest as Request,
@@ -2230,7 +2255,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             mockRequest.params = { id: polygon.id };
 
             mockPolygonModel.findById.mockResolvedValue(polygon);
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
             mockPolygonModel.delete.mockResolvedValue(true);
             mockStorageService.deleteFile.mockResolvedValue(undefined);
 
@@ -2262,8 +2287,8 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
             mockStorageService.saveFile.mockRejectedValue(new Error('ML export service down'));
 
             await polygonController.createPolygon(
@@ -2298,8 +2323,8 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 metadata: createPolygonMetadataVariations.detailed
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
 
             let savedData: any;
             mockStorageService.saveFile.mockImplementation((buffer, path) => {
@@ -2413,9 +2438,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: largePoints
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -2443,13 +2468,13 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             mockRequest.params = { id: polygon.id };
 
             mockPolygonModel.findById.mockResolvedValue(polygon);
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
             // First update
             mockRequest.body = update1;
             const updatedPolygon1 = createMockPolygon({ ...polygon, ...update1 });
             mockPolygonModel.update.mockResolvedValueOnce(updatedPolygon1);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.updatePolygon(
                 mockRequest as Request,
@@ -2466,9 +2491,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             mockRequest.body = update2;
             const updatedPolygon2 = createMockPolygon({ ...polygon, ...update2 });
             mockPolygonModel.findById.mockResolvedValue(updatedPolygon1); // Returns first update
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
             mockPolygonModel.update.mockResolvedValue(updatedPolygon2);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.updatePolygon(
                 mockRequest as Request,
@@ -2490,7 +2515,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
             // Simulate database constraint violation
             const constraintError = new Error('duplicate key value violates unique constraint');
@@ -2560,9 +2585,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -2645,7 +2670,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             mockRequest.user = user;
             mockRequest.params = { imageId: image.id };
 
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
             mockPolygonModel.findByImageId.mockResolvedValue(polygons);
 
             await polygonController.getImagePolygons(
@@ -2688,9 +2713,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -2782,9 +2807,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             const startTime = performance.now();
 
@@ -2821,9 +2846,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: complexPoints
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             const startTime = performance.now();
 
@@ -2863,9 +2888,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                     points
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                     mockRequest as Request,
@@ -2914,9 +2939,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: maxPoints
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             const { result, duration, memoryUsage } = await measurePolygonOperation(async () => {
                 await polygonController.createPolygon(
@@ -2954,9 +2979,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: overlappingPolygons.polygon1
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
             mockPolygonModel.create.mockResolvedValue(mockPolygon1);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -2982,9 +3007,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: overlappingPolygons.polygon2
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
             mockPolygonModel.create.mockResolvedValue(mockPolygon2);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -3020,9 +3045,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: testCase.points
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -3084,9 +3109,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                     points
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue('data/polygons/mock-polygon-id.json');
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                     mockRequest as Request,
@@ -3128,9 +3153,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -3172,8 +3197,8 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
             
             // Simulate storage service being down
             mockStorageService.saveFile.mockRejectedValue(new Error('Storage service unavailable'));
@@ -3200,7 +3225,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             mockRequest.params = { id: polygon.id };
 
             mockPolygonModel.findById.mockResolvedValue(polygon);
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
             mockPolygonModel.delete.mockResolvedValue(true);
             
             // Storage cleanup fails but main operation succeeds
@@ -3238,8 +3263,8 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
             
             // Simulate ML service timeout
             mockStorageService.saveFile.mockRejectedValue(new Error('Timeout'));
@@ -3286,9 +3311,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: request.points
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
-                mockPolygonModel.create.mockResolvedValue(mockPolygon);
-                mockStorageService.saveFile.mockResolvedValue(undefined);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+                mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+                mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
                 await polygonController.createPolygon(
                 mockRequest as Request,
@@ -3296,7 +3321,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 mockNext
                 );
 
-                if (mockResponse.status.mock.calls.some(call => call[0] === 201)) {
+                if ((mockResponse.status as jest.MockedFunction<any>).mock.calls.some((call: any[]) => call[0] === 201)) {
                 successCount++;
                 } else {
                 errorCount++;
@@ -3336,11 +3361,11 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 points: createValidPolygonPoints.triangle()
                 });
 
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
                 if (!transition.allowPolygons) {
                     // Don't mock create - let it fail naturally or add validation error
-                mockImageModel.findById.mockResolvedValue(image);
+                mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
                 } else {
                     // Existing success path mocks
                 }
@@ -3370,7 +3395,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 label: 'new_polygon'
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
             mockPolygonModel.findByImageId.mockResolvedValue(existingPolygons);
 
             // Create one more polygon (should succeed if no limit enforced)
@@ -3378,8 +3403,8 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 user_id: user.id,
                 original_image_id: image.id
             });
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
@@ -3435,7 +3460,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             mockRequest.params = { id: polygon.id };
 
             mockPolygonModel.findById.mockResolvedValue(polygon);
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
             await polygonController.getPolygon(
                 mockRequest as Request,
@@ -3457,7 +3482,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
     describe('Final Validation Suite', () => {
         test('should validate complete test coverage', () => {
             // Verify all controller methods are tested
-            const controllerMethods = [
+            const controllerMethods: (keyof typeof polygonController)[] = [
                 'createPolygon',
                 'getImagePolygons', 
                 'getPolygon',
@@ -3747,8 +3772,8 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             points
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
             
             // Simulate circuit breaker - storage service repeatedly failing
             let failureCount = 0;
@@ -3823,9 +3848,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             points
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
             mockRequest as Request,
@@ -3852,7 +3877,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             });
 
             mockPolygonModel.findById.mockResolvedValue(polygon);
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
             
             // Simulate microservice (ML service) being down
             const serviceError = new Error('Microservice unavailable');
@@ -3887,7 +3912,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             mockRequest.params = { id: polygon.id };
 
             mockPolygonModel.findById.mockResolvedValue(polygon);
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
             mockPolygonModel.delete.mockResolvedValue(true);
             
             // Simulate message queue (for async processing) being down
@@ -3927,9 +3952,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             updated_at: new Date()
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
             mockRequest as Request,
@@ -3960,7 +3985,7 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             mockRequest.params = { id: polygon.id };
 
             mockPolygonModel.findById.mockResolvedValue(polygon);
-            mockImageModel.findById.mockResolvedValue(image);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
 
             await polygonController.getPolygon(
             mockRequest as Request,
@@ -3997,9 +4022,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
             }
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
             mockRequest as Request,
@@ -4044,9 +4069,9 @@ describe('PolygonController - Comprehensive Unit Tests', () => {
                 }
             });
 
-            mockImageModel.findById.mockResolvedValue(image);
-            mockPolygonModel.create.mockResolvedValue(mockPolygon);
-            mockStorageService.saveFile.mockResolvedValue(undefined);
+            mockImageModel.findById.mockImplementation((id: string) => mockResolvedValue(image));
+            mockPolygonModel.create.mockImplementation((data: any) => mockResolvedValue(mockPolygon));
+            mockStorageService.saveFile.mockImplementation(() => mockResolvedValue(undefined));
 
             await polygonController.createPolygon(
                 mockRequest as Request,
