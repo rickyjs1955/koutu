@@ -134,7 +134,12 @@ export const storageService = {
    * @param fileExtension The file extension
    * @returns The content type
    */
-  getContentType(fileExtension: string): string {
+  getContentType(fileExtension: string | null | undefined): string {
+    // Handle null, undefined, or empty string inputs
+    if (!fileExtension || typeof fileExtension !== 'string') {
+      return 'application/octet-stream';
+    }
+
     const contentTypeMap: { [key: string]: string } = {
       '.jpg': 'image/jpeg',
       '.jpeg': 'image/jpeg',
