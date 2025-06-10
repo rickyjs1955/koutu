@@ -424,6 +424,328 @@ if (typeof global !== 'undefined') {
 }
 
 /**
+ * Ensure wardrobe-specific tables exist in both modes
+ * This fixes the "wardrobe_items does not exist" errors
+ * 
+ * @returns {Promise<void>}
+ */
+export const ensureWardrobeTablesExist = async (): Promise<void> => {
+  const TestDB = getTestDatabaseConnection();
+  
+  try {
+    // Check if wardrobe_items table exists
+    const result = await TestDB.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'wardrobe_items'
+      );
+    `);
+
+    if (!result.rows[0].exists) {
+      console.log('🔧 Creating missing wardrobe_items table...');
+      
+      // Create wardrobe_items table
+      await TestDB.query(`
+        CREATE TABLE wardrobe_items (
+          id SERIAL PRIMARY KEY,
+          wardrobe_id UUID NOT NULL REFERENCES wardrobes(id) ON DELETE CASCADE,
+          garment_item_id UUID NOT NULL REFERENCES garment_items(id) ON DELETE CASCADE,
+          position INTEGER DEFAULT 0,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE(wardrobe_id, garment_item_id)
+        )
+      `);
+
+      // Add performance indexes
+      await TestDB.query(`
+        CREATE INDEX idx_wardrobe_items_wardrobe_id ON wardrobe_items(wardrobe_id);
+        CREATE INDEX idx_wardrobe_items_garment_id ON wardrobe_items(garment_item_id);
+        CREATE INDEX idx_wardrobe_items_position ON wardrobe_items(wardrobe_id, position);
+      `);
+    }
+
+    // Ensure wardrobes table has is_default column
+    await TestDB.query(`
+      ALTER TABLE wardrobes 
+      ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT FALSE;
+    `);
+
+    // Ensure wardrobes columns are TEXT (not VARCHAR with limits)
+    try {
+      await TestDB.query(`
+        ALTER TABLE wardrobes 
+        ALTER COLUMN name TYPE TEXT,
+        ALTER COLUMN description TYPE TEXT;
+      `);
+    } catch (error) {
+      // Columns might already be TEXT, ignore error
+      console.log('📝 Wardrobes columns already TEXT or conversion not needed');
+    }
+
+    console.log('✅ Wardrobe tables verified and ready');
+  } catch (error) {
+    console.warn('⚠️ Error ensuring wardrobe tables exist:', error);
+    throw error;
+  }
+};
+
+/**
+ * Setup wardrobe test environment with proper schema
+ * Call this in your test setup files
+ * 
+ * @returns {Promise<void>}
+ */
+export const setupWardrobeTestEnvironment = async (): Promise<void> => {
+  console.log('🧪 Setting up wardrobe test environment...');
+  
+  // Setup base test environment (your existing function)
+  setupTestEnvironment();
+  
+  // Initialize database connection
+  const TestDB = getTestDatabaseConnection();
+  await TestDB.initialize();
+  
+  // Ensure wardrobe-specific tables exist
+  await ensureWardrobeTablesExist();
+  
+  console.log('✅ Wardrobe test environment ready');
+};
+
+/**
+ * Enhanced validation that includes wardrobe tables
+ * Extends your existing validateMigration function
+ * 
+ * @returns {Promise<boolean>}
+ */
+export const validateWardrobeMigration = async (): Promise<boolean> => {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('Wardrobe migration validation can only run in test environment');
+  }
+
+  console.log('🔍 Validating wardrobe tables in both Docker and Manual modes...');
+  
+  try {
+    // Test wardrobe operations with both implementations
+    const results = await Promise.all([
+      testWardrobeImplementation('docker'),
+      testWardrobeImplementation('manual')
+    ]);
+
+    const [dockerResult, manualResult] = results;
+    
+    // Compare table structures
+    const dockerTables = dockerResult.tables.sort();
+    const manualTables = manualResult.tables.sort();
+    
+    if (JSON.stringify(dockerTables) === JSON.stringify(manualTables)) {
+      console.log('✅ Wardrobe migration validation passed - both modes have identical table structures');
+      return true;
+    } else {
+      console.log('❌ Wardrobe migration validation failed - table structures differ');
+      console.log('Docker tables:', dockerTables);
+      console.log('Manual tables:', manualTables);
+      return false;
+    }
+  } catch (error) {
+    console.log('❌ Wardrobe migration validation error:', error);
+    return false;
+  }
+};
+
+/**
+ * Test wardrobe-specific implementation
+ * 
+ * @param {'docker' | 'manual'} type - Which implementation to test
+ * @returns {Promise<any>} Result from wardrobe table queries
+ */
+async function testWardrobeImplementation(type: 'docker' | 'manual'): Promise<any> {
+  const originalEnv = process.env.USE_MANUAL_TESTS;
+  
+  try {
+    // Force the implementation type
+    process.env.USE_MANUAL_TESTS = type === 'manual' ? 'true' : 'false';
+    
+    const TestDB = getTestDatabaseConnection();
+    await TestDB.initialize();
+    
+    // Ensure wardrobe tables exist
+    await ensureWardrobeTablesExist();
+    
+    // Test wardrobe table structure
+    const tableResult = await TestDB.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_name IN ('wardrobes', 'wardrobe_items', 'garment_items')
+      ORDER BY table_name
+    `);
+    
+    const columnResult = await TestDB.query(`
+      SELECT table_name, column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name IN ('wardrobes', 'wardrobe_items') 
+      ORDER BY table_name, column_name
+    `);
+    
+    await TestDB.cleanup();
+    
+    interface WardrobeTableResult {
+      table_name: string;
+    }
+
+    interface WardrobeColumnResult {
+      table_name: string;
+      column_name: string;
+      data_type: string;
+    }
+
+    interface WardrobeImplementationTestResult {
+      tables: string[];
+      columns: WardrobeColumnResult[];
+    }
+
+        return {
+          tables: tableResult.rows.map((r: WardrobeTableResult) => r.table_name),
+          columns: columnResult.rows
+        } as WardrobeImplementationTestResult;
+  } finally {
+    // Restore original environment
+    if (originalEnv !== undefined) {
+      process.env.USE_MANUAL_TESTS = originalEnv;
+    } else {
+      delete process.env.USE_MANUAL_TESTS;
+    }
+  }
+}
+
+/**
+ * Quick diagnostic for wardrobe test failures
+ * Call this when wardrobe tests are failing to get debugging info
+ * 
+ * @returns {Promise<object>} Diagnostic information
+ */
+export const diagnoseWardrobeTestFailures = async (): Promise<object> => {
+  console.log('🔍 Diagnosing wardrobe test setup...');
+  
+  const TestDB = getTestDatabaseConnection();
+  const mode = shouldUseDocker() ? 'DOCKER' : 'MANUAL';
+  
+  try {
+    await TestDB.initialize();
+    
+    // Check if required tables exist
+    const tableCheck = await TestDB.query(`
+      SELECT 
+        CASE WHEN EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'wardrobes') 
+          THEN 'EXISTS' ELSE 'MISSING' END as wardrobes_table,
+        CASE WHEN EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'wardrobe_items') 
+          THEN 'EXISTS' ELSE 'MISSING' END as wardrobe_items_table,
+        CASE WHEN EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'garment_items') 
+          THEN 'EXISTS' ELSE 'MISSING' END as garment_items_table
+    `);
+    
+    // Check wardrobes table structure
+    let wardrobesStructure = null;
+    try {
+      wardrobesStructure = await TestDB.query(`
+        SELECT column_name, data_type, is_nullable 
+        FROM information_schema.columns 
+        WHERE table_name = 'wardrobes'
+        ORDER BY ordinal_position
+      `);
+    } catch (error) {
+      wardrobesStructure = { error: error instanceof Error ? error.message : String(error) };
+    }
+    
+    const diagnosis = {
+      mode,
+      tables: tableCheck.rows[0],
+      wardrobesStructure: wardrobesStructure.rows || wardrobesStructure,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('📊 Wardrobe Test Diagnosis:', JSON.stringify(diagnosis, null, 2));
+    
+    return diagnosis;
+  } catch (error) {
+    console.error('❌ Error during diagnosis:', error);
+    return {
+      mode,
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString()
+    };
+  }
+};
+
+/**
+ * Enhanced test setup for wardrobe integration tests
+ * Use this instead of calling TestDatabaseConnection directly
+ * 
+ * @returns {Promise<any>} The initialized database connection
+ */
+export const initializeWardrobeTests = async (): Promise<any> => {
+  console.log(`🧪 Initializing wardrobe tests in ${shouldUseDocker() ? 'DOCKER' : 'MANUAL'} mode...`);
+  
+  try {
+    // Initialize with proper mode detection
+    const TestDB = getTestDatabaseConnection();
+    const pool = await TestDB.initialize();
+    
+    // Ensure wardrobe tables exist
+    await ensureWardrobeTablesExist();
+    
+    // Clear test data
+    await TestDB.clearAllTables();
+    
+    console.log('✅ Wardrobe tests initialized successfully');
+    return pool;
+  } catch (error) {
+    console.error('❌ Failed to initialize wardrobe tests:', error);
+    
+    // Provide helpful error message
+    if (error instanceof Error && error.message.includes('wardrobe_items')) {
+      console.log(`
+🚨 WARDROBE TABLE ISSUE DETECTED
+════════════════════════════════════════
+The wardrobe_items table is missing. This can happen when:
+1. Database schema is outdated
+2. Migration scripts haven't run
+3. Different environment than expected
+
+QUICK FIX:
+${shouldUseDocker() ? 
+  '1. Restart Docker containers: docker-compose down && docker-compose up -d' :
+  '1. Run database migrations manually'
+}
+2. Call ensureWardrobeTablesExist() before tests
+3. Or switch modes: ${shouldUseDocker() ? 
+  'USE_MANUAL_TESTS=true' : 'USE_DOCKER_TESTS=true'
+}
+════════════════════════════════════════
+      `);
+    }
+    
+    throw error;
+  }
+};
+
+/**
+ * Mock database connection for wardrobe tests
+ * Use this in your jest.doMock() calls
+ * 
+ * @returns {object} Mock database object
+ */
+export const createWardrobeDatabaseMock = () => {
+  const TestDB = getTestDatabaseConnection();
+  
+  return {
+    query: async (text: string, params?: any[]) => {
+      return TestDB.query(text, params);
+    }
+  };
+};
+
+/**
  * ============================================================================
  * MAINTENANCE NOTES FOR FUTURE DEVELOPERS
  * ============================================================================

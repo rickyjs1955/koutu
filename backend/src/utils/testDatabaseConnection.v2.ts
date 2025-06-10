@@ -1,3 +1,16 @@
+// /backend/src/utils/testDatabaseConnection.v2.ts - ENHANCED DOCKER MODE
+/**
+ * Enhanced Docker Database Connection (Docker Mode)
+ * 
+ * This version connects to Docker PostgreSQL containers for testing.
+ * More reliable and isolated than manual setup for CI/CD environments.
+ * Enhanced with all required schema elements for wardrobe tests.
+ * 
+ * @author Development Team
+ * @version 2.1.0 - Enhanced Docker Mode
+ * @since June 10, 2025
+ */
+
 import { Pool, PoolConfig, PoolClient } from 'pg';
 
 export class TestDatabaseConnection {
@@ -9,7 +22,9 @@ export class TestDatabaseConnection {
     private static activeConnections = new Set<PoolClient>();
     private static cleanupInProgress = false;
 
-    // SAME INTERFACE as your existing class, but Docker-backed implementation
+    /**
+     * Initialize Docker-based test database connection
+     */
     static async initialize(): Promise<Pool> {
         if (this.initializationPromise) {
             return this.initializationPromise;
@@ -33,13 +48,13 @@ export class TestDatabaseConnection {
         try {
             this.isInitializing = true;
 
-            // FIXED: Only wait for PostgreSQL test database, not Firebase
-            await this.waitForPostgreSQLTest();
+            // Wait for Docker PostgreSQL to be ready
+            await this.waitForDockerPostgreSQL();
 
-            // Connect to Docker postgres-test service (port 5433)
+            // Connect to Docker postgres-test service
             this.testPool = new Pool({
                 host: 'localhost',
-                port: 5433, // Docker postgres-test service
+                port: 5433, // Docker postgres-test service port
                 user: 'postgres',
                 password: 'postgres',
                 database: 'koutu_test',
@@ -49,17 +64,17 @@ export class TestDatabaseConnection {
                 allowExitOnIdle: true
             });
 
-            // Same pool event handlers as before
+            // Add pool event handlers
             this.testPool.on('error', (err) => {
-                console.warn('Database pool error:', err);
+                console.warn('🐳 Docker database pool error:', err);
             });
 
-            this.testPool.on('connect', (client) => {
-                console.log('Database client connected');
+            this.testPool.on('connect', () => {
+                console.log('🐳 Docker database client connected');
             });
 
-            this.testPool.on('remove', (client) => {
-                console.log('Database client removed');
+            this.testPool.on('remove', () => {
+                console.log('🐳 Docker database client removed');
             });
 
             // Test connection
@@ -71,10 +86,11 @@ export class TestDatabaseConnection {
                 testClient.release();
             }
 
-            // Set up schema
+            // Set up database schema
             await this.setupDatabase();
 
             this.isInitialized = true;
+            console.log('✅ Docker database setup completed');
             return this.testPool;
         } catch (error) {
             await this.cleanupPools();
@@ -84,21 +100,24 @@ export class TestDatabaseConnection {
         }
     }
 
-    // FIXED: Only wait for PostgreSQL, Firebase is handled separately
-    private static async waitForPostgreSQLTest(): Promise<void> {
-        console.log('🐳 Waiting for Docker PostgreSQL test service...');
+    /**
+     * Wait for Docker PostgreSQL container to be ready
+     */
+    private static async waitForDockerPostgreSQL(): Promise<void> {
+        console.log('🐳 Waiting for Docker PostgreSQL container...');
         
-        const maxAttempts = 15; // Reduced from 30
+        const maxAttempts = 30;
         const delay = 1000;
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
+                // Try connecting to ensure database exists
                 const testPool = new Pool({
                     host: 'localhost',
                     port: 5433,
                     user: 'postgres',
                     password: 'postgres',
-                    database: 'postgres', // Connect to default db first
+                    database: 'koutu_test', // Try the test database directly
                     max: 1,
                     connectionTimeoutMillis: 2000
                 });
@@ -106,24 +125,74 @@ export class TestDatabaseConnection {
                 try {
                     await testPool.query('SELECT 1');
                     await testPool.end();
-                    console.log('✅ Docker PostgreSQL test database is ready');
+                    console.log('✅ Docker PostgreSQL with koutu_test database is ready');
                     return;
-                } catch (error) {
+                } catch (dbError: any) {
                     await testPool.end().catch(() => {});
+                    
+                    // If database doesn't exist, try to create it
+                    if (dbError.message.includes('koutu_test') && dbError.message.includes('does not exist')) {
+                        await this.createTestDatabaseInDocker();
+                        // Try again on next iteration
+                    }
                 }
             } catch (error) {
-                // Service not ready yet
+                // Container not ready yet
+                if (attempt % 5 === 0) {
+                    console.log(`⏳ Still waiting for Docker PostgreSQL... (attempt ${attempt}/${maxAttempts})`);
+                }
             }
 
             if (attempt === maxAttempts) {
-                throw new Error(`❌ Docker PostgreSQL test database not ready after ${maxAttempts} attempts. Is 'koutu-postgres-test' container running?`);
+                throw new Error(
+                    `❌ Docker PostgreSQL not ready after ${maxAttempts} attempts.\n` +
+                    `Please ensure PostgreSQL container is running on port 5433.\n` +
+                    `Example: docker run --name test-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=koutu_test -p 5433:5432 -d postgres:13`
+                );
             }
 
             await new Promise(resolve => setTimeout(resolve, delay));
         }
     }
 
-    // KEEP ALL EXISTING METHODS - just the implementation changes
+    /**
+     * Create test database in Docker container if it doesn't exist
+     */
+    private static async createTestDatabaseInDocker(): Promise<void> {
+        try {
+            const adminPool = new Pool({
+                host: 'localhost',
+                port: 5433,
+                user: 'postgres',
+                password: 'postgres',
+                database: 'postgres', // Connect to default database
+                max: 1,
+                connectionTimeoutMillis: 2000
+            });
+
+            try {
+                // Check if database exists
+                const result = await adminPool.query(
+                    'SELECT 1 FROM pg_database WHERE datname = $1',
+                    ['koutu_test']
+                );
+
+                if (result.rows.length === 0) {
+                    // Create test database
+                    await adminPool.query('CREATE DATABASE koutu_test');
+                    console.log('🐳 Created koutu_test database in Docker container');
+                }
+            } finally {
+                await adminPool.end();
+            }
+        } catch (error) {
+            console.warn('Warning: Could not create test database in Docker:', error);
+        }
+    }
+
+    /**
+     * Set up database schema in Docker container
+     */
     private static async setupDatabase(): Promise<void> {
         if (!this.testPool) {
             throw new Error('Test pool not initialized');
@@ -141,20 +210,21 @@ export class TestDatabaseConnection {
                 }
             }
 
-            await this.createSchema(client);
+            // Create complete schema
+            await this.createCompleteDockerSchema(client);
+            
+            console.log('✅ Docker database schema created successfully');
         } finally {
             this.activeConnections.delete(client);
             client.release();
         }
     }
 
-    // Keep all your existing methods unchanged
-    private static async createSchema(client: any): Promise<void> {
-        await this.createBasicSchema(client);
-    }
-
-    private static async createBasicSchema(client: any): Promise<void> {
-        // Create tables in dependency order
+    /**
+     * Create complete database schema for Docker testing
+     */
+    private static async createCompleteDockerSchema(client: any): Promise<void> {
+        // Create users table
         await client.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -167,6 +237,7 @@ export class TestDatabaseConnection {
             )
         `);
 
+        // Create user_oauth_providers table
         await client.query(`
             CREATE TABLE IF NOT EXISTS user_oauth_providers (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -180,6 +251,7 @@ export class TestDatabaseConnection {
             )
         `);
 
+        // Create original_images table
         await client.query(`
             CREATE TABLE IF NOT EXISTS original_images (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -196,6 +268,7 @@ export class TestDatabaseConnection {
             )
         `);
 
+        // Create garment_items table with all required columns
         await client.query(`
             CREATE TABLE IF NOT EXISTS garment_items (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -213,7 +286,7 @@ export class TestDatabaseConnection {
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 
-                -- Additional columns for compatibility
+                -- Additional columns for testGarmentModel compatibility
                 file_path TEXT,
                 mask_path TEXT,
                 metadata JSONB DEFAULT '{}',
@@ -221,11 +294,12 @@ export class TestDatabaseConnection {
             )
         `);
 
+        // Create wardrobes table with TEXT columns (no length limit) and is_default
         await client.query(`
             CREATE TABLE IF NOT EXISTS wardrobes (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                name VARCHAR(255) NOT NULL,
+                name TEXT NOT NULL,
                 description TEXT,
                 is_default BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -233,15 +307,106 @@ export class TestDatabaseConnection {
             )
         `);
 
-        // Add indexes for better performance
+        // Create wardrobe_items table (this was missing in original setup!)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS wardrobe_items (
+                id SERIAL PRIMARY KEY,
+                wardrobe_id UUID NOT NULL REFERENCES wardrobes(id) ON DELETE CASCADE,
+                garment_item_id UUID NOT NULL REFERENCES garment_items(id) ON DELETE CASCADE,
+                position INTEGER DEFAULT 0,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                UNIQUE(wardrobe_id, garment_item_id)
+            )
+        `);
+
+        // Create comprehensive performance indexes
         await client.query(`
             CREATE INDEX IF NOT EXISTS idx_original_images_user_id ON original_images(user_id);
             CREATE INDEX IF NOT EXISTS idx_original_images_status ON original_images(status);
             CREATE INDEX IF NOT EXISTS idx_original_images_upload_date ON original_images(upload_date DESC);
+            CREATE INDEX IF NOT EXISTS idx_garment_items_user_id ON garment_items(user_id);
+            CREATE INDEX IF NOT EXISTS idx_wardrobes_user_id ON wardrobes(user_id);
+            CREATE INDEX IF NOT EXISTS idx_wardrobes_name ON wardrobes(name);
+            CREATE INDEX IF NOT EXISTS idx_wardrobe_items_wardrobe_id ON wardrobe_items(wardrobe_id);
+            CREATE INDEX IF NOT EXISTS idx_wardrobe_items_garment_id ON wardrobe_items(garment_item_id);
+            CREATE INDEX IF NOT EXISTS idx_wardrobe_items_position ON wardrobe_items(wardrobe_id, position);
         `);
+
+        console.log('✅ Docker database schema with all tables created');
     }
 
-    // KEEP ALL EXISTING PUBLIC METHODS - same interface!
+    /**
+     * Ensure all required tables exist (for compatibility with manual mode)
+     */
+    static async ensureTablesExist(): Promise<void> {
+        if (!this.testPool || !this.isInitialized) {
+            throw new Error('Test database not initialized. Call initialize() first.');
+        }
+
+        const client = await this.testPool.connect();
+        this.activeConnections.add(client);
+        try {
+            // Check if wardrobe_items table exists
+            const result = await client.query(`
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'wardrobe_items'
+                );
+            `);
+
+            if (!result.rows[0].exists) {
+                console.log('🐳 Creating missing wardrobe_items table in Docker...');
+                await client.query(`
+                    CREATE TABLE wardrobe_items (
+                        id SERIAL PRIMARY KEY,
+                        wardrobe_id UUID NOT NULL REFERENCES wardrobes(id) ON DELETE CASCADE,
+                        garment_item_id UUID NOT NULL REFERENCES garment_items(id) ON DELETE CASCADE,
+                        position INTEGER DEFAULT 0,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        UNIQUE(wardrobe_id, garment_item_id)
+                    )
+                `);
+
+                // Add indexes
+                await client.query(`
+                    CREATE INDEX idx_wardrobe_items_wardrobe_id ON wardrobe_items(wardrobe_id);
+                    CREATE INDEX idx_wardrobe_items_garment_id ON wardrobe_items(garment_item_id);
+                    CREATE INDEX idx_wardrobe_items_position ON wardrobe_items(wardrobe_id, position);
+                `);
+            }
+
+            // Ensure wardrobes table has is_default column
+            await client.query(`
+                ALTER TABLE wardrobes 
+                ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT FALSE;
+            `);
+
+            // Ensure wardrobes columns are TEXT (not VARCHAR with limits)
+            try {
+                await client.query(`
+                    ALTER TABLE wardrobes 
+                    ALTER COLUMN name TYPE TEXT,
+                    ALTER COLUMN description TYPE TEXT;
+                `);
+            } catch (error) {
+                // Might already be TEXT, ignore error
+                console.log('🐳 Columns already TEXT or conversion not needed');
+            }
+
+            console.log('✅ Docker database tables verified and updated');
+        } catch (error) {
+            console.warn('Warning: Error ensuring Docker tables exist:', error);
+        } finally {
+            this.activeConnections.delete(client);
+            client.release();
+        }
+    }
+
+    /**
+     * Get the active pool instance
+     */
     static getPool(): Pool {
         if (!this.testPool || !this.isInitialized) {
             throw new Error('Test database not initialized. Call initialize() first.');
@@ -249,6 +414,9 @@ export class TestDatabaseConnection {
         return this.testPool;
     }
 
+    /**
+     * Execute a database query
+     */
     static async query(text: string, params?: any[]): Promise<any> {
         if (this.cleanupInProgress) {
             throw new Error('Database cleanup in progress, cannot execute queries');
@@ -267,6 +435,9 @@ export class TestDatabaseConnection {
         }
     }
 
+    /**
+     * Clear all data from test tables (Docker-safe)
+     */
     static async clearAllTables(): Promise<void> {
         if (!this.testPool || !this.isInitialized) {
             throw new Error('Test database not initialized. Call initialize() first.');
@@ -275,21 +446,26 @@ export class TestDatabaseConnection {
         const client = await this.testPool.connect();
         this.activeConnections.add(client);
         try {
+            // Clear tables in reverse dependency order for Docker environment
             const tables = [
+                'wardrobe_items',
                 'user_oauth_providers',
                 'garment_items',
-                'original_images', 
                 'wardrobes',
+                'original_images', 
                 'users'
             ];
 
+            // Disable foreign key checks temporarily
             await client.query('SET session_replication_role = replica');
             
             try {
                 for (const table of tables) {
                     await client.query(`TRUNCATE TABLE ${table} RESTART IDENTITY CASCADE`);
                 }
+                console.log('🐳 All Docker test tables cleared');
             } finally {
+                // Re-enable foreign key checks
                 await client.query('SET session_replication_role = DEFAULT');
             }
         } finally {
@@ -298,9 +474,12 @@ export class TestDatabaseConnection {
         }
     }
 
+    /**
+     * Clean up Docker database connections (does not drop database)
+     */
     static async cleanup(): Promise<void> {
         if (this.cleanupInProgress) {
-            console.log('Cleanup already in progress, skipping...');
+            console.log('Docker cleanup already in progress, skipping...');
             return;
         }
 
@@ -308,8 +487,9 @@ export class TestDatabaseConnection {
         console.log('🔄 Starting Docker database cleanup...');
 
         try {
+            // Wait for active connections to finish
             if (this.activeConnections.size > 0) {
-                console.log(`⏳ Waiting for ${this.activeConnections.size} active connections to finish...`);
+                console.log(`⏳ Waiting for ${this.activeConnections.size} Docker connections to finish...`);
                 
                 let attempts = 0;
                 while (this.activeConnections.size > 0 && attempts < 10) {
@@ -317,37 +497,42 @@ export class TestDatabaseConnection {
                     attempts++;
                 }
 
+                // Force release remaining connections
                 if (this.activeConnections.size > 0) {
-                    console.log(`⚠️ Force releasing ${this.activeConnections.size} remaining connections`);
+                    console.log(`⚠️ Force releasing ${this.activeConnections.size} remaining Docker connections`);
                     for (const client of this.activeConnections) {
                         try {
                             (client as any).release(true);
                         } catch (error) {
-                            console.warn('Error force-releasing client:', error);
+                            console.warn('Error force-releasing Docker client:', error);
                         }
                     }
                     this.activeConnections.clear();
                 }
             }
 
+            // Close pools (but don't drop database - Docker container persists)
             await this.cleanupPools();
             
-            console.log('✅ Docker database cleanup completed');
+            console.log('✅ Docker database cleanup completed (container persists)');
         } catch (error) {
-            console.warn('⚠️ Cleanup had issues:', error);
+            console.warn('⚠️ Docker cleanup had issues:', error);
         } finally {
             this.resetState();
             this.cleanupInProgress = false;
         }
     }
 
+    /**
+     * Close database pools
+     */
     private static async cleanupPools(): Promise<void> {
         const promises: Promise<void>[] = [];
 
         if (this.testPool && !this.testPool.ended) {
             promises.push(
                 this.testPool.end().catch(error => {
-                    console.warn('Test pool cleanup error:', error);
+                    console.warn('Docker test pool cleanup error:', error);
                 })
             );
         }
@@ -355,7 +540,7 @@ export class TestDatabaseConnection {
         if (this.mainPool && !this.mainPool.ended) {
             promises.push(
                 this.mainPool.end().catch(error => {
-                    console.warn('Main pool cleanup error:', error);
+                    console.warn('Docker main pool cleanup error:', error);
                 })
             );
         }
@@ -366,6 +551,9 @@ export class TestDatabaseConnection {
         this.mainPool = null;
     }
 
+    /**
+     * Reset internal state
+     */
     private static resetState(): void {
         this.isInitialized = false;
         this.isInitializing = false;
@@ -375,7 +563,7 @@ export class TestDatabaseConnection {
         this.activeConnections.clear();
     }
 
-    // Keep all utility methods
+    // Utility methods for debugging and compatibility
     static get initialized(): boolean {
         return this.isInitialized;
     }

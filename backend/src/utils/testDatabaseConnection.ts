@@ -1,5 +1,15 @@
-// /backend/src/utils/testDatabaseConnection.ts - FINAL FIX
-// Simply make the name column nullable to fix the NOT NULL constraint violation
+// /backend/src/utils/testDatabaseConnection.ts - ENHANCED MANUAL MODE
+/**
+ * Enhanced Manual Database Connection (Original Mode)
+ * 
+ * This version creates/drops test databases dynamically.
+ * Preserves the original approach that passed ~4000 tests.
+ * Enhanced with missing schema elements for wardrobe tests.
+ * 
+ * @author Development Team
+ * @version 1.1.0 - Enhanced
+ * @since June 10, 2025
+ */
 
 import { Pool, Client, PoolConfig, PoolClient } from 'pg';
 import { TEST_DB_CONFIG, MAIN_DB_CONFIG } from './testConfig';
@@ -92,6 +102,7 @@ export class TestDatabaseConnection {
       await this.setupDatabase();
 
       this.isInitialized = true;
+      console.log('✅ Manual database setup completed');
       return this.testPool;
     } catch (error) {
       // Cleanup on failure
@@ -169,12 +180,12 @@ export class TestDatabaseConnection {
       const schema = fs.readFileSync(schemaPath, 'utf8');
       await client.query(schema);
     } else {
-      // Fallback: create basic schema manually
-      await this.createBasicSchema(client);
+      // Fallback: create enhanced schema manually
+      await this.createEnhancedSchema(client);
     }
   }
 
-  private static async createBasicSchema(client: any): Promise<void> {
+  private static async createEnhancedSchema(client: any): Promise<void> {
     // Create tables in dependency order
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -201,7 +212,7 @@ export class TestDatabaseConnection {
       )
     `);
 
-    // Enhanced original_images table to match your test model
+    // Enhanced original_images table
     await client.query(`
       CREATE TABLE IF NOT EXISTS original_images (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -218,7 +229,7 @@ export class TestDatabaseConnection {
       )
     `);
 
-    // FINAL FIX: Make name column nullable to avoid NOT NULL constraint violation
+    // ENHANCED: garment_items with all required columns
     await client.query(`
       CREATE TABLE IF NOT EXISTS garment_items (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -236,7 +247,7 @@ export class TestDatabaseConnection {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         
-        -- ADD the missing columns that garmentModel.ts needs
+        -- Additional columns for testGarmentModel compatibility
         file_path TEXT,
         mask_path TEXT,
         metadata JSONB DEFAULT '{}',
@@ -244,11 +255,12 @@ export class TestDatabaseConnection {
       )
     `);
 
+    // ENHANCED: wardrobes with TEXT columns and is_default
     await client.query(`
       CREATE TABLE IF NOT EXISTS wardrobes (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        name VARCHAR(255) NOT NULL,
+        name TEXT NOT NULL,
         description TEXT,
         is_default BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -256,12 +268,93 @@ export class TestDatabaseConnection {
       )
     `);
 
-    // Add indexes for better performance
+    // NEW: wardrobe_items table (was missing!)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS wardrobe_items (
+        id SERIAL PRIMARY KEY,
+        wardrobe_id UUID NOT NULL REFERENCES wardrobes(id) ON DELETE CASCADE,
+        garment_item_id UUID NOT NULL REFERENCES garment_items(id) ON DELETE CASCADE,
+        position INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(wardrobe_id, garment_item_id)
+      )
+    `);
+
+    // Add comprehensive indexes for better performance
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_original_images_user_id ON original_images(user_id);
       CREATE INDEX IF NOT EXISTS idx_original_images_status ON original_images(status);
       CREATE INDEX IF NOT EXISTS idx_original_images_upload_date ON original_images(upload_date DESC);
+      CREATE INDEX IF NOT EXISTS idx_garment_items_user_id ON garment_items(user_id);
+      CREATE INDEX IF NOT EXISTS idx_wardrobes_user_id ON wardrobes(user_id);
+      CREATE INDEX IF NOT EXISTS idx_wardrobes_name ON wardrobes(name);
+      CREATE INDEX IF NOT EXISTS idx_wardrobe_items_wardrobe_id ON wardrobe_items(wardrobe_id);
+      CREATE INDEX IF NOT EXISTS idx_wardrobe_items_garment_id ON wardrobe_items(garment_item_id);
+      CREATE INDEX IF NOT EXISTS idx_wardrobe_items_position ON wardrobe_items(wardrobe_id, position);
     `);
+
+    console.log('✅ Enhanced database schema created');
+  }
+
+  // NEW: Method to ensure tables exist (for compatibility)
+  static async ensureTablesExist(): Promise<void> {
+    if (!this.testPool || !this.isInitialized) {
+      throw new Error('Test database not initialized. Call initialize() first.');
+    }
+
+    const client = await this.testPool.connect();
+    this.activeConnections.add(client);
+    try {
+      // Check if wardrobe_items table exists, create if missing
+      const result = await client.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_name = 'wardrobe_items'
+        );
+      `);
+
+      if (!result.rows[0].exists) {
+        console.log('Creating missing wardrobe_items table...');
+        await client.query(`
+          CREATE TABLE wardrobe_items (
+            id SERIAL PRIMARY KEY,
+            wardrobe_id UUID NOT NULL REFERENCES wardrobes(id) ON DELETE CASCADE,
+            garment_item_id UUID NOT NULL REFERENCES garment_items(id) ON DELETE CASCADE,
+            position INTEGER DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE(wardrobe_id, garment_item_id)
+          )
+        `);
+
+        // Add indexes
+        await client.query(`
+          CREATE INDEX idx_wardrobe_items_wardrobe_id ON wardrobe_items(wardrobe_id);
+          CREATE INDEX idx_wardrobe_items_garment_id ON wardrobe_items(garment_item_id);
+          CREATE INDEX idx_wardrobe_items_position ON wardrobe_items(wardrobe_id, position);
+        `);
+      }
+
+      // Ensure wardrobes table has is_default column
+      await client.query(`
+        ALTER TABLE wardrobes 
+        ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT FALSE;
+      `);
+
+      // Ensure wardrobes columns are TEXT (not VARCHAR with limits)
+      await client.query(`
+        ALTER TABLE wardrobes 
+        ALTER COLUMN name TYPE TEXT,
+        ALTER COLUMN description TYPE TEXT;
+      `);
+
+    } catch (error) {
+      console.warn('Error ensuring tables exist:', error);
+    } finally {
+      this.activeConnections.delete(client);
+      client.release();
+    }
   }
 
   static getPool(): Pool {
@@ -299,10 +392,11 @@ export class TestDatabaseConnection {
     try {
       // Clear tables in reverse dependency order to avoid foreign key violations
       const tables = [
+        'wardrobe_items',
         'user_oauth_providers',
         'garment_items',
-        'original_images', 
         'wardrobes',
+        'original_images', 
         'users'
       ];
 
@@ -358,7 +452,7 @@ export class TestDatabaseConnection {
         }
       }
 
-      // Step 2: Gracefully close pools (REMOVED TIMEOUTS)
+      // Step 2: Gracefully close pools
       await this.cleanupPools();
       
       // Step 3: Drop test database
@@ -376,7 +470,7 @@ export class TestDatabaseConnection {
   private static async cleanupPools(): Promise<void> {
     const promises: Promise<void>[] = [];
 
-    // Close test pool WITHOUT timeout
+    // Close test pool
     if (this.testPool && !this.testPool.ended) {
       promises.push(
         this.testPool.end().catch(error => {
@@ -385,7 +479,7 @@ export class TestDatabaseConnection {
       );
     }
 
-    // Close main pool WITHOUT timeout
+    // Close main pool
     if (this.mainPool && !this.mainPool.ended) {
       promises.push(
         this.mainPool.end().catch(error => {
@@ -443,17 +537,15 @@ export class TestDatabaseConnection {
     this.activeConnections.clear();
   }
 
-  // Utility method to check if initialized (for testing)
+  // Utility methods
   static get initialized(): boolean {
     return this.isInitialized;
   }
 
-  // Utility method to check if initializing (for testing)  
   static get initializing(): boolean {
     return this.isInitializing;
   }
 
-  // Utility method to get active connection count (for debugging)
   static get activeConnectionCount(): number {
     return this.activeConnections.size;
   }

@@ -421,7 +421,7 @@ describe('LabelingService Unit Tests', () => {
 
   describe('Data Validation Logic', () => {
     // Helper function for type-safe validation
-    const isValidMaskDataType = (data: any): boolean => {
+    const isValidMaskDataType = (data: any): data is (number[] | Uint8ClampedArray) => {
       return Array.isArray(data) || (data != null && data instanceof Uint8ClampedArray);
     };
 

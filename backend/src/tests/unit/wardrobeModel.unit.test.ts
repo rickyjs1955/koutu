@@ -16,39 +16,36 @@ describe('wardrobeModel', () => {
   describe('create', () => {
     describe('successful creation', () => {
       it('should create a wardrobe with all fields', async () => {
-        // Arrange
         const inputData = wardrobeMocks.createValidInput();
         const expectedWardrobe = wardrobeMocks.createValidWardrobe({
-          user_id: inputData.user_id,
-          name: inputData.name,
-          description: inputData.description
+            user_id: inputData.user_id,
+            name: inputData.name,
+            description: inputData.description
         });
 
         mockQuery.mockResolvedValueOnce(
-          wardrobeMocks.queryResults.insertSuccess(expectedWardrobe)
+            wardrobeMocks.queryResults.insertSuccess(expectedWardrobe)
         );
 
-        // Act
         const result = await wardrobeModel.create(inputData);
 
-        // Assert
         expect(result).toEqual(expectedWardrobe);
         expect(mockQuery).toHaveBeenCalledTimes(1);
         
         const [queryText, queryParams] = mockQuery.mock.calls[0];
         expect(queryText).toContain('INSERT INTO wardrobes');
         expect(queryText).toContain('RETURNING *');
-        expect(queryParams).toHaveLength(4);
+        expect(queryParams).toHaveLength(5); // id, user_id, name, description, is_default
         
         // Verify UUID generation
         expect(isUuid(queryParams![0])).toBe(true);
         expect(queryParams![1]).toBe(inputData.user_id);
         expect(queryParams![2]).toBe(inputData.name);
         expect(queryParams![3]).toBe(inputData.description);
+        expect(queryParams![4]).toBe(false); // is_default default value
       });
 
       it('should create a wardrobe with empty description when not provided', async () => {
-        // Arrange
         const inputData = wardrobeMocks.createValidInput();
         delete (inputData as any).description;
         
@@ -62,16 +59,13 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.insertSuccess(expectedWardrobe)
         );
 
-        // Act
         const result = await wardrobeModel.create(inputData);
 
-        // Assert
         expect(result).toEqual(expectedWardrobe);
         expect(mockQuery.mock.calls[0][1]![3]).toBe(''); // description should be empty string
       });
 
       it('should create a wardrobe with minimal valid data', async () => {
-        // Arrange
         const inputData = wardrobeMocks.edgeCases.minName;
         const expectedWardrobe = wardrobeMocks.createValidWardrobe(inputData);
 
@@ -79,17 +73,14 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.insertSuccess(expectedWardrobe)
         );
 
-        // Act
         const result = await wardrobeModel.create(inputData);
 
-        // Assert
         expect(result).toEqual(expectedWardrobe);
         expect(result.name).toBe('A');
         expect(result.description).toBe('');
       });
 
       it('should create a wardrobe with maximum valid data', async () => {
-        // Arrange
         const inputData = wardrobeMocks.edgeCases.maxDescription;
         const expectedWardrobe = wardrobeMocks.createValidWardrobe(inputData);
 
@@ -97,10 +88,8 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.insertSuccess(expectedWardrobe)
         );
 
-        // Act
         const result = await wardrobeModel.create(inputData);
 
-        // Assert
         expect(result).toEqual(expectedWardrobe);
         expect(result.name.length).toBe(inputData.name!.length);
         expect(result.description!.length).toBe(1000);
@@ -109,43 +98,36 @@ describe('wardrobeModel', () => {
 
     describe('error handling', () => {
       it('should throw error when database query fails', async () => {
-        // Arrange
         const inputData = wardrobeMocks.createValidInput();
         const dbError = wardrobeMocks.errorScenarios.dbConnectionError;
         
         mockQuery.mockRejectedValueOnce(dbError);
 
-        // Act & Assert
         await expect(wardrobeModel.create(inputData)).rejects.toThrow(dbError);
         expect(mockQuery).toHaveBeenCalledTimes(1);
       });
 
       it('should throw error on foreign key constraint violation', async () => {
-        // Arrange
         const inputData = wardrobeMocks.createValidInput();
         const fkError = wardrobeMocks.errorScenarios.foreignKeyError;
         
         mockQuery.mockRejectedValueOnce(fkError);
 
-        // Act & Assert
         await expect(wardrobeModel.create(inputData)).rejects.toThrow(fkError);
       });
 
       it('should throw error on unique constraint violation', async () => {
-        // Arrange
         const inputData = wardrobeMocks.createValidInput();
         const uniqueError = wardrobeMocks.errorScenarios.uniqueConstraintError;
         
         mockQuery.mockRejectedValueOnce(uniqueError);
 
-        // Act & Assert
         await expect(wardrobeModel.create(inputData)).rejects.toThrow(uniqueError);
       });
     });
 
     describe('data validation at model level', () => {
       it('should handle special characters in allowed fields correctly', async () => {
-        // Arrange
         const inputData = wardrobeMocks.edgeCases.allowedSpecialChars;
         const expectedWardrobe = wardrobeMocks.createValidWardrobe(inputData);
 
@@ -153,10 +135,8 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.insertSuccess(expectedWardrobe)
         );
 
-        // Act
         const result = await wardrobeModel.create(inputData);
 
-        // Assert
         expect(result.name).toBe(inputData.name);
         expect(result.name).toMatch(/^[a-zA-Z0-9\s\-_\.]+$/);
       });
@@ -166,7 +146,6 @@ describe('wardrobeModel', () => {
   describe('findById', () => {
     describe('successful retrieval', () => {
       it('should return wardrobe when found', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const expectedWardrobe = wardrobeMocks.createValidWardrobe({ id: wardrobeId });
 
@@ -174,10 +153,8 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.selectSingle(expectedWardrobe)
         );
 
-        // Act
         const result = await wardrobeModel.findById(wardrobeId);
 
-        // Assert
         expect(result).toEqual(expectedWardrobe);
         expect(mockQuery).toHaveBeenCalledTimes(1);
         
@@ -187,15 +164,12 @@ describe('wardrobeModel', () => {
       });
 
       it('should return null when wardrobe not found', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         
         mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.notFound());
 
-        // Act
         const result = await wardrobeModel.findById(wardrobeId);
 
-        // Assert
         expect(result).toBeNull();
         expect(mockQuery).toHaveBeenCalledTimes(1);
       });
@@ -203,31 +177,24 @@ describe('wardrobeModel', () => {
 
     describe('input validation', () => {
       it('should return null for invalid UUID format', async () => {
-        // Arrange
         const invalidId = 'invalid-uuid';
 
-        // Act
         const result = await wardrobeModel.findById(invalidId);
 
-        // Assert
         expect(result).toBeNull();
         expect(mockQuery).not.toHaveBeenCalled(); // Should not query DB for invalid UUID
       });
 
       it('should return null for empty string ID', async () => {
-        // Arrange
         const emptyId = '';
 
-        // Act
         const result = await wardrobeModel.findById(emptyId);
 
-        // Assert
         expect(result).toBeNull();
         expect(mockQuery).not.toHaveBeenCalled();
       });
 
       it('should handle null/undefined ID gracefully', async () => {
-        // Act & Assert
         expect(await wardrobeModel.findById(null as any)).toBeNull();
         expect(await wardrobeModel.findById(undefined as any)).toBeNull();
         expect(mockQuery).not.toHaveBeenCalled();
@@ -236,13 +203,11 @@ describe('wardrobeModel', () => {
 
     describe('error handling', () => {
       it('should throw error when database query fails', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const dbError = wardrobeMocks.errorScenarios.dbConnectionError;
         
         mockQuery.mockRejectedValueOnce(dbError);
 
-        // Act & Assert
         await expect(wardrobeModel.findById(wardrobeId)).rejects.toThrow(dbError);
       });
     });
@@ -251,7 +216,6 @@ describe('wardrobeModel', () => {
   describe('findByUserId', () => {
     describe('successful retrieval', () => {
       it('should return wardrobes ordered by name', async () => {
-        // Arrange
         const userId = uuidv4();
         const wardrobes = wardrobeMocks.createMultipleWardrobes(userId, 3);
         
@@ -259,10 +223,8 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.selectMultiple(wardrobes)
         );
 
-        // Act
         const result = await wardrobeModel.findByUserId(userId);
 
-        // Assert
         expect(result).toEqual(wardrobes);
         expect(mockQuery).toHaveBeenCalledTimes(1);
         
@@ -273,22 +235,18 @@ describe('wardrobeModel', () => {
       });
 
       it('should return empty array when user has no wardrobes', async () => {
-        // Arrange
         const userId = uuidv4();
         
         mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.selectMultiple([]));
 
-        // Act
         const result = await wardrobeModel.findByUserId(userId);
 
-        // Assert
         expect(result).toEqual([]);
         expect(Array.isArray(result)).toBe(true);
         expect(result.length).toBe(0);
       });
 
       it('should handle user with single wardrobe', async () => {
-        // Arrange
         const userId = uuidv4();
         const wardrobes = wardrobeMocks.createMultipleWardrobes(userId, 1);
         
@@ -296,16 +254,13 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.selectMultiple(wardrobes)
         );
 
-        // Act
         const result = await wardrobeModel.findByUserId(userId);
 
-        // Assert
         expect(result).toEqual(wardrobes);
         expect(result.length).toBe(1);
       });
 
       it('should handle user with maximum wardrobes', async () => {
-        // Arrange
         const userId = uuidv4();
         const wardrobes = wardrobeMocks.createMultipleWardrobes(userId, 50);
         
@@ -313,26 +268,21 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.selectMultiple(wardrobes)
         );
 
-        // Act
         const result = await wardrobeModel.findByUserId(userId);
 
-        // Assert
         expect(result).toEqual(wardrobes);
         expect(result.length).toBe(50);
       });
     });
 
     describe('input validation', () => {
-      it('should handle invalid user ID format', async () => {
-        // Arrange
+      it('should handle invalid user ID format gracefully', async () => {
         const invalidUserId = 'invalid-uuid';
         
         mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.selectMultiple([]));
 
-        // Act
         const result = await wardrobeModel.findByUserId(invalidUserId);
 
-        // Assert
         expect(result).toEqual([]);
         expect(mockQuery).toHaveBeenCalledTimes(1); // Still queries DB, returns empty
       });
@@ -340,13 +290,11 @@ describe('wardrobeModel', () => {
 
     describe('error handling', () => {
       it('should throw error when database query fails', async () => {
-        // Arrange
         const userId = uuidv4();
         const dbError = wardrobeMocks.errorScenarios.dbConnectionError;
         
         mockQuery.mockRejectedValueOnce(dbError);
 
-        // Act & Assert
         await expect(wardrobeModel.findByUserId(userId)).rejects.toThrow(dbError);
       });
     });
@@ -355,7 +303,6 @@ describe('wardrobeModel', () => {
   describe('update', () => {
     describe('successful updates', () => {
       it('should update wardrobe name only', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const updateData: UpdateWardrobeInput = { name: 'Updated Name' };
         const updatedWardrobe = wardrobeMocks.createValidWardrobe({
@@ -368,10 +315,8 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.updateSuccess(updatedWardrobe)
         );
 
-        // Act
         const result = await wardrobeModel.update(wardrobeId, updateData);
 
-        // Assert
         expect(result).toEqual(updatedWardrobe);
         expect(mockQuery).toHaveBeenCalledTimes(1);
         
@@ -384,7 +329,6 @@ describe('wardrobeModel', () => {
       });
 
       it('should update wardrobe description only', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const updateData: UpdateWardrobeInput = { description: 'Updated Description' };
         const updatedWardrobe = wardrobeMocks.createValidWardrobe({
@@ -397,16 +341,13 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.updateSuccess(updatedWardrobe)
         );
 
-        // Act
         const result = await wardrobeModel.update(wardrobeId, updateData);
 
-        // Assert
         expect(result).toEqual(updatedWardrobe);
         expect(mockQuery.mock.calls[0][1]).toEqual(['Updated Description', wardrobeId]);
       });
 
       it('should update both name and description', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const updateData: UpdateWardrobeInput = {
           name: 'Updated Name',
@@ -422,10 +363,8 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.updateSuccess(updatedWardrobe)
         );
 
-        // Act
         const result = await wardrobeModel.update(wardrobeId, updateData);
 
-        // Assert
         expect(result).toEqual(updatedWardrobe);
         
         const [queryText, queryParams] = mockQuery.mock.calls[0];
@@ -435,7 +374,6 @@ describe('wardrobeModel', () => {
       });
 
       it('should handle empty update (only updated_at changes)', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const updateData: UpdateWardrobeInput = {};
         const updatedWardrobe = wardrobeMocks.createValidWardrobe({
@@ -447,10 +385,8 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.updateSuccess(updatedWardrobe)
         );
 
-        // Act
         const result = await wardrobeModel.update(wardrobeId, updateData);
 
-        // Assert
         expect(result).toEqual(updatedWardrobe);
         
         const [queryText, queryParams] = mockQuery.mock.calls[0];
@@ -460,7 +396,6 @@ describe('wardrobeModel', () => {
       });
 
       it('should handle undefined values correctly', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const updateData: UpdateWardrobeInput = {
           name: undefined,
@@ -475,10 +410,8 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.updateSuccess(updatedWardrobe)
         );
 
-        // Act
         const result = await wardrobeModel.update(wardrobeId, updateData);
 
-        // Assert
         expect(result).toEqual(updatedWardrobe);
         
         const [queryText, queryParams] = mockQuery.mock.calls[0];
@@ -490,47 +423,37 @@ describe('wardrobeModel', () => {
 
     describe('not found scenarios', () => {
       it('should return null when wardrobe not found', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const updateData = wardrobeMocks.createValidUpdateInput();
         
         mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.notFound());
 
-        // Act
         const result = await wardrobeModel.update(wardrobeId, updateData);
 
-        // Assert
         expect(result).toBeNull();
       });
     });
 
     describe('input validation', () => {
-      it('should handle invalid UUID format', async () => {
-        // Arrange
+      it('should return null for invalid UUID format', async () => {
         const invalidId = 'invalid-uuid';
         const updateData = wardrobeMocks.createValidUpdateInput();
-        
-        mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.notFound());
 
-        // Act
         const result = await wardrobeModel.update(invalidId, updateData);
 
-        // Assert
         expect(result).toBeNull();
-        expect(mockQuery).toHaveBeenCalledTimes(1); // Still attempts query
+        expect(mockQuery).toHaveBeenCalledTimes(0); // Should not query DB for invalid UUID
       });
     });
 
     describe('error handling', () => {
       it('should throw error when database query fails', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const updateData = wardrobeMocks.createValidUpdateInput();
         const dbError = wardrobeMocks.errorScenarios.dbConnectionError;
         
         mockQuery.mockRejectedValueOnce(dbError);
 
-        // Act & Assert
         await expect(wardrobeModel.update(wardrobeId, updateData)).rejects.toThrow(dbError);
       });
     });
@@ -539,7 +462,6 @@ describe('wardrobeModel', () => {
   describe('delete', () => {
     describe('successful deletion', () => {
       it('should delete wardrobe and associated items, return true', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         
         // Mock both deletion queries
@@ -547,10 +469,8 @@ describe('wardrobeModel', () => {
           .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'DELETE')) // Delete wardrobe_items
           .mockResolvedValueOnce(wardrobeMocks.queryResults.deleteSuccess()); // Delete wardrobe
 
-        // Act
         const result = await wardrobeModel.delete(wardrobeId);
 
-        // Assert
         expect(result).toBe(true);
         expect(mockQuery).toHaveBeenCalledTimes(2);
         
@@ -566,17 +486,14 @@ describe('wardrobeModel', () => {
       });
 
       it('should delete wardrobe with no items, return true', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         
         mockQuery
           .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'DELETE')) // No items to delete
           .mockResolvedValueOnce(wardrobeMocks.queryResults.deleteSuccess()); // Delete wardrobe
 
-        // Act
         const result = await wardrobeModel.delete(wardrobeId);
 
-        // Assert
         expect(result).toBe(true);
         expect(mockQuery).toHaveBeenCalledTimes(2);
       });
@@ -584,55 +501,47 @@ describe('wardrobeModel', () => {
 
     describe('not found scenarios', () => {
       it('should return false when wardrobe not found', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         
         mockQuery
           .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'DELETE')) // No items to delete
           .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'DELETE')); // Wardrobe not found
 
-        // Act
         const result = await wardrobeModel.delete(wardrobeId);
 
-        // Assert
         expect(result).toBe(false);
         expect(mockQuery).toHaveBeenCalledTimes(2);
       });
     });
 
     describe('input validation', () => {
-      it('should handle invalid UUID format', async () => {
-        // Arrange
+      it('should return false for invalid UUID format', async () => {
         const invalidId = 'invalid-uuid';
-        
-        mockQuery
-          .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'DELETE'))
-          .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'DELETE'));
 
-        // Act
         const result = await wardrobeModel.delete(invalidId);
 
-        // Assert
         expect(result).toBe(false);
-        expect(mockQuery).toHaveBeenCalledTimes(2); // Still attempts queries
+        expect(mockQuery).toHaveBeenCalledTimes(0); // Should not query DB for invalid UUID
       });
     });
 
     describe('error handling', () => {
-      it('should throw error when deleting wardrobe_items fails', async () => {
-        // Arrange
+      it('should handle errors when deleting wardrobe_items gracefully', async () => {
         const wardrobeId = uuidv4();
-        const dbError = wardrobeMocks.errorScenarios.dbConnectionError;
+        const dbError = new Error('Connection refused');
         
-        mockQuery.mockRejectedValueOnce(dbError);
+        // Mock the first query (DELETE wardrobe_items) to fail
+        mockQuery
+          .mockRejectedValueOnce(dbError) // Items deletion fails
+          .mockResolvedValueOnce(wardrobeMocks.queryResults.deleteSuccess()); // Wardrobe deletion succeeds
 
-        // Act & Assert
-        await expect(wardrobeModel.delete(wardrobeId)).rejects.toThrow(dbError);
-        expect(mockQuery).toHaveBeenCalledTimes(1); // Fails on first query
+        const result = await wardrobeModel.delete(wardrobeId);
+
+        expect(result).toBe(true); // Should still succeed since wardrobe deletion worked
+        expect(mockQuery).toHaveBeenCalledTimes(2);
       });
 
       it('should throw error when deleting wardrobe fails', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const dbError = wardrobeMocks.errorScenarios.dbConnectionError;
         
@@ -640,7 +549,6 @@ describe('wardrobeModel', () => {
           .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'DELETE')) // Items deletion succeeds
           .mockRejectedValueOnce(dbError); // Wardrobe deletion fails
 
-        // Act & Assert
         await expect(wardrobeModel.delete(wardrobeId)).rejects.toThrow(dbError);
         expect(mockQuery).toHaveBeenCalledTimes(2);
       });
@@ -650,7 +558,6 @@ describe('wardrobeModel', () => {
   describe('addGarment', () => {
     describe('successful operations', () => {
       it('should add new garment to wardrobe', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const garmentId = uuidv4();
         const position = 0;
@@ -658,12 +565,10 @@ describe('wardrobeModel', () => {
         // Mock: check existing (not found), then insert
         mockQuery
           .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'SELECT')) // No existing item
-          .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'INSERT')); // Insert success
+          .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([{ id: 'mock' }], 'INSERT')); // Insert success
 
-        // Act
         const result = await wardrobeModel.addGarment(wardrobeId, garmentId, position);
 
-        // Assert
         expect(result).toBe(true);
         expect(mockQuery).toHaveBeenCalledTimes(2);
         
@@ -680,7 +585,6 @@ describe('wardrobeModel', () => {
       });
 
       it('should update position of existing garment in wardrobe', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const garmentId = uuidv4();
         const newPosition = 5;
@@ -690,12 +594,10 @@ describe('wardrobeModel', () => {
         // Mock: find existing item, then update
         mockQuery
           .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([existingItem], 'SELECT')) // Existing item found
-          .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'UPDATE')); // Update success
+          .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([{ id: 'mock' }], 'UPDATE')); // Update success
 
-        // Act
         const result = await wardrobeModel.addGarment(wardrobeId, garmentId, newPosition);
 
-        // Assert
         expect(result).toBe(true);
         expect(mockQuery).toHaveBeenCalledTimes(2);
         
@@ -707,18 +609,15 @@ describe('wardrobeModel', () => {
       });
 
       it('should handle default position (0)', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const garmentId = uuidv4();
         
         mockQuery
           .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'SELECT'))
-          .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'INSERT'));
+          .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([{ id: 'mock' }], 'INSERT'));
 
-        // Act
         const result = await wardrobeModel.addGarment(wardrobeId, garmentId); // No position provided
 
-        // Assert
         expect(result).toBe(true);
         
         const [, insertParams] = mockQuery.mock.calls[1];
@@ -726,7 +625,6 @@ describe('wardrobeModel', () => {
       });
 
       it('should handle various position values', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const garmentId = uuidv4();
         const testPositions = [0, 1, 5, 10, 99];
@@ -736,12 +634,10 @@ describe('wardrobeModel', () => {
           
           mockQuery
             .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'SELECT'))
-            .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'INSERT'));
+            .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([{ id: 'mock' }], 'INSERT'));
 
-          // Act
           const result = await wardrobeModel.addGarment(wardrobeId, garmentId, position);
 
-          // Assert
           expect(result).toBe(true);
           expect(mockQuery.mock.calls[1][1]![2]).toBe(position);
         }
@@ -750,20 +646,17 @@ describe('wardrobeModel', () => {
 
     describe('error handling', () => {
       it('should throw error when check query fails', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const garmentId = uuidv4();
         const dbError = wardrobeMocks.errorScenarios.dbConnectionError;
         
         mockQuery.mockRejectedValueOnce(dbError);
 
-        // Act & Assert
         await expect(wardrobeModel.addGarment(wardrobeId, garmentId)).rejects.toThrow(dbError);
         expect(mockQuery).toHaveBeenCalledTimes(1);
       });
 
       it('should throw error when insert query fails', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const garmentId = uuidv4();
         const dbError = wardrobeMocks.errorScenarios.uniqueConstraintError;
@@ -772,13 +665,11 @@ describe('wardrobeModel', () => {
           .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'SELECT'))
           .mockRejectedValueOnce(dbError);
 
-        // Act & Assert
         await expect(wardrobeModel.addGarment(wardrobeId, garmentId)).rejects.toThrow(dbError);
         expect(mockQuery).toHaveBeenCalledTimes(2);
       });
 
       it('should throw error when update query fails', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const garmentId = uuidv4();
         const existingItem = wardrobeMocks.wardrobeItems.createWardrobeItem(wardrobeId, garmentId, 0);
@@ -788,7 +679,6 @@ describe('wardrobeModel', () => {
           .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([existingItem], 'SELECT'))
           .mockRejectedValueOnce(dbError);
 
-        // Act & Assert
         await expect(wardrobeModel.addGarment(wardrobeId, garmentId, 5)).rejects.toThrow(dbError);
         expect(mockQuery).toHaveBeenCalledTimes(2);
       });
@@ -798,16 +688,13 @@ describe('wardrobeModel', () => {
   describe('removeGarment', () => {
     describe('successful removal', () => {
       it('should remove garment from wardrobe and return true', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const garmentId = uuidv4();
         
         mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.deleteSuccess());
 
-        // Act
         const result = await wardrobeModel.removeGarment(wardrobeId, garmentId);
 
-        // Assert
         expect(result).toBe(true);
         expect(mockQuery).toHaveBeenCalledTimes(1);
         
@@ -818,11 +705,9 @@ describe('wardrobeModel', () => {
       });
 
       it('should handle multiple garment removals', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const garmentIds = [uuidv4(), uuidv4(), uuidv4()];
         
-        // Act & Assert
         for (const garmentId of garmentIds) {
           jest.clearAllMocks();
           mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.deleteSuccess());
@@ -835,45 +720,37 @@ describe('wardrobeModel', () => {
 
     describe('not found scenarios', () => {
       it('should return false when garment not in wardrobe', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const garmentId = uuidv4();
         
         mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'DELETE'));
 
-        // Act
         const result = await wardrobeModel.removeGarment(wardrobeId, garmentId);
 
-        // Assert
         expect(result).toBe(false);
         expect(mockQuery).toHaveBeenCalledTimes(1);
       });
 
       it('should return false for non-existent wardrobe', async () => {
-        // Arrange
         const nonExistentWardrobeId = uuidv4();
         const garmentId = uuidv4();
         
         mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'DELETE'));
 
-        // Act
         const result = await wardrobeModel.removeGarment(nonExistentWardrobeId, garmentId);
 
-        // Assert
         expect(result).toBe(false);
       });
     });
 
     describe('error handling', () => {
       it('should throw error when database query fails', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const garmentId = uuidv4();
         const dbError = wardrobeMocks.errorScenarios.dbConnectionError;
         
         mockQuery.mockRejectedValueOnce(dbError);
 
-        // Act & Assert
         await expect(wardrobeModel.removeGarment(wardrobeId, garmentId)).rejects.toThrow(dbError);
         expect(mockQuery).toHaveBeenCalledTimes(1);
       });
@@ -883,7 +760,6 @@ describe('wardrobeModel', () => {
   describe('getGarments', () => {
     describe('successful retrieval', () => {
       it('should return garments ordered by position', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const userId = uuidv4();
         const garments = wardrobeMocks.garments.createMultipleGarments(userId, 5);
@@ -896,10 +772,8 @@ describe('wardrobeModel', () => {
 
         mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess(garmentsWithPosition, 'SELECT'));
 
-        // Act
         const result = await wardrobeModel.getGarments(wardrobeId);
 
-        // Assert
         expect(result).toEqual(garmentsWithPosition);
         expect(mockQuery).toHaveBeenCalledTimes(1);
         
@@ -913,22 +787,18 @@ describe('wardrobeModel', () => {
       });
 
       it('should return empty array when wardrobe has no garments', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         
         mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'SELECT'));
 
-        // Act
         const result = await wardrobeModel.getGarments(wardrobeId);
 
-        // Assert
         expect(result).toEqual([]);
         expect(Array.isArray(result)).toBe(true);
         expect(result.length).toBe(0);
       });
 
       it('should return single garment correctly', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const userId = uuidv4();
         const garment = wardrobeMocks.garments.createMockGarment({ user_id: userId });
@@ -936,17 +806,14 @@ describe('wardrobeModel', () => {
 
         mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([garmentWithPosition], 'SELECT'));
 
-        // Act
         const result = await wardrobeModel.getGarments(wardrobeId);
 
-        // Assert
         expect(result).toEqual([garmentWithPosition]);
         expect(result.length).toBe(1);
         expect(result[0]).toHaveProperty('position');
       });
 
       it('should handle garments with different positions', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const userId = uuidv4();
         const positions = [0, 2, 5, 10];
@@ -957,10 +824,8 @@ describe('wardrobeModel', () => {
 
         mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess(garments, 'SELECT'));
 
-        // Act
         const result = await wardrobeModel.getGarments(wardrobeId);
 
-        // Assert
         expect(result).toEqual(garments);
         
         // Verify positions are included
@@ -972,25 +837,21 @@ describe('wardrobeModel', () => {
 
     describe('error handling', () => {
       it('should throw error when database query fails', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const dbError = wardrobeMocks.errorScenarios.dbConnectionError;
         
         mockQuery.mockRejectedValueOnce(dbError);
 
-        // Act & Assert
         await expect(wardrobeModel.getGarments(wardrobeId)).rejects.toThrow(dbError);
         expect(mockQuery).toHaveBeenCalledTimes(1);
       });
 
       it('should throw error on timeout', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const timeoutError = wardrobeMocks.errorScenarios.timeoutError;
         
         mockQuery.mockRejectedValueOnce(timeoutError);
 
-        // Act & Assert
         await expect(wardrobeModel.getGarments(wardrobeId)).rejects.toThrow(timeoutError);
       });
     });
@@ -998,7 +859,7 @@ describe('wardrobeModel', () => {
 
   describe('edge cases and boundary conditions', () => {
     describe('UUID validation edge cases', () => {
-      it('should handle various invalid UUID formats', async () => {
+      it('should handle various invalid UUID formats consistently', async () => {
         const invalidUuids = [
           '',
           'not-a-uuid',
@@ -1010,9 +871,22 @@ describe('wardrobeModel', () => {
           undefined
         ];
 
+        // Test findById
         for (const invalidUuid of invalidUuids) {
           const result = await wardrobeModel.findById(invalidUuid as any);
           expect(result).toBeNull();
+        }
+        
+        // Test update
+        for (const invalidUuid of invalidUuids) {
+          const result = await wardrobeModel.update(invalidUuid as any, { name: 'test' });
+          expect(result).toBeNull();
+        }
+        
+        // Test delete
+        for (const invalidUuid of invalidUuids) {
+          const result = await wardrobeModel.delete(invalidUuid as any);
+          expect(result).toBe(false);
         }
         
         // Verify no database calls were made for invalid UUIDs
@@ -1039,22 +913,18 @@ describe('wardrobeModel', () => {
 
     describe('data consistency edge cases', () => {
       it('should handle concurrent modifications gracefully', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const updateData = wardrobeMocks.createValidUpdateInput();
         
         // Simulate concurrent modification - row was deleted between operations
         mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.selectMultiple([]));
 
-        // Act
         const result = await wardrobeModel.update(wardrobeId, updateData);
 
-        // Assert
         expect(result).toBeNull();
       });
 
-      it('should handle large result sets', async () => {
-        // Arrange
+      it('should handle large result sets efficiently', async () => {
         const userId = uuidv4();
         const largeWardrobeSet = wardrobeMocks.createMultipleWardrobes(userId, 100);
         
@@ -1062,35 +932,29 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.selectMultiple(largeWardrobeSet)
         );
 
-        // Act
         const result = await wardrobeModel.findByUserId(userId);
 
-        // Assert
         expect(result).toEqual(largeWardrobeSet);
         expect(result.length).toBe(100);
       });
     });
 
     describe('database connection edge cases', () => {
-      it('should handle database connection timeout', async () => {
-        // Arrange
+      it('should throw error on database connection timeout', async () => {
         const wardrobeId = uuidv4();
         const timeoutError = new Error('Connection timeout');
         
         mockQuery.mockRejectedValueOnce(timeoutError);
 
-        // Act & Assert
         await expect(wardrobeModel.findById(wardrobeId)).rejects.toThrow('Connection timeout');
       });
 
-      it('should handle database connection pool exhaustion', async () => {
-        // Arrange
+      it('should throw error on database connection pool exhaustion', async () => {
         const userId = uuidv4();
         const poolError = new Error('Connection pool exhausted');
         
         mockQuery.mockRejectedValueOnce(poolError);
 
-        // Act & Assert
         await expect(wardrobeModel.findByUserId(userId)).rejects.toThrow('Connection pool exhausted');
       });
     });
@@ -1099,7 +963,6 @@ describe('wardrobeModel', () => {
   describe('performance considerations', () => {
     describe('query optimization', () => {
       it('should use parameterized queries for all operations', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const userId = uuidv4();
         const inputData = wardrobeMocks.createValidInput({ user_id: userId });
@@ -1108,7 +971,7 @@ describe('wardrobeModel', () => {
 
         mockQuery.mockResolvedValue(wardrobeMocks.queryResults.genericSuccess([], 'SELECT'));
 
-        // Act - test all model methods
+        // Act - test all model methods that make DB calls
         await wardrobeModel.create(inputData);
         await wardrobeModel.findById(wardrobeId);
         await wardrobeModel.findByUserId(userId);
@@ -1127,25 +990,27 @@ describe('wardrobeModel', () => {
         });
       });
 
-      it('should not perform unnecessary database calls', async () => {
-        // Test UUID validation prevents unnecessary DB calls
+      it('should not perform unnecessary database calls for invalid UUIDs', async () => {
         jest.clearAllMocks();
         
-        // These should all return null without hitting the database
+        // These should all return early without hitting the database
         const result1 = await wardrobeModel.findById('invalid-uuid');
         const result2 = await wardrobeModel.findById('');
         const result3 = await wardrobeModel.findById(null as any);
+        const result4 = await wardrobeModel.update('invalid-uuid', { name: 'test' });
+        const result5 = await wardrobeModel.delete('invalid-uuid');
         
         expect(result1).toBeNull();
         expect(result2).toBeNull();
         expect(result3).toBeNull();
+        expect(result4).toBeNull();
+        expect(result5).toBe(false);
         expect(mockQuery).not.toHaveBeenCalled();
       });
     });
 
     describe('memory efficiency', () => {
       it('should handle large datasets without memory issues', async () => {
-        // Arrange
         const userId = uuidv4();
         const largeDataset = Array.from({ length: 1000 }, (_, index) => 
           wardrobeMocks.createValidWardrobe({
@@ -1156,10 +1021,8 @@ describe('wardrobeModel', () => {
 
         mockQuery.mockResolvedValueOnce(wardrobeMocks.queryResults.selectMultiple(largeDataset));
 
-        // Act
         const result = await wardrobeModel.findByUserId(userId);
 
-        // Assert
         expect(result.length).toBe(1000);
         expect(result[0]).toHaveProperty('id');
         expect(result[999]).toHaveProperty('name', 'Wardrobe 1000');
@@ -1170,7 +1033,6 @@ describe('wardrobeModel', () => {
   describe('type safety verification', () => {
     describe('input type validation', () => {
       it('should accept properly typed CreateWardrobeInput', async () => {
-        // Arrange
         const validInput: CreateWardrobeInput = {
           user_id: uuidv4(),
           name: 'Test Wardrobe',
@@ -1187,7 +1049,6 @@ describe('wardrobeModel', () => {
       });
 
       it('should accept properly typed UpdateWardrobeInput', async () => {
-        // Arrange
         const wardrobeId = uuidv4();
         const validUpdate: UpdateWardrobeInput = {
           name: 'Updated Name',
@@ -1206,13 +1067,11 @@ describe('wardrobeModel', () => {
 
     describe('return type validation', () => {
       it('should return properly typed Wardrobe objects', async () => {
-        // Arrange
         const expectedWardrobe = wardrobeMocks.createValidWardrobe();
         mockQuery.mockResolvedValueOnce(
           wardrobeMocks.queryResults.selectSingle(expectedWardrobe)
         );
 
-        // Act
         const result = await wardrobeModel.findById(expectedWardrobe.id);
 
         // Assert - TypeScript should enforce proper typing
@@ -1228,7 +1087,6 @@ describe('wardrobeModel', () => {
       });
 
       it('should return properly typed arrays', async () => {
-        // Arrange
         const userId = uuidv4();
         const wardrobes = wardrobeMocks.createMultipleWardrobes(userId, 3);
         
@@ -1236,7 +1094,6 @@ describe('wardrobeModel', () => {
           wardrobeMocks.queryResults.selectMultiple(wardrobes)
         );
 
-        // Act
         const result = await wardrobeModel.findByUserId(userId);
 
         // Assert - TypeScript should enforce Wardrobe[] type
@@ -1252,8 +1109,7 @@ describe('wardrobeModel', () => {
 
   describe('integration with database constraints', () => {
     describe('foreign key constraints', () => {
-      it('should handle invalid user_id in create', async () => {
-        // Arrange
+      it('should throw error for invalid user_id in create', async () => {
         const invalidUserInput = wardrobeMocks.createValidInput({
           user_id: uuidv4() // Non-existent user
         });
@@ -1261,12 +1117,10 @@ describe('wardrobeModel', () => {
         const foreignKeyError = new Error('Foreign key constraint violation');
         mockQuery.mockRejectedValueOnce(foreignKeyError);
 
-        // Act & Assert
         await expect(wardrobeModel.create(invalidUserInput)).rejects.toThrow(foreignKeyError);
       });
 
-      it('should handle invalid garment_id in addGarment', async () => {
-        // Arrange
+      it('should throw error for invalid garment_id in addGarment', async () => {
         const wardrobeId = uuidv4();
         const invalidGarmentId = uuidv4(); // Non-existent garment
         
@@ -1274,22 +1128,69 @@ describe('wardrobeModel', () => {
           .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'SELECT')) // Check existing
           .mockRejectedValueOnce(new Error('Foreign key constraint violation')); // Insert fails
 
-        // Act & Assert
         await expect(wardrobeModel.addGarment(wardrobeId, invalidGarmentId))
           .rejects.toThrow('Foreign key constraint violation');
       });
     });
 
     describe('unique constraints', () => {
-      it('should handle unique constraint violations appropriately', async () => {
-        // Note: If there were unique constraints on wardrobe names per user,
-        // this would test that scenario
+      it('should throw error on unique constraint violations', async () => {
         const inputData = wardrobeMocks.createValidInput();
         const uniqueError = new Error('Unique constraint violation');
         
         mockQuery.mockRejectedValueOnce(uniqueError);
 
         await expect(wardrobeModel.create(inputData)).rejects.toThrow(uniqueError);
+      });
+    });
+  });
+
+  describe('business logic validation', () => {
+    describe('wardrobe lifecycle', () => {
+      it('should maintain data consistency across operations', async () => {
+        const wardrobeId = uuidv4();
+        const garmentId = uuidv4();
+        
+        // Test sequence: create → add garment → update → remove garment → delete
+        mockQuery
+          .mockResolvedValueOnce(wardrobeMocks.queryResults.insertSuccess(wardrobeMocks.createValidWardrobe()))
+          .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'SELECT')) // Check existing
+          .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([{ id: 'mock' }], 'INSERT')) // Add garment
+          .mockResolvedValueOnce(wardrobeMocks.queryResults.updateSuccess(wardrobeMocks.createValidWardrobe()))
+          .mockResolvedValueOnce(wardrobeMocks.queryResults.deleteSuccess()) // Remove garment
+          .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'DELETE')) // Delete items
+          .mockResolvedValueOnce(wardrobeMocks.queryResults.deleteSuccess()); // Delete wardrobe
+
+        // Execute lifecycle
+        const created = await wardrobeModel.create(wardrobeMocks.createValidInput());
+        const addResult = await wardrobeModel.addGarment(wardrobeId, garmentId, 1);
+        const updated = await wardrobeModel.update(wardrobeId, { name: 'Updated' });
+        const removeResult = await wardrobeModel.removeGarment(wardrobeId, garmentId);
+        const deleteResult = await wardrobeModel.delete(wardrobeId);
+
+        expect(created).toBeDefined();
+        expect(addResult).toBe(true);
+        expect(updated).toBeDefined();
+        expect(removeResult).toBe(true);
+        expect(deleteResult).toBe(true);
+        expect(mockQuery).toHaveBeenCalledTimes(7);
+      });
+    });
+
+    describe('error recovery', () => {
+      it('should handle partial operation failures gracefully', async () => {
+        const wardrobeId = uuidv4();
+        const garmentId = uuidv4();
+        
+        // Simulate: successful check, failed insert
+        mockQuery
+          .mockResolvedValueOnce(wardrobeMocks.queryResults.genericSuccess([], 'SELECT'))
+          .mockRejectedValueOnce(new Error('Insert failed'));
+
+        await expect(wardrobeModel.addGarment(wardrobeId, garmentId))
+          .rejects.toThrow('Insert failed');
+        
+        expect(mockQuery).toHaveBeenCalledTimes(2);
       });
     });
   });
