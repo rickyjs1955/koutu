@@ -45,8 +45,6 @@ jest.doMock('../../config/firebase', () => {
 // #region FIXED: Use Dual-Mode Infrastructure
 import { 
     getTestDatabaseConnection, 
-    getTestUserModel,
-    setupWardrobeTestEnvironmentWithUserModel, 
     setupWardrobeTestQuickFix
 } from '../../utils/dockerMigrationHelper';
 
