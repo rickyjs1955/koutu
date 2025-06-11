@@ -208,8 +208,10 @@ export const getTestDatabaseConnection = () => {
  */
 export const getTestDatabase = () => {
   if (shouldUseDocker()) {
+    console.log('📦 Loading Docker test database implementation');
     return require('./testDatabase.v2').TestDatabase;
   } else {
+    console.log('🛠️ Loading Manual test database implementation');
     return require('./testDatabase').TestDatabase;
   }
 };
@@ -742,6 +744,203 @@ export const createWardrobeDatabaseMock = () => {
     query: async (text: string, params?: any[]) => {
       return TestDB.query(text, params);
     }
+  };
+};
+
+/**
+ * Get the appropriate testUserModel implementation
+ * 
+ * This ensures the user model uses the same database connection
+ * as the rest of the dual-mode system.
+ * 
+ * @returns {testUserModel} Either Docker or Manual implementation
+ */
+export const getTestUserModel = () => {
+  if (shouldUseDocker()) {
+    // 🐳 DOCKER MODE: Use v2 user model that works with Docker database
+    console.log('📦 Loading Docker test user model implementation');
+    return require('./testUserModel.v2').testUserModel;
+  } else {
+    // 🔧 MANUAL MODE: Use original user model with manual database
+    console.log('🛠️ Loading Manual test user model implementation');
+    return require('./testUserModel').testUserModel;
+  }
+};
+
+/**
+ * Enhanced test setup for wardrobe integration tests with user model
+ * This replaces setupWardrobeTestEnvironment and includes user model setup
+ * 
+ * @returns {Promise<{ TestDB: any, testUserModel: any }>}
+ */
+export const setupWardrobeTestEnvironmentWithUserModel = async () => {
+  console.log('🧪 Setting up wardrobe test environment with user model...');
+  
+  // Setup base test environment
+  setupTestEnvironment();
+  
+  // Initialize database connection
+  const TestDB = getTestDatabaseConnection();
+  await TestDB.initialize();
+  
+  // Ensure wardrobe-specific tables exist
+  await ensureWardrobeTablesExist();
+  
+  // Get the appropriate user model
+  const testUserModel = getTestUserModel();
+  
+  console.log('✅ Wardrobe test environment with user model ready');
+  
+  return {
+    TestDB,
+    testUserModel
+  };
+};
+
+/**
+ * Get the appropriate testImageModel implementation
+ * 
+ * @returns {testImageModel} Either Docker or Manual implementation
+ */
+export const getTestImageModel = () => {
+  if (shouldUseDocker()) {
+    console.log('📦 Loading Docker test image model implementation');
+    return require('./testImageModel.v2').testImageModel;
+  } else {
+    console.log('🛠️ Loading Manual test image model implementation');
+    return require('./testImageModel').testImageModel;
+  }
+};
+
+/**
+ * Get the appropriate testGarmentModel implementation
+ * 
+ * @returns {testGarmentModel} Either Docker or Manual implementation
+ */
+export const getTestGarmentModel = () => {
+  if (shouldUseDocker()) {
+    console.log('📦 Loading Docker test garment model implementation');
+    return require('./testGarmentModel.v2').testGarmentModel;
+  } else {
+    console.log('🛠️ Loading Manual test garment model implementation');
+    return require('./testGarmentModel').testGarmentModel;
+  }
+};
+
+/**
+ * Get the appropriate ImageServiceTestHelper implementation
+ * 
+ * @returns {ImageServiceTestHelper} Either Docker or Manual implementation
+ */
+export const getTestImageService = () => {
+  if (shouldUseDocker()) {
+    console.log('📦 Loading Docker test image service implementation');
+    return require('./testImageService.v2').ImageServiceTestHelper;
+  } else {
+    console.log('🛠️ Loading Manual test image service implementation');
+    return require('./testImageService').ImageServiceTestHelper;
+  }
+};
+
+/**
+ * Enhanced test setup for wardrobe integration tests with ALL models
+ * This replaces setupWardrobeTestEnvironmentWithUserModel and includes all models
+ * 
+ * @returns {Promise<{ TestDB: any, testUserModel: any, testImageModel: any, testGarmentModel: any, ImageServiceTestHelper: any }>}
+ */
+export const setupWardrobeTestEnvironmentWithAllModels = async () => {
+  console.log('🧪 Setting up wardrobe test environment with ALL models...');
+  
+  // Setup base test environment
+  setupTestEnvironment();
+  
+  // Initialize database connection
+  const TestDB = getTestDatabaseConnection();
+  await TestDB.initialize();
+  
+  // Ensure wardrobe-specific tables exist
+  await ensureWardrobeTablesExist();
+  
+  // Get the appropriate models
+  const testUserModel = getTestUserModel();
+  const testImageModel = getTestImageModel();
+  const testGarmentModel = getTestGarmentModel();
+  const ImageServiceTestHelper = getTestImageService();
+  
+  console.log('✅ Wardrobe test environment with ALL models ready');
+  
+  return {
+    TestDB,
+    testUserModel,
+    testImageModel,
+    testGarmentModel,
+    ImageServiceTestHelper
+  };
+};
+
+/**
+ * Create simple test image directly with database connection
+ * Use this to replace testImageModel.create() calls in tests
+ * 
+ * @param TestDB - Database connection
+ * @param userId - User ID
+ * @param name - Image name for file path
+ * @returns Promise resolving to created image
+ */
+export const createTestImageDirect = async (TestDB: any, userId: string, name: string, imageCounter: number) => {
+  const { v4: uuidv4 } = require('uuid');
+  const id = uuidv4();
+  
+  const result = await TestDB.query(
+    `INSERT INTO original_images 
+    (id, user_id, file_path, original_metadata, status, created_at, updated_at) 
+    VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) 
+    RETURNING *`,
+    [
+      id,
+      userId,
+      `/uploads/user${userId.slice(-1)}/wardrobe_test_${imageCounter}_${name}.jpg`,
+      JSON.stringify({ 
+        width: 1920, 
+        height: 1080, 
+        format: 'JPEG',
+        size: 2048576,
+        uploaded_at: new Date().toISOString()
+      }),
+      'new'
+    ]
+  );
+  
+  return result.rows[0];
+};
+
+/**
+ * 🎯 QUICK FIX for wardrobeController.int.test.ts
+ * 
+ * Use this setup function in your test instead of the complex imports
+ */
+export const setupWardrobeTestQuickFix = async () => {
+  console.log('🚀 Quick fix setup for wardrobe tests...');
+  
+  // Setup environment
+  setupTestEnvironment();
+  
+  // Initialize database
+  const TestDB = getTestDatabaseConnection();
+  await TestDB.initialize();
+  await ensureWardrobeTablesExist();
+  await TestDB.clearAllTables();
+  
+  // Get user model
+  const testUserModel = getTestUserModel();
+  
+  console.log('✅ Quick fix setup complete');
+  
+  return {
+    TestDB,
+    testUserModel,
+    createTestImage: (userId: string, name: string, imageCounter: number) => 
+      createTestImageDirect(TestDB, userId, name, imageCounter)
   };
 };
 

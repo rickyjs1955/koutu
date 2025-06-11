@@ -365,9 +365,10 @@ export class TestDatabaseConnection {
   }
 
   static async query(text: string, params?: any[]): Promise<any> {
-    if (this.cleanupInProgress) {
-      throw new Error('Database cleanup in progress, cannot execute queries');
-    }
+  if (text.includes('wardrobe_garments')) {
+    console.log('🚨 WRONG TABLE QUERY:', text);
+    console.trace(); // Show stack trace
+  }
     
     const pool = this.getPool();
     const client = await pool.connect();

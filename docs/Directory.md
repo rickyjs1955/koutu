@@ -91,10 +91,16 @@ Backend:
 47. /backend/src/utils/testDatabaseConnection.ts            ✅Unit ✅Integration 🔔Security
 48. /backend/src/utils/testUserModel.ts                     ✅Unit 🔔Integration ✅Security
 49. /backend/src/utils/InstagramApiError.ts                 ✅Unit ✅Integration ✅Security
-50. /backend/src/utils/dockerMigrationHelper.ts             ❌Unit ❌Integration ❌Security
-51. /backend/src/utils/testGarmentModel.ts                  ❌Unit ❌Integration ❌Security
-52. /backend/src/validators/schemas.ts                      ✅Unit ✅Integration ✅Security
-53. /backend/src/app.ts                                     ❌Unit ❌Integration ❌Security
+50. /backend/src/utils/testImageService.ts                  ❌Unit ❌Integration ❌Security
+51. /backend/src/utils/dockerMigrationHelper.ts             ❌Unit ❌Integration ❌Security
+52. /backend/src/utils/testGarmentModel.ts                  ❌Unit ❌Integration ❌Security
+53. /backend/src/utils/testDatabaseConnection.v2.ts         ❌Unit ❌Integration ❌Security
+54. /backend/src/utils/testUserModel.v2.ts                  ❌Unit ❌Integration ❌Security
+57. /backend/src/utils/testDatabase.v2.ts                   ❌Unit ❌Integration ❌Security
+58. /backend/src/utils/testGarmentModel.v2.ts               ❌Unit ❌Integration ❌Security
+59. /backend/src/utils/testImageService.v2.ts               ❌Unit ❌Integration ❌Security
+60. /backend/src/validators/schemas.ts                      ✅Unit ✅Integration ✅Security
+61. /backend/src/app.ts                                     ❌Unit ❌Integration ❌Security
 
 Additional Test Suites:
 firebass.docker.int.test.ts
