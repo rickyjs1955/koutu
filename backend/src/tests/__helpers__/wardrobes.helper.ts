@@ -676,20 +676,71 @@ export const wardrobeValidationHelpers = {
   /**
    * Test all validation scenarios for wardrobe names
    */
-  getNameValidationTests(): Array<{ name: string; shouldPass: boolean; description: string }> {
+  getNameValidationTests() {
     return [
-      { name: 'Valid Name', shouldPass: true, description: 'Simple valid name' },
-      { name: 'Valid-Name_123', shouldPass: true, description: 'Valid with allowed special chars' },
-      { name: 'My.Wardrobe Collection', shouldPass: true, description: 'Valid with dots and spaces' },
-      { name: '', shouldPass: false, description: 'Empty name' },
-      { name: '   ', shouldPass: false, description: 'Whitespace only' },
-      { name: 'a'.repeat(101), shouldPass: false, description: 'Name too long (101 chars)' },
-      { name: 'Invalid@Name', shouldPass: false, description: 'Contains invalid character @' },
-      { name: 'Invalid#Name', shouldPass: false, description: 'Contains invalid character #' },
-      { name: 'Invalid$Name', shouldPass: false, description: 'Contains invalid character $' },
-      { name: 'Invalid%Name', shouldPass: false, description: 'Contains invalid character %' },
-      { name: 'A', shouldPass: true, description: 'Single character (minimum)' },
-      { name: 'a'.repeat(100), shouldPass: true, description: 'Maximum length (100 chars)' }
+      // Valid names
+      {
+        name: 'Simple valid name',
+        description: 'Simple valid name',
+        shouldPass: true
+      },
+      {
+        name: 'Valid with allowed special chars',
+        description: 'Valid with allowed special chars',
+        shouldPass: true
+      },
+      {
+        name: 'Valid with dots and spaces',
+        description: 'Valid with dots and spaces',
+        shouldPass: true
+      },
+      {
+        name: 'A',
+        description: 'Single character (minimum)',
+        shouldPass: true
+      },
+      {
+        name: 'a'.repeat(100),
+        description: 'Maximum length (100 chars)',
+        shouldPass: true
+      },
+      
+      // Invalid names
+      {
+        name: '',
+        description: 'Empty name',
+        shouldPass: false
+      },
+      {
+        name: '   ',
+        description: 'Whitespace only',
+        shouldPass: false
+      },
+      {
+        name: 'a'.repeat(101),
+        description: 'Name too long (101 chars)',
+        shouldPass: false
+      },
+      {
+        name: 'Invalid@Name',
+        description: 'Contains invalid character @',
+        shouldPass: false
+      },
+      {
+        name: 'Invalid#Name',
+        description: 'Contains invalid character #',
+        shouldPass: false
+      },
+      {
+        name: 'Invalid$Name',
+        description: 'Contains invalid character $',
+        shouldPass: false
+      },
+      {
+        name: 'Invalid%Name',
+        description: 'Contains invalid character %',
+        shouldPass: false
+      }
     ];
   },
 
