@@ -91,6 +91,17 @@ CREATE TABLE wardrobes (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Create wardrobe_items table
+CREATE TABLE wardrobe_items (
+  id SERIAL PRIMARY KEY,
+  wardrobe_id UUID NOT NULL REFERENCES wardrobes(id) ON DELETE CASCADE,
+  garment_item_id UUID NOT NULL REFERENCES garment_items(id) ON DELETE CASCADE,
+  position INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(wardrobe_id, garment_item_id)
+);
+
 -- Create indexes for better performance
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_original_images_user_id ON original_images(user_id);
@@ -103,6 +114,10 @@ CREATE INDEX idx_garment_items_data_version ON garment_items(data_version);
 CREATE INDEX idx_garment_items_category ON garment_items(category);
 CREATE INDEX idx_garment_items_name ON garment_items(name);
 CREATE INDEX idx_wardrobes_user_id ON wardrobes(user_id);
+CREATE INDEX idx_wardrobe_items_wardrobe_id ON wardrobe_items(wardrobe_id);
+CREATE INDEX idx_wardrobe_items_garment_id ON wardrobe_items(garment_item_id);
+CREATE INDEX idx_wardrobe_items_position ON wardrobe_items(wardrobe_id, position);
+CREATE INDEX idx_wardrobe_items_created_at ON wardrobe_items(created_at DESC);
 
 -- Add JSON indexes for better metadata query performance
 CREATE INDEX idx_garment_items_metadata_gin ON garment_items USING GIN (metadata);

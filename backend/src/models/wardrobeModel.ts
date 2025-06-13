@@ -129,7 +129,12 @@ export const wardrobeModel = {
     }
   },
   
-  async addGarment(wardrobeId: string, garmentId: string, position: number = 0): Promise<boolean> {
+  async addGarment(
+    wardrobeId: string, 
+    garmentId: string, 
+    position: number = 0,
+    options: { allowUpdate?: boolean } = { allowUpdate: true }
+  ): Promise<boolean> {
     try {
       // Check if the garment is already in the wardrobe
       const existingItem = await query(
@@ -138,27 +143,34 @@ export const wardrobeModel = {
       );
       
       if (existingItem.rows.length > 0) {
-        // Update the position if the garment is already in the wardrobe
-        await query(
-          'UPDATE wardrobe_items SET position = $1 WHERE wardrobe_id = $2 AND garment_item_id = $3',
-          [position, wardrobeId, garmentId]
-        );
-      } else {
-        // Add the garment to the wardrobe
-        await query(
-          'INSERT INTO wardrobe_items (wardrobe_id, garment_item_id, position) VALUES ($1, $2, $3)',
-          [wardrobeId, garmentId, position]
-        );
+        if (options.allowUpdate) {
+          // Update the position if the garment is already in the wardrobe (old behavior)
+          await query(
+            'UPDATE wardrobe_items SET position = $1, updated_at = NOW() WHERE wardrobe_id = $2 AND garment_item_id = $3',
+            [position, wardrobeId, garmentId]
+          );
+          return true;
+        } else {
+          // Throw an error for strict duplicate prevention (new behavior)
+          throw new Error('Garment already in wardrobe');
+        }
       }
+      
+      // Add the garment to the wardrobe
+      await query(
+        'INSERT INTO wardrobe_items (wardrobe_id, garment_item_id, position, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
+        [wardrobeId, garmentId, position]
+      );
       
       return true;
     } catch (error) {
       if (error instanceof Error && error.message.includes('wardrobe_items') && error.message.includes('does not exist')) {
         throw new Error('wardrobe_items table not found - please create the table first');
       }
+      // Re-throw the error (including our "Garment already in wardrobe" error)
       throw error;
     }
-  },
+},
   
   async removeGarment(wardrobeId: string, garmentId: string): Promise<boolean> {
     try {

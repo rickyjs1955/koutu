@@ -496,9 +496,10 @@ describe('wardrobeController - Security Tests', () => {
                 // Assert - Should use URL parameter, not body parameter
                 expect(mockWardrobeModel.findById).toHaveBeenCalledWith(realWardrobeId);
                 expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
-                realWardrobeId, // Uses URL param
+                realWardrobeId,
                 expect.any(String),
-                expect.any(Number)
+                expect.any(Number),
+                { allowUpdate: false }
                 );
             });
         });
@@ -1684,7 +1685,7 @@ describe('wardrobeController - Security Tests', () => {
                 // Assert - Should validate ownership at each service boundary
                 expect(mockWardrobeModel.findById).toHaveBeenCalledWith(wardrobeId);
                 expect(mockGarmentModel.findById).toHaveBeenCalledWith(garmentId);
-                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(wardrobeId, garmentId, 0);
+                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(wardrobeId, garmentId, 0, { allowUpdate: false });
                 expect(mockRes.status).toHaveBeenCalledWith(200);
             });
 

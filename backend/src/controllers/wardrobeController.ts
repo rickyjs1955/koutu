@@ -476,18 +476,47 @@ export const wardrobeController = {
         return next(ApiError.forbidden('You do not have permission to modify this wardrobe'));
       }
       
-      // Verify garment exists and belongs to user
-      const garment = await garmentModel.findById(garmentId);
+      // FIXED: Better error handling for garment lookup
+      let garment;
+      try {
+        garment = await garmentModel.findById(garmentId);
+      } catch (error) {
+        console.error('Error finding garment:', error);
+        // If there's a database error finding the garment, treat as not found
+        return next(ApiError.notFound('Garment not found', 'GARMENT_NOT_FOUND'));
+      }
       
+      // FIXED: Ensure we check for null garment
       if (!garment) {
         return next(ApiError.notFound('Garment not found', 'GARMENT_NOT_FOUND'));
       }
       
+      // FIXED: Check user ownership of garment
       if (garment.user_id !== req.user.id) {
         return next(ApiError.forbidden('You do not have permission to use this garment', 'GARMENT_ACCESS_DENIED'));
       }
       
-      await wardrobeModel.addGarment(id, garmentId, position !== undefined ? Number(position) : 0);
+      // IMPROVED: Try to add garment with proper error handling
+      try {
+        await wardrobeModel.addGarment(
+          id, 
+          garmentId, 
+          position !== undefined ? Number(position) : 0,
+          { allowUpdate: false } // Strict mode for API calls
+        );
+      } catch (addError) {
+        console.error('Error adding garment to wardrobe:', addError);
+        
+        // Check for duplicate errors
+        if (addError instanceof Error && addError.message && 
+            (addError.message.includes('duplicate') || 
+            addError.message.includes('already in wardrobe'))) {
+          return next(ApiError.conflict('Garment already in wardrobe'));
+        }
+        
+        // For other database errors, return a generic error
+        return next(ApiError.internal('Failed to add garment to wardrobe'));
+      }
       
       res.status(200).json({
         status: 'success',

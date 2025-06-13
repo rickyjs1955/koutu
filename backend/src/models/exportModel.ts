@@ -43,6 +43,14 @@ export interface ExportJobQueryOptions {
     includeExpired?: boolean;
 }
 
+export interface UserStats {
+    total: number;
+    byStatus: Record<string, number>;
+    completedToday: number;
+    totalProcessedItems: number;
+    averageProcessingTime: number;
+}
+
 export const exportModel = {
     /**
      * Create a new export batch job
@@ -138,79 +146,36 @@ export const exportModel = {
     /**
      * Update export job
      */
-    async update(id: string, data: UpdateExportJobInput): Promise<ExportBatchJob | null> {
+    async update(id: string, updateData: UpdateExportJobInput): Promise<ExportBatchJob | null> {
+        // Validate UUID first - return early if invalid
         if (!isUuid(id)) {
-        return null;
+            return null;
         }
 
-        const updates: string[] = [];
-        const values: any[] = [];
-        let paramIndex = 1;
-
-        // Build dynamic update query
-        if (data.status !== undefined) {
-        updates.push(`status = $${paramIndex}`);
-        values.push(data.status);
-        paramIndex++;
+        // Build dynamic update query only if we have valid data
+        const updateFields = Object.entries(updateData).filter(([_, value]) => value !== undefined);
+        
+        if (updateFields.length === 0) {
+            // No real updates, just return existing record
+            return this.findById(id);
         }
 
-        if (data.progress !== undefined) {
-        updates.push(`progress = $${paramIndex}`);
-        values.push(data.progress);
-        paramIndex++;
-        }
+        const setClause = updateFields.map(([key], index) => `${key} = $${index + 1}`).join(', ');
+        const values = updateFields.map(([_, value]) => value);
+        values.push(id); // Add id as last parameter
 
-        if (data.total_items !== undefined) {
-        updates.push(`total_items = $${paramIndex}`);
-        values.push(data.total_items);
-        paramIndex++;
-        }
+        const queryText = `
+            UPDATE export_batch_jobs 
+            SET ${setClause}, updated_at = NOW()
+            WHERE id = $${values.length}
+            RETURNING *
+        `;
 
-        if (data.processed_items !== undefined) {
-        updates.push(`processed_items = $${paramIndex}`);
-        values.push(data.processed_items);
-        paramIndex++;
-        }
-
-        if (data.output_url !== undefined) {
-        updates.push(`output_url = $${paramIndex}`);
-        values.push(data.output_url);
-        paramIndex++;
-        }
-
-        if (data.error !== undefined) {
-        updates.push(`error = $${paramIndex}`);
-        values.push(data.error);
-        paramIndex++;
-        }
-
-        if (data.completed_at !== undefined) {
-        updates.push(`completed_at = $${paramIndex}`);
-        values.push(data.completed_at);
-        paramIndex++;
-        }
-
-        // Always update updated_at
-        updates.push(`updated_at = NOW()`);
-
-        if (updates.length === 1) {
-        // Only updated_at would be updated, so no real changes
-        return this.findById(id);
-        }
-
-        // Add ID to values
-        values.push(id);
-
-        const result = await query(
-        `UPDATE export_batch_jobs 
-        SET ${updates.join(', ')} 
-        WHERE id = $${paramIndex} 
-        RETURNING *`,
-        values
-        );
-
-        if (result.rows.length === 0) {
-        return null;
+        const result = await query(queryText, values);
+        
+        // Now safely check result.rows
+        if (!result || result.rows.length === 0) {
+            return null;
         }
 
         return this.transformDbRecord(result.rows[0]);
@@ -284,65 +249,88 @@ export const exportModel = {
     /**
      * Get user export statistics
      */
-    async getUserStats(userId: string): Promise<{
-        total: number;
-        byStatus: Record<string, number>;
-        completedToday: number;
-        totalProcessedItems: number;
-        averageProcessingTime: number;
-    }> {
-        const statsResult = await query(
-        `SELECT 
+    async getUserStats(userId: string): Promise<UserStats> {
+        // First query - get job statistics by status
+        const statsQuery = `
+            SELECT 
             COUNT(*) as total,
             status,
-            SUM(processed_items) as total_processed_items,
-            AVG(EXTRACT(EPOCH FROM (completed_at - created_at))) as avg_processing_seconds
-        FROM export_batch_jobs 
-        WHERE user_id = $1 
-        GROUP BY status`,
-        [userId]
-        );
+            COALESCE(SUM(processed_items), 0) as total_processed_items,
+            AVG(CASE 
+                WHEN status = 'completed' AND completed_at IS NOT NULL AND created_at IS NOT NULL 
+                THEN EXTRACT(EPOCH FROM (completed_at - created_at))
+                ELSE NULL 
+            END) as avg_processing_seconds
+            FROM export_batch_jobs 
+            WHERE user_id = $1 
+            GROUP BY status
+        `;
 
-        const todayResult = await query(
-        `SELECT COUNT(*) as completed_today
-        FROM export_batch_jobs 
-        WHERE user_id = $1 
-        AND status = 'completed'
-        AND DATE(completed_at) = CURRENT_DATE`,
-        [userId]
-        );
+        // Second query - get today's completed jobs
+        const todayQuery = `
+            SELECT COUNT(*) as completed_today
+            FROM export_batch_jobs 
+            WHERE user_id = $1 
+            AND status = 'completed'
+            AND DATE(completed_at) = CURRENT_DATE
+        `;
 
-        const stats = {
-        total: 0,
-        byStatus: {} as Record<string, number>,
-        completedToday: parseInt(todayResult.rows[0]?.completed_today || '0', 10),
-        totalProcessedItems: 0,
-        averageProcessingTime: 0
+        const [statsResult, todayResult] = await Promise.all([
+            query(statsQuery, [userId]),
+            query(todayQuery, [userId])
+        ]);
+
+        const statsRows = statsResult.rows;
+        const todayRow = todayResult.rows[0];
+
+        // Calculate totals with proper null handling
+        const total = statsRows.reduce((sum, row) => {
+            const count = parseInt(row.total) || 0; // Handle null/undefined
+            return sum + count;
+        }, 0);
+
+        const totalProcessedItems = statsRows.reduce((sum, row) => {
+            const items = parseInt(row.total_processed_items) || 0; // Handle null/undefined
+            return sum + items;
+        }, 0);
+
+        // Calculate byStatus object
+        const byStatus = statsRows.reduce((acc, row) => {
+            const status = row.status;
+            const count = parseInt(row.total) || 0; // Handle null/undefined
+            acc[status] = count;
+            return acc;
+        }, {} as Record<string, number>);
+
+        // Calculate average processing time (only for completed jobs)
+        let averageProcessingTime = 0;
+        const completedRows = statsRows.filter(row => row.status === 'completed');
+        if (completedRows.length > 0) {
+            const totalTime = completedRows.reduce((sum, row) => {
+            const time = parseFloat(row.avg_processing_seconds) || 0; // Handle null/undefined
+            const count = parseInt(row.total) || 0;
+            return sum + (time * count);
+            }, 0);
+            
+            const totalCompletedJobs = completedRows.reduce((sum, row) => {
+            const count = parseInt(row.total) || 0;
+            return sum + count;
+            }, 0);
+            
+            if (totalCompletedJobs > 0) {
+            averageProcessingTime = Math.round(totalTime / totalCompletedJobs);
+            }
+        }
+
+        const completedToday = parseInt(todayRow?.completed_today) || 0; // Handle null/undefined
+
+        return {
+            total,
+            byStatus,
+            completedToday,
+            totalProcessedItems,
+            averageProcessingTime
         };
-
-        let totalProcessingTime = 0;
-        let completedJobs = 0;
-
-        statsResult.rows.forEach(row => {
-        const count = parseInt(row.total, 10);
-        stats.byStatus[row.status] = count;
-        stats.total += count;
-        
-        if (row.total_processed_items) {
-            stats.totalProcessedItems += parseInt(row.total_processed_items, 10);
-        }
-
-        if (row.status === 'completed' && row.avg_processing_seconds) {
-            totalProcessingTime += parseFloat(row.avg_processing_seconds) * count;
-            completedJobs += count;
-        }
-        });
-
-        if (completedJobs > 0) {
-        stats.averageProcessingTime = Math.round(totalProcessingTime / completedJobs);
-        }
-
-        return stats;
     },
 
     /**
@@ -416,37 +404,39 @@ export const exportModel = {
     /**
      * Batch update job progress (for efficient progress reporting)
      */
-    async batchUpdateProgress(updates: Array<{
-        id: string;
-        progress: number;
-        processed_items: number;
-    }>): Promise<number> {
+    async batchUpdateProgress(updates: Array<{id: string, progress: number, processed_items: number}>): Promise<number> {
         if (updates.length === 0) {
-        return 0;
+            return 0;
         }
 
-        // Use a single query with CASE statements for efficiency
-        const caseProgressStatements = updates.map((_, index) => 
-        `WHEN id = ${3 * index + 1} THEN ${3 * index + 2}`
+        // Build the CASE statements for efficient batch update
+        const progressCases = updates.map((_, index) => 
+            `WHEN id = $${index * 3 + 1} THEN $${index * 3 + 2}`
+        ).join(' ');
+        
+        const processedItemsCases = updates.map((_, index) => 
+            `WHEN id = $${index * 3 + 1} THEN $${index * 3 + 3}`
         ).join(' ');
 
-        const caseProcessedItemsStatements = updates.map((_, index) => 
-        `WHEN id = ${3 * index + 1} THEN ${3 * index + 3}`
-        ).join(' ');
+        const ids = updates.map(u => u.id);
+        const idPlaceholders = ids.map((_, index) => `$${updates.length * 3 + 1 + index}`).join(', ');
 
-        const allIds = updates.map(update => update.id);
-        const queryParams = updates.flatMap(update => [update.id, update.progress, update.processed_items]);
-        const idPlaceholders = allIds.map((_, index) => `${updates.length * 3 + index + 1}`).join(',');
-
-        const result = await query(
-        `UPDATE export_batch_jobs 
-        SET progress = CASE ${caseProgressStatements} END,
-            processed_items = CASE ${caseProcessedItemsStatements} END,
+        const queryText = `
+            UPDATE export_batch_jobs 
+            SET 
+            progress = CASE ${progressCases} END,
+            processed_items = CASE ${processedItemsCases} END,
             updated_at = NOW()
-        WHERE id IN (${idPlaceholders})`,
-        [...queryParams, ...allIds]
-        );
+            WHERE id IN (${idPlaceholders})
+        `;
 
-        return result.rowCount ?? 0;
+        // Flatten parameters: [id1, progress1, processed_items1, id2, progress2, processed_items2, ..., id1, id2, ...]
+        const params = [
+            ...updates.flatMap(u => [u.id, u.progress, u.processed_items]),
+            ...ids
+        ];
+
+        const result = await query(queryText, params);
+        return result.rowCount || 0;
     }
 };

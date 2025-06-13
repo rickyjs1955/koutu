@@ -982,7 +982,12 @@ describe('wardrobeController', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(validWardrobeId, validGarmentId, 0);
+                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
+                validWardrobeId, 
+                validGarmentId, 
+                0, 
+                { allowUpdate: false }
+                );
                 expect(mockRes.status).toHaveBeenCalledWith(200);
                 expect(mockRes.json).toHaveBeenCalledWith({
                 status: 'success',
@@ -1018,7 +1023,12 @@ describe('wardrobeController', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(validWardrobeId, validGarmentId, customPosition);
+                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
+                validWardrobeId, 
+                validGarmentId, 
+                customPosition, 
+                { allowUpdate: false }
+                );
                 expect(mockRes.status).toHaveBeenCalledWith(200);
             });
         });
@@ -1052,7 +1062,12 @@ describe('wardrobeController', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(validWardrobeId, validGarmentId, 0);
+                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
+                validWardrobeId, 
+                validGarmentId, 
+                0, 
+                { allowUpdate: false }
+                );
             });
 
             it('should accept position 0', async () => {
@@ -1067,7 +1082,12 @@ describe('wardrobeController', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(validWardrobeId, validGarmentId, 0);
+                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
+                validWardrobeId, 
+                validGarmentId, 
+                0, 
+                { allowUpdate: false }
+                );
             });
 
             it('should accept positive position values', async () => {
@@ -1082,7 +1102,7 @@ describe('wardrobeController', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(validWardrobeId, validGarmentId, 10);
+                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(validWardrobeId, validGarmentId, 10, { allowUpdate: false });
             });
 
             it('should convert string position to number', async () => {
@@ -1097,7 +1117,7 @@ describe('wardrobeController', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(validWardrobeId, validGarmentId, 7);
+                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(validWardrobeId, validGarmentId, 7, { allowUpdate: false });
             });
 
             it('should reject negative position values', async () => {
@@ -1726,67 +1746,69 @@ describe('wardrobeController', () => {
         });
 
         it('should handle position value of zero correctly', async () => {
-        // Arrange
-        const wardrobe = wardrobeMocks.createValidWardrobe({ 
-            id: 'a0b1c2d3-e4f5-6789-abcd-ef0123456789',
-            user_id: mockUser.id 
-        });
-        const garment = wardrobeMocks.garments.createMockGarment({ 
-            id: 'b1c2d3e4-f5a6-789b-cdef-012345678901',
-            user_id: mockUser.id 
-        });
+            // Arrange
+            const wardrobe = wardrobeMocks.createValidWardrobe({ 
+                id: 'a0b1c2d3-e4f5-6789-abcd-ef0123456789',
+                user_id: mockUser.id 
+            });
+            const garment = wardrobeMocks.garments.createMockGarment({ 
+                id: 'b1c2d3e4-f5a6-789b-cdef-012345678901',
+                user_id: mockUser.id 
+            });
 
-        mockReq.params = { id: 'a0b1c2d3-e4f5-6789-abcd-ef0123456789' };
-        mockReq.body = { garmentId: 'b1c2d3e4-f5a6-789b-cdef-012345678901', position: 0 };
-        mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-        mockGarmentModel.findById.mockResolvedValue(garment);
-        mockWardrobeModel.addGarment.mockResolvedValue(true);
+            mockReq.params = { id: 'a0b1c2d3-e4f5-6789-abcd-ef0123456789' };
+            mockReq.body = { garmentId: 'b1c2d3e4-f5a6-789b-cdef-012345678901', position: 0 };
+            mockWardrobeModel.findById.mockResolvedValue(wardrobe);
+            mockGarmentModel.findById.mockResolvedValue(garment);
+            mockWardrobeModel.addGarment.mockResolvedValue(true);
 
-        // Act
-        await wardrobeController.addGarmentToWardrobe(
-            mockReq as Request,
-            mockRes as Response,
-            mockNext
-        );
+            // Act
+            await wardrobeController.addGarmentToWardrobe(
+                mockReq as Request,
+                mockRes as Response,
+                mockNext
+            );
 
-        // Assert
-        expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
-            'a0b1c2d3-e4f5-6789-abcd-ef0123456789',
-            'b1c2d3e4-f5a6-789b-cdef-012345678901',
-            0
-        );
+            // Assert
+            expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
+                'a0b1c2d3-e4f5-6789-abcd-ef0123456789',
+                'b1c2d3e4-f5a6-789b-cdef-012345678901',
+                0,
+                { allowUpdate: false }
+            );
         });
 
         it('should handle large position values', async () => {
-        // Arrange
-        const wardrobe = wardrobeMocks.createValidWardrobe({ 
-            id: 'a0b1c2d3-e4f5-6789-abcd-ef0123456789',
-            user_id: mockUser.id 
-        });
-        const garment = wardrobeMocks.garments.createMockGarment({ 
-            id: 'b1c2d3e4-f5a6-789b-cdef-012345678901',
-            user_id: mockUser.id 
-        });
+            // Arrange
+            const wardrobe = wardrobeMocks.createValidWardrobe({ 
+                id: 'a0b1c2d3-e4f5-6789-abcd-ef0123456789',
+                user_id: mockUser.id 
+            });
+            const garment = wardrobeMocks.garments.createMockGarment({ 
+                id: 'b1c2d3e4-f5a6-789b-cdef-012345678901',
+                user_id: mockUser.id 
+            });
 
-        mockReq.params = { id: 'a0b1c2d3-e4f5-6789-abcd-ef0123456789' };
-        mockReq.body = { garmentId: 'b1c2d3e4-f5a6-789b-cdef-012345678901', position: 999 };
-        mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-        mockGarmentModel.findById.mockResolvedValue(garment);
-        mockWardrobeModel.addGarment.mockResolvedValue(true);
+            mockReq.params = { id: 'a0b1c2d3-e4f5-6789-abcd-ef0123456789' };
+            mockReq.body = { garmentId: 'b1c2d3e4-f5a6-789b-cdef-012345678901', position: 999 };
+            mockWardrobeModel.findById.mockResolvedValue(wardrobe);
+            mockGarmentModel.findById.mockResolvedValue(garment);
+            mockWardrobeModel.addGarment.mockResolvedValue(true);
 
-        // Act
-        await wardrobeController.addGarmentToWardrobe(
-            mockReq as Request,
-            mockRes as Response,
-            mockNext
-        );
+            // Act
+            await wardrobeController.addGarmentToWardrobe(
+                mockReq as Request,
+                mockRes as Response,
+                mockNext
+            );
 
-        // Assert
-        expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
-            'a0b1c2d3-e4f5-6789-abcd-ef0123456789',
-            'b1c2d3e4-f5a6-789b-cdef-012345678901',
-            999
-        );
+            // Assert
+            expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
+                'a0b1c2d3-e4f5-6789-abcd-ef0123456789',
+                'b1c2d3e4-f5a6-789b-cdef-012345678901',
+                999,
+                { allowUpdate: false }
+            );
         });
     });
 
@@ -2875,7 +2897,12 @@ describe('wardrobeController', () => {
                 mockNext
                 );
 
-                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(wardrobeId, garmentIds[i], i);
+                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
+                wardrobeId, 
+                garmentIds[i], 
+                i, 
+                { allowUpdate: false }
+                );
                 expect(mockRes.status).toHaveBeenCalledWith(200);
             }
 
