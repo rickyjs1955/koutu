@@ -83,7 +83,7 @@ describe('ExportController', () => {
       mockRequest.user = undefined;
       mockRequest.body = { options: ExportMocks.createMockMLExportOptions() };
 
-      const mockApiError = new ApiError(401, 'User authentication required');
+      const mockApiError = new ApiError('User authentication required', 401, 'UNAUTHORIZED');
       (ApiError.unauthorized as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -211,7 +211,7 @@ describe('ExportController', () => {
       // Arrange
       mockRequest.user = undefined;
 
-      const mockApiError = new ApiError(401, 'User authentication required');
+      const mockApiError = new ApiError('User authentication required', 401, 'UNAUTHORIZED');
       (ApiError.unauthorized as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -308,7 +308,7 @@ describe('ExportController', () => {
       mockRequest.params = { jobId: mockJobId };
       mockExportService.getBatchJob.mockResolvedValue(null);
 
-      const mockApiError = new ApiError(404, 'Export job not found');
+      const mockApiError = new ApiError('Export job not found', 404, 'NOT_FOUND');
       (ApiError.notFound as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -335,7 +335,7 @@ describe('ExportController', () => {
       mockRequest.params = { jobId: mockJobId };
       mockExportService.getBatchJob.mockResolvedValue(otherUserJob);
 
-      const mockApiError = new ApiError(403, 'You do not have permission to access this export');
+      const mockApiError = new ApiError('You do not have permission to access this export', 403, 'FORBIDDEN');
       (ApiError.forbidden as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -364,7 +364,7 @@ describe('ExportController', () => {
         mockRequest.params = { jobId: mockJobId };
         mockExportService.getBatchJob.mockResolvedValue(incompleteJob);
 
-        const mockApiError = new ApiError(400, `Export job is not ready for download (status: ${status})`);
+        const mockApiError = new ApiError(`Export job is not ready for download (status: ${status})`, 400, 'BAD_REQUEST');
         (ApiError.badRequest as jest.Mock).mockReturnValue(mockApiError);
 
         // Act
@@ -413,7 +413,7 @@ describe('ExportController', () => {
       mockRequest.user = undefined;
       mockRequest.params = { jobId: mockJobId };
 
-      const mockApiError = new ApiError(401, 'User authentication required');
+      const mockApiError = new ApiError('User authentication required', 401, 'UNAUTHORIZED');
       (ApiError.unauthorized as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -481,7 +481,7 @@ describe('ExportController', () => {
       // Arrange
       mockRequest.user = undefined;
 
-      const mockApiError = new ApiError(401, 'User authentication required');
+      const mockApiError = new ApiError('User authentication required', 401, 'UNAUTHORIZED');
       (ApiError.unauthorized as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -608,7 +608,7 @@ describe('ExportController', () => {
       mockRequest.params = { jobId: mockJobId };
       mockExportService.getBatchJob.mockResolvedValue(null);
 
-      const mockApiError = new ApiError(404, 'Export job not found');
+      const mockApiError = new ApiError('Export job not found', 404, 'NOT_FOUND');
       (ApiError.notFound as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -633,7 +633,7 @@ describe('ExportController', () => {
       mockRequest.params = { jobId: mockJobId };
       mockExportService.getBatchJob.mockResolvedValue(otherUserJob);
 
-      const mockApiError = new ApiError(403, 'You do not have permission to access this export job');
+      const mockApiError = new ApiError('You do not have permission to access this export job', 403, 'FORBIDDEN');
       (ApiError.forbidden as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -653,7 +653,7 @@ describe('ExportController', () => {
       mockRequest.user = undefined;
       mockRequest.params = { jobId: mockJobId };
 
-      const mockApiError = new ApiError(401, 'User authentication required');
+      const mockApiError = new ApiError('User authentication required', 401, 'UNAUTHORIZED');
       (ApiError.unauthorized as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -672,10 +672,10 @@ describe('ExportController', () => {
 
     it('should handle null user object', async () => {
       // Arrange
-      mockRequest.user = null;
+      mockRequest.user = undefined;
       mockRequest.body = { options: ExportMocks.createMockMLExportOptions() };
 
-      const mockApiError = new ApiError(401, 'User authentication required');
+      const mockApiError = new ApiError('User authentication required', 401, 'UNAUTHORIZED');
       (ApiError.unauthorized as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -725,6 +725,7 @@ describe('ExportController', () => {
       const complexOptions: MLExportOptions = {
         format: 'coco',
         includeImages: true,
+        includeRawPolygons: true,
         includeMasks: true,
         imageFormat: 'png',
         compressionQuality: 95,
@@ -845,7 +846,7 @@ describe('ExportController', () => {
       mockRequest.params = { jobId: mockJobId };
       mockExportService.getBatchJob.mockResolvedValue(null);
 
-      const mockApiError = new ApiError(404, 'Export job not found');
+      const mockApiError = new ApiError('Export job not found', 404, 'NOT_FOUND');
       (ApiError.notFound as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -872,7 +873,7 @@ describe('ExportController', () => {
       mockRequest.params = { jobId: mockJobId };
       mockExportService.getBatchJob.mockResolvedValue(otherUserJob);
 
-      const mockApiError = new ApiError(403, 'You do not have permission to cancel this export job');
+      const mockApiError = new ApiError('You do not have permission to cancel this export job', 403, 'FORBIDDEN');
       (ApiError.forbidden as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -898,7 +899,7 @@ describe('ExportController', () => {
       mockRequest.params = { jobId: mockJobId };
       mockExportService.getBatchJob.mockResolvedValue(completedJob);
 
-      const mockApiError = new ApiError(400, 'Cannot cancel job with status: completed');
+      const mockApiError = new ApiError('Cannot cancel job with status: completed', 400, 'BAD_REQUEST');
       (ApiError.badRequest as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -925,7 +926,7 @@ describe('ExportController', () => {
       mockRequest.params = { jobId: mockJobId };
       mockExportService.getBatchJob.mockResolvedValue(failedJob);
 
-      const mockApiError = new ApiError(400, 'Cannot cancel job with status: failed');
+      const mockApiError = new ApiError('Cannot cancel job with status: failed', 400, 'BAD_REQUEST');
       (ApiError.badRequest as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -946,7 +947,7 @@ describe('ExportController', () => {
       mockRequest.user = undefined;
       mockRequest.params = { jobId: mockJobId };
 
-      const mockApiError = new ApiError(401, 'User authentication required');
+      const mockApiError = new ApiError('User authentication required', 401, 'UNAUTHORIZED');
       (ApiError.unauthorized as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -1028,7 +1029,7 @@ describe('ExportController', () => {
 
     it('should handle ApiError instances correctly', async () => {
       // Arrange
-      const apiError = new ApiError(500, 'Internal server error', 'INTERNAL_ERROR');
+      const apiError = new ApiError('Internal server error', 500, 'INTERNAL_ERROR');
       mockExportService.exportMLData.mockRejectedValue(apiError);
       mockRequest.body = { options: ExportMocks.createMockMLExportOptions() };
 
@@ -1173,7 +1174,7 @@ describe('ExportController', () => {
 
     it('should handle response serialization errors', async () => {
       // Arrange
-      const circularObject = {};
+      const circularObject: any = {};
       circularObject['self'] = circularObject; // Circular reference
 
       mockExportService.getUserBatchJobs.mockResolvedValue(circularObject as any);
@@ -1266,7 +1267,7 @@ describe('ExportController', () => {
       mockRequest.user = { email: 'test@example.com', name: 'Test User' } as any; // Missing id
       mockRequest.body = { options: ExportMocks.createMockMLExportOptions() };
 
-      const mockApiError = new ApiError(401, 'User authentication required');
+      const mockApiError = new ApiError('User authentication required', 401, 'UNAUTHORIZED');
       (ApiError.unauthorized as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -1286,7 +1287,7 @@ describe('ExportController', () => {
       mockRequest.user = { id: null, email: 'test@example.com', name: 'Test User' } as any;
       mockRequest.body = { options: ExportMocks.createMockMLExportOptions() };
 
-      const mockApiError = new ApiError(401, 'User authentication required');
+      const mockApiError = new ApiError('User authentication required', 401, 'UNAUTHORIZED');
       (ApiError.unauthorized as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -1303,10 +1304,10 @@ describe('ExportController', () => {
 
     it('should handle user object with empty string id', async () => {
       // Arrange
-      mockRequest.user = { id: '', email: 'test@example.com', name: 'Test User' };
+      mockRequest.user = { id: '', email: 'test@example.com' };
       mockRequest.body = { options: ExportMocks.createMockMLExportOptions() };
 
-      const mockApiError = new ApiError(401, 'User authentication required');
+      const mockApiError = new ApiError('User authentication required', 401, 'UNAUTHORIZED');
       (ApiError.unauthorized as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -1331,7 +1332,7 @@ describe('ExportController', () => {
       for (let i = 0; i < concurrentRequests; i++) {
         const options = ExportMocks.createMockMLExportOptions({ format: 'coco' });
         const request = ExportTestHelpers.createMockRequest({
-          user: { id: `user-${i}`, email: `user${i}@example.com`, name: `User ${i}` },
+          user: { id: `user-${i}`, email: `user${i}@example.com` },
           body: { options }
         });
         const response = ExportTestHelpers.createMockResponse();
@@ -1369,7 +1370,7 @@ describe('ExportController', () => {
         });
 
         const request = ExportTestHelpers.createMockRequest({
-          user: { id: userId, email: `${userId}@example.com`, name: userId },
+          user: { id: userId, email: `${userId}@example.com` },
           params: { jobId }
         });
         const response = ExportTestHelpers.createMockResponse();
