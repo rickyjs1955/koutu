@@ -2,7 +2,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { exportController } from '../../controllers/exportController';
 import { exportService } from '../../services/exportService';
-import { MLExportOptions } from '../../../../shared/src/schemas/export';
 import { ApiError } from '../../utils/ApiError';
 import { ExportMocks } from '../__mocks__/exports.mock';
 import { ExportTestHelpers } from '../__helpers__/exports.helper';
@@ -29,7 +28,7 @@ describe('ExportController Security Tests', () => {
 
     // Setup mock request with authenticated user
     mockRequest = ExportTestHelpers.createMockRequest({
-      user: { id: mockUserId, email: 'test@example.com', name: 'Test User' },
+      user: { id: mockUserId, email: 'test@example.com' },
       body: {},
       params: {},
       query: {},
@@ -53,7 +52,7 @@ describe('ExportController Security Tests', () => {
       mockRequest.user = undefined;
       mockRequest.body = { options: ExportMocks.createMockMLExportOptions() };
 
-      const mockApiError = new ApiError(401, 'User authentication required');
+      const mockApiError = new ApiError('User authentication required', 401, 'Unauthorized');
       (ApiError.unauthorized as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -88,7 +87,7 @@ describe('ExportController Security Tests', () => {
       } as any;
 
       const mockNext = jest.fn();
-      const mockApiError = new Error('Mock API Error');
+      const mockApiError = new ApiError('User authentication required', 401, 'Unauthorized');
       
       // Mock ApiError.unauthorized to return the mock error
       jest.spyOn(ApiError, 'unauthorized').mockReturnValue(mockApiError);
@@ -120,8 +119,7 @@ describe('ExportController Security Tests', () => {
       for (const maliciousUserId of hijackAttempts) {
         mockRequest.user = { 
           id: maliciousUserId as any, 
-          email: 'attacker@evil.com', 
-          name: 'Attacker' 
+          email: 'attacker@evil.com'
         };
         mockRequest.body = { options: ExportMocks.createMockMLExportOptions() };
 
@@ -181,7 +179,7 @@ describe('ExportController Security Tests', () => {
       mockRequest.params = { jobId: victimJobId };
       mockExportService.getBatchJob.mockResolvedValue(victimJob);
 
-      const mockApiError = new ApiError(403, 'You do not have permission to access this export job');
+      const mockApiError = new ApiError('You do not have permission to access this export job', 403, 'Forbidden');
       (ApiError.forbidden as jest.Mock).mockReturnValue(mockApiError);
 
       // Act
@@ -316,7 +314,7 @@ describe('ExportController Security Tests', () => {
         mockRequest.params = { jobId: guessedJobId };
         mockExportService.getBatchJob.mockResolvedValue(null); // Job not found
 
-        const mockApiError = new ApiError(404, 'Export job not found');
+        const mockApiError = new ApiError('Export job not found', 404, 'Not Found');
         (ApiError.notFound as jest.Mock).mockReturnValue(mockApiError);
 
         // Act
@@ -384,7 +382,7 @@ describe('ExportController Security Tests', () => {
           format: 'coco',
           '__proto__': { admin: true },
           'constructor.prototype.admin': true
-        },
+        } as any,
         {
           format: 'coco',
           'constructor': {
@@ -440,7 +438,7 @@ describe('ExportController Security Tests', () => {
         mockRequest.params = { jobId: xssPayload };
         mockExportService.getBatchJob.mockResolvedValue(null);
 
-        const mockApiError = new ApiError(404, 'Export job not found');
+        const mockApiError = new ApiError('Export job not found', 404, 'Not Found');
         (ApiError.notFound as jest.Mock).mockReturnValue(mockApiError);
 
         // Act
@@ -621,7 +619,7 @@ describe('ExportController Security Tests', () => {
 
       for (let i = 0; i < concurrentRequests; i++) {
         const request = ExportTestHelpers.createMockRequest({
-          user: { id: `attacker-${i}`, email: `attacker${i}@evil.com`, name: `Attacker ${i}` },
+          user: { id: `attacker-${i}`, email: `attacker${i}@evil.com` },
           body: { options: ExportMocks.createMockMLExportOptions() }
         });
         const response = ExportTestHelpers.createMockResponse();
@@ -742,7 +740,7 @@ describe('ExportController Security Tests', () => {
       mockRequest.params = { jobId: nonExistingJobId };
       mockExportService.getBatchJob.mockResolvedValue(null);
 
-      const mockApiError = new ApiError(404, 'Export job not found');
+      const mockApiError = new ApiError('Export job not found', 404, 'Not Found');
       (ApiError.notFound as jest.Mock).mockReturnValue(mockApiError);
 
       const startTime2 = Date.now();
@@ -789,10 +787,10 @@ describe('ExportController Security Tests', () => {
         scenario.mockSetup();
 
         if (scenario.expectedError === 'Export job not found') {
-          const mockApiError = new ApiError(404, 'Export job not found');
+          const mockApiError = new ApiError('Export job not found', 404, 'Not Found');
           (ApiError.notFound as jest.Mock).mockReturnValue(mockApiError);
         } else {
-          const mockApiError = new ApiError(403, scenario.expectedError);
+          const mockApiError = new ApiError(scenario.expectedError, 403, 'Forbidden');
           (ApiError.forbidden as jest.Mock).mockReturnValue(mockApiError);
         }
 
@@ -886,7 +884,7 @@ describe('ExportController Security Tests', () => {
 
       for (let i = 0; i < rapidRequests; i++) {
         const request = ExportTestHelpers.createMockRequest({
-          user: { id: mockUserId, email: 'test@example.com', name: 'Test User' },
+          user: { id: mockUserId, email: 'test@example.com' },
           body: { options: ExportMocks.createMockMLExportOptions() }
         });
         const response = ExportTestHelpers.createMockResponse();
@@ -923,7 +921,7 @@ describe('ExportController Security Tests', () => {
         });
 
         const request = ExportTestHelpers.createMockRequest({
-          user: { id: mockUserId, email: 'test@example.com', name: 'Test User' },
+          user: { id: mockUserId, email: 'test@example.com' },
           params: { jobId }
         });
         const response = ExportTestHelpers.createMockResponse();
@@ -935,7 +933,7 @@ describe('ExportController Security Tests', () => {
           mockExportService.cancelExportJob.mockResolvedValue(undefined);
           return exportController.cancelExportJob(request as Request, response as Response, next);
         } else {
-          const mockApiError = new ApiError(400, `Cannot cancel job with status: ${state}`);
+          const mockApiError = new ApiError(`Cannot cancel job with status: ${state}`, 400, 'Bad Request');
           (ApiError.badRequest as jest.Mock).mockReturnValue(mockApiError);
           return exportController.cancelExportJob(request as Request, response as Response, next);
         }
@@ -1094,7 +1092,7 @@ describe('ExportController Security Tests', () => {
           valueOf: () => ({ exploit: true }),
           constructor: { name: 'AdminError' }
         },
-        new Error('Normal error with __proto__ pollution').__proto__ = { admin: true },
+        Object.assign(new Error('Normal error with __proto__ pollution'), { admin: true }),
         Object.assign(new Error('Error with exploit'), { 
           exploit: 'process.exit(1)',
           backdoor: () => 'system compromised'
@@ -1188,7 +1186,7 @@ describe('ExportController Security Tests', () => {
 
       for (let i = 0; i < rapidRequests; i++) {
         const request = ExportTestHelpers.createMockRequest({
-          user: { id: mockUserId, email: 'test@example.com', name: 'Test User' },
+          user: { id: mockUserId, email: 'test@example.com' },
           body: { options: ExportMocks.createMockMLExportOptions() }
         });
         const response = ExportTestHelpers.createMockResponse();
@@ -1228,7 +1226,7 @@ describe('ExportController Security Tests', () => {
 
       const promises = attackVectors.map(async (vector, index) => {
         const request = ExportTestHelpers.createMockRequest({
-          user: { id: vector.userId, email: `${vector.userId}@evil.com`, name: vector.userId },
+          user: { id: vector.userId, email: `${vector.userId}@evil.com` },
           body: { options: vector.request },
           headers: {
             'x-forwarded-for': vector.ip,
