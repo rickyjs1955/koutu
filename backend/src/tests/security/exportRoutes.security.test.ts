@@ -43,7 +43,8 @@ describe('ExportService', () => {
     jest.setSystemTime(mockDate);
 
     // Setup default mocks
-    mockUuidV4.mockReturnValue(mockJobId);
+    const mockUuidBuffer = new Uint8Array(16); // UUID is 16 bytes
+    mockUuidV4.mockReturnValue(mockUuidBuffer);
     mockPath.join.mockImplementation((...paths) => paths.join('/'));
     mockFs.existsSync.mockReturnValue(true);
     mockFs.mkdirSync.mockImplementation();
@@ -64,8 +65,17 @@ describe('ExportService', () => {
     mockSharp.mockReturnValue(mockSharpInstance as any);
 
     // Setup archiver mock with proper async handling
-    const mockArchiveInstance = {
-      on: jest.fn((event: string, callback: Function) => {
+    interface MockArchiveInstance {
+      on: jest.Mock;
+      pipe: jest.Mock;
+      directory: jest.Mock;
+      file: jest.Mock;
+      finalize: jest.Mock;
+      onCallbacks: Record<string, Function>;
+    }
+
+    const mockArchiveInstance: MockArchiveInstance = {
+      on: jest.fn((event: string, callback: Function): MockArchiveInstance => {
         mockArchiveInstance.onCallbacks = mockArchiveInstance.onCallbacks || {};
         mockArchiveInstance.onCallbacks[event] = callback;
         return mockArchiveInstance;
@@ -73,19 +83,25 @@ describe('ExportService', () => {
       pipe: jest.fn().mockReturnThis(),
       directory: jest.fn().mockReturnThis(),
       file: jest.fn().mockReturnThis(),
-      finalize: jest.fn().mockImplementation(() => {
+      finalize: jest.fn().mockImplementation((): void => {
         // Simulate successful archive completion
         if (mockArchiveInstance.onCallbacks?.close) {
-          setImmediate(mockArchiveInstance.onCallbacks.close);
+          setImmediate(() => mockArchiveInstance.onCallbacks.close());
         }
       }),
-      onCallbacks: {} as any
+      onCallbacks: {} as Record<string, Function>
     };
     mockArchiver.mockReturnValue(mockArchiveInstance as any);
 
     // Setup createWriteStream mock
-    const mockWriteStream = {
-      on: jest.fn((event: string, callback: Function) => {
+    interface MockWriteStream {
+      on: jest.Mock;
+      write: jest.Mock;
+      end: jest.Mock;
+    }
+
+    const mockWriteStream: MockWriteStream = {
+      on: jest.fn((event: string, callback: () => void): MockWriteStream => {
         if (event === 'close') {
           setImmediate(callback);
         }
@@ -114,7 +130,7 @@ describe('ExportService', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -158,7 +174,7 @@ describe('ExportService', () => {
           rows: [],
           rowCount: 1,
           command: 'INSERT',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -196,7 +212,7 @@ describe('ExportService', () => {
         rows: [],
         rowCount: 1,
         command: 'UPDATE',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -220,7 +236,7 @@ describe('ExportService', () => {
         rows: [],
         rowCount: 0,
         command: 'UPDATE',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -251,7 +267,7 @@ describe('ExportService', () => {
         rows: [mockJobData],
         rowCount: 1,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -285,7 +301,7 @@ describe('ExportService', () => {
         rows: [],
         rowCount: 0,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -317,7 +333,7 @@ describe('ExportService', () => {
         rows: [mockJobData],
         rowCount: 1,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -364,7 +380,7 @@ describe('ExportService', () => {
         rows: mockJobs,
         rowCount: mockJobs.length,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -388,7 +404,7 @@ describe('ExportService', () => {
         rows: [],
         rowCount: 0,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -409,7 +425,7 @@ describe('ExportService', () => {
         rows: mockGarmentData,
         rowCount: mockGarmentData.length,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -443,7 +459,7 @@ describe('ExportService', () => {
         rows: [],
         rowCount: 0,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -481,7 +497,7 @@ describe('ExportService', () => {
         rows: mockGarmentData,
         rowCount: mockGarmentData.length,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -505,7 +521,7 @@ describe('ExportService', () => {
         rows: mockGarmentData,
         rowCount: 1,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -660,7 +676,7 @@ describe('ExportService', () => {
           rows: [],
           rowCount: 1,
           command: 'INSERT',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -693,7 +709,7 @@ describe('ExportService', () => {
           rows: [],
           rowCount: 1,
           command: 'UPDATE',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -719,7 +735,7 @@ describe('ExportService', () => {
           rows: [],
           rowCount: 1,
           command: 'UPDATE',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -751,7 +767,7 @@ describe('ExportService', () => {
           rows: [],
           rowCount: 1,
           command: 'UPDATE',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -781,7 +797,7 @@ describe('ExportService', () => {
       beforeEach(() => {
         // Mock the archiver module to prevent actual zip creation
         jest.mock('archiver', () => {
-          const mockArchive = {
+          const mockArchive: any = {
             directory: jest.fn().mockReturnThis(),
             finalize: jest.fn().mockResolvedValue(undefined),
             pipe: jest.fn().mockReturnThis(),
@@ -818,7 +834,7 @@ describe('ExportService', () => {
 
         // Mock the private method call
         const createZipArchiveSpy = jest.spyOn(exportService as any, 'createZipArchive');
-        createZipArchiveSpy.mockImplementation(async (source: string, output: string) => {
+        createZipArchiveSpy.mockImplementation(async (...args: unknown[]) => {
           // Simulate successful zip creation
           return Promise.resolve();
         });
@@ -839,7 +855,7 @@ describe('ExportService', () => {
 
         // Mock the private method to throw an error
         const createZipArchiveSpy = jest.spyOn(exportService as any, 'createZipArchive');
-        createZipArchiveSpy.mockImplementation(async (source: string, output: string) => {
+        createZipArchiveSpy.mockImplementation(async (...args: unknown[]) => {
           throw expectedError;
         });
 
@@ -979,7 +995,7 @@ describe('ExportService', () => {
         ],
         rowCount: 1,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1037,7 +1053,7 @@ describe('ExportService', () => {
 
       // Mock the private method directly to avoid complex async processing
       const processMLExportSpy = jest.spyOn(exportService as any, 'processMLExport')
-        .mockImplementation(async (job) => {
+        .mockImplementation(async (job: any) => {
           // Simulate processing without actually doing it
           job.status = 'completed';
           job.progress = 100;
@@ -1062,9 +1078,9 @@ describe('ExportService', () => {
 
       // Mock successful job creation for all requests
       mockQuery
-        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: null, fields: [] })
-        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: null, fields: [] })
-        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: null, fields: [] });
+        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: 0, fields: [] })
+        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: 0, fields: [] })
+        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: 0, fields: [] });
 
       // Mock processMLExport to prevent actual processing
       jest.spyOn(exportService as any, 'processMLExport').mockResolvedValue(undefined);
@@ -1089,8 +1105,8 @@ describe('ExportService', () => {
       const options = ExportMocks.createMockMLExportOptions();
       
       mockQuery
-        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: null, fields: [] }) // Create job
-        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'UPDATE', oid: null, fields: [] }); // Cancel job
+        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: 0, fields: [] }) // Create job
+        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'UPDATE', oid: 0, fields: [] }); // Cancel job
 
       // Act
       const jobId = await exportService.exportMLData(mockUserId, options);
@@ -1147,7 +1163,7 @@ describe('ExportService', () => {
         rows: diverseGarmentData,
         rowCount: 5,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
