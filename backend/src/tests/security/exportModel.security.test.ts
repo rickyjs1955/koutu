@@ -25,8 +25,8 @@ describe('ExportModel Security Tests', () => {
     jest.useFakeTimers();
     jest.setSystemTime(mockDate);
 
-    mockUuidV4.mockReturnValue(mockJobId);
-    mockIsUuid.mockImplementation((id: string) => 
+    mockUuidV4.mockReturnValue(mockJobId as any);
+    mockIsUuid.mockImplementation((id: unknown) => 
       typeof id === 'string' && id.includes('-') && id.length >= 32
     );
   });
@@ -51,7 +51,7 @@ describe('ExportModel Security Tests', () => {
         rows: [ExportMocks.createMockExportBatchJob()],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -89,7 +89,7 @@ describe('ExportModel Security Tests', () => {
         rows: [],
         rowCount: 0,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -149,7 +149,7 @@ describe('ExportModel Security Tests', () => {
         rows: [ExportMocks.createMockExportBatchJob()],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -158,7 +158,8 @@ describe('ExportModel Security Tests', () => {
 
       // Assert - Verify JSON.stringify safely handles malicious content
       const queryCall = mockQuery.mock.calls[0];
-      const serializedOptions = queryCall[1][3]; // options parameter
+      expect(queryCall).toBeDefined();
+      const serializedOptions = queryCall![1]![3]; // options parameter
       
       expect(typeof serializedOptions).toBe('string');
       expect(serializedOptions).toContain('script');
@@ -185,7 +186,7 @@ describe('ExportModel Security Tests', () => {
         rows: [],
         rowCount: 0,
         command: 'UPDATE',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -228,7 +229,7 @@ describe('ExportModel Security Tests', () => {
         rows: [ExportMocks.createMockExportBatchJob({ user_id: userAId })],
         rowCount: 1,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -241,7 +242,8 @@ describe('ExportModel Security Tests', () => {
       const queryParams = queryCall[1];
 
       expect(queryText).toContain('WHERE user_id = $1');
-      expect(queryParams[0]).toBe(userAId);
+      expect(queryParams).toBeDefined();
+      expect(queryParams![0]).toBe(userAId);
       expect(queryParams).not.toContain(userBId);
     });
 
@@ -254,7 +256,7 @@ describe('ExportModel Security Tests', () => {
             rows: [ExportMocks.createMockExportBatchJob()],
             rowCount: 1,
             command: 'UPDATE',
-            oid: null,
+            oid: 0,
             fields: []
         });
 
@@ -287,7 +289,7 @@ describe('ExportModel Security Tests', () => {
         rows: [],
         rowCount: 0,
         command: 'UPDATE',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -300,7 +302,7 @@ describe('ExportModel Security Tests', () => {
       const queryParams = queryCall[1];
 
       expect(queryText).toContain('WHERE user_id = $1');
-      expect(queryParams[0]).toBe(maliciousUserId);
+      expect(queryParams![0]).toBe(maliciousUserId);
       expect(queryText).not.toContain("UPDATE export_batch_jobs SET status='cancelled");
     });
   });
@@ -339,7 +341,7 @@ describe('ExportModel Security Tests', () => {
             rows: [ExportMocks.createMockExportBatchJob()],
             rowCount: 1,
             command: 'INSERT',
-            oid: null,
+            oid: 0,
             fields: []
         });
 
@@ -348,7 +350,8 @@ describe('ExportModel Security Tests', () => {
         
         // Verify the large data was serialized
         const queryCall = mockQuery.mock.calls[0];
-        const serializedOptions = queryCall[1][3];
+        expect(queryCall).toBeDefined();
+        const serializedOptions = queryCall![1]![3];
         expect(typeof serializedOptions).toBe('string');
         expect(serializedOptions.length).toBeGreaterThan(50000); // Adjusted expectation
     });
@@ -378,7 +381,7 @@ describe('ExportModel Security Tests', () => {
         rows: [ExportMocks.createMockExportBatchJob()],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -387,7 +390,8 @@ describe('ExportModel Security Tests', () => {
 
       // Assert - Should handle all special characters safely
       const queryCall = mockQuery.mock.calls[0];
-      const serializedOptions = queryCall[1][3];
+      expect(queryCall).toBeDefined();
+      const serializedOptions = queryCall![1]![3];
       
       expect(typeof serializedOptions).toBe('string');
       expect(() => JSON.parse(serializedOptions)).not.toThrow();
@@ -435,7 +439,7 @@ describe('ExportModel Security Tests', () => {
             rows: [ExportMocks.createMockExportBatchJob()],
             rowCount: 1,
             command: 'UPDATE',
-            oid: null,
+            oid: 0,
             fields: []
             });
 
@@ -449,7 +453,7 @@ describe('ExportModel Security Tests', () => {
             
             // Handle NaN specially since it can't use toContain()
             if (Number.isNaN(attackValue)) {
-            expect(Number.isNaN(queryParams[0])).toBe(true);
+            expect(Number.isNaN(queryParams![0])).toBe(true);
             } else {
             expect(queryParams).toContain(attackValue);
             }
@@ -469,7 +473,7 @@ describe('ExportModel Security Tests', () => {
         rows: [],
         rowCount: 0,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -496,7 +500,7 @@ describe('ExportModel Security Tests', () => {
             rows: [],
             rowCount: massiveUpdates.length, // This should be the actual count
             command: 'UPDATE',
-            oid: null,
+            oid: 0,
             fields: []
         });
 
@@ -510,7 +514,8 @@ describe('ExportModel Security Tests', () => {
         const queryParams = queryCall[1];
 
         expect(queryText).toContain('CASE');
-        expect(queryParams.length).toBe(massiveUpdates.length * 4); // 3 params per update + all IDs
+        expect(queryParams).toBeDefined();
+        expect(queryParams!.length).toBe(massiveUpdates.length * 4); // 3 params per update + all IDs
     });
 
     it('should handle concurrent database operations safely', async () => {
@@ -524,7 +529,7 @@ describe('ExportModel Security Tests', () => {
           rows: [ExportMocks.createMockExportBatchJob()],
           rowCount: 1,
           command: 'SELECT',
-          oid: null,
+          oid: 0,
           fields: []
         });
       }
@@ -560,7 +565,7 @@ describe('ExportModel Security Tests', () => {
           rows: [ExportMocks.createMockExportBatchJob()],
           rowCount: 1,
           command: 'UPDATE',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -595,7 +600,7 @@ describe('ExportModel Security Tests', () => {
           rows: [ExportMocks.createMockExportBatchJob()],
           rowCount: 1,
           command: 'INSERT',
-          oid: null,
+          oid: 0,
           fields: []
         });
 

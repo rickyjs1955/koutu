@@ -69,7 +69,7 @@ Backend:
 17. /backend/src/models/polygonModel.ts                     ✅Unit ✅Integration 🔔Security
 18. /backend/src/models/garmentModel.ts                     ✅Unit ✅Integration ✅Security
 19. /backend/src/models/wardrobeModel.ts                    ✅Unit ✅Integration ✅Security
-20. /backend/src/models/exportModel.ts                      ✅Unit 🛠️Integration ✅Security
+20. /backend/src/models/exportModel.ts                      ✅Unit ✅Integration ✅Security
 21. /backend/src/routes/imageRoutes.ts                      ✅Unit ✅Integration ✅Security
 22. /backend/src/routes/polygonRoutes.ts                    ✅Unit ✅Integration 🔔Security
 23. /backend/src/routes/garmentRoutes.ts                    ✅Unit ✅Integration ✅Security

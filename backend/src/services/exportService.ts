@@ -695,15 +695,36 @@ class ExportService {
       ]
     );
   }
+  /**
+   * Safely parse options from JSON or object
+   * Handles both JSON strings and already parsed objects
+   */
+  private safeParseOptions(options: any): any {
+    if (options === null || options === undefined) {
+      return {};
+    }
+    if (typeof options === 'string') {
+      try {
+        return JSON.parse(options);
+      } catch (error) {
+        console.warn('Failed to parse options JSON:', error);
+        return {};
+      }
+    }
+    if (typeof options === 'object') {
+      return options; // Already parsed (JSONB)
+    }
+    return {};
+  }
 
   /**
-   * Get batch job by ID
+   * Get batch job by ID with safe JSON parsing
    */
   async getBatchJob(batchJobId: string): Promise<MLExportBatchJob | null> {
     const result = await query(
       `SELECT id, user_id, status, options, progress, total_items, processed_items, 
               output_url, error, created_at, updated_at, completed_at 
-       FROM export_batch_jobs WHERE id = $1`,
+      FROM export_batch_jobs WHERE id = $1`,
       [batchJobId]
     );
     
@@ -715,7 +736,7 @@ class ExportService {
       id: job.id,
       userId: job.user_id,
       status: job.status,
-      options: JSON.parse(job.options),
+      options: this.safeParseOptions(job.options), // FIXED: Safe parsing
       progress: job.progress,
       totalItems: job.total_items,
       processedItems: job.processed_items,
@@ -728,15 +749,15 @@ class ExportService {
   }
 
   /**
-   * Get user batch jobs
+   * Get user batch jobs with safe JSON parsing
    */
   async getUserBatchJobs(userId: string): Promise<MLExportBatchJob[]> {
     const result = await query(
       `SELECT id, user_id, status, options, progress, total_items, processed_items, 
               output_url, error, created_at, updated_at, completed_at 
-       FROM export_batch_jobs 
-       WHERE user_id = $1 
-       ORDER BY created_at DESC`,
+      FROM export_batch_jobs 
+      WHERE user_id = $1 
+      ORDER BY created_at DESC`,
       [userId]
     );
     
@@ -744,7 +765,7 @@ class ExportService {
       id: job.id,
       userId: job.user_id,
       status: job.status,
-      options: JSON.parse(job.options),
+      options: this.safeParseOptions(job.options), // FIXED: Safe parsing
       progress: job.progress,
       totalItems: job.total_items,
       processedItems: job.processed_items,

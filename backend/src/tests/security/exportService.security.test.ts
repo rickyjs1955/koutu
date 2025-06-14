@@ -23,7 +23,7 @@ const mockFs = fs as jest.Mocked<typeof fs>;
 const mockPath = path as jest.Mocked<typeof path>;
 const mockArchiver = archiver as jest.MockedFunction<typeof archiver>;
 const mockSharp = sharp as jest.MockedFunction<typeof sharp>;
-const mockUuidV4 = require('uuid').v4 as jest.MockedFunction<typeof import('uuid').v4>;
+const mockUuidV4 = require('uuid').v4 as jest.MockedFunction<() => string>;
 
 describe('ExportService Security Tests', () => {
   const mockUserId = 'user-123';
@@ -75,7 +75,15 @@ describe('ExportService Security Tests', () => {
         setTimeout(() => {
           const outputMock = mockFs.createWriteStream.mock.results[mockFs.createWriteStream.mock.results.length - 1];
           if (outputMock && outputMock.value && outputMock.value.on) {
-            const closeCb = outputMock.value.on.mock.calls.find(call => call[0] === 'close')?.[1];
+            interface MockOutputValue {
+              on: jest.MockedFunction<(event: string, callback: () => void) => void>;
+            }
+            
+            interface MockResult {
+              value: MockOutputValue;
+            }
+            
+            const closeCb: (() => void) | undefined = (outputMock as MockResult)?.value?.on?.mock?.calls?.find((call: [string, () => void]) => call[0] === 'close')?.[1];
             if (closeCb) closeCb();
           }
         }, 10);
@@ -106,6 +114,10 @@ describe('ExportService Security Tests', () => {
       const maliciousOptions: MLExportOptions = {
         format: 'coco',
         includeImages: true,
+        includeRawPolygons: false,
+        includeMasks: false,
+        imageFormat: 'jpg',
+        compressionQuality: 90,
         garmentIds: [
           "'; DROP TABLE garments; --",
           "garment-1'; UPDATE users SET role='admin'; --",
@@ -119,9 +131,9 @@ describe('ExportService Security Tests', () => {
       };
 
       mockQuery
-        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: null, fields: [] }) // Job creation
-        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'UPDATE', oid: null, fields: [] }) // Status update
-        .mockResolvedValueOnce({ rows: [], rowCount: 0, command: 'SELECT', oid: null, fields: [] }); // Garment fetch
+        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: 0, fields: [] }) // Job creation
+        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'UPDATE', oid: 0, fields: [] }) // Status update
+        .mockResolvedValueOnce({ rows: [], rowCount: 0, command: 'SELECT', oid: 0, fields: [] }); // Garment fetch
 
       // Mock processMLExport to prevent actual processing
       jest.spyOn(exportService as any, 'processMLExport').mockResolvedValue(undefined);
@@ -159,7 +171,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -255,7 +267,7 @@ describe('ExportService Security Tests', () => {
         rows: userBGarments,
         rowCount: 5,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -318,7 +330,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -355,7 +367,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -388,7 +400,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -410,7 +422,7 @@ describe('ExportService Security Tests', () => {
           rows: [],
           rowCount: 1,
           command: 'INSERT',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -463,7 +475,7 @@ describe('ExportService Security Tests', () => {
         rows: systemPathGarments,
         rowCount: 1,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -500,7 +512,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -511,7 +523,8 @@ describe('ExportService Security Tests', () => {
 
       // Assert - Debug information should be preserved in database (filtering should be at API level)
       const insertQuery = mockQuery.mock.calls[0];
-      const serializedOptions = insertQuery[1][3];
+      expect(insertQuery).toBeDefined();
+      const serializedOptions = insertQuery![1]![3]; // Options JSON string
       const parsed = JSON.parse(serializedOptions);
       
       expect(parsed.debug.databaseUrl).toBe('postgresql://admin:password@internal-db:5432/fashion');
@@ -597,7 +610,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -623,7 +636,7 @@ describe('ExportService Security Tests', () => {
           rows: [],
           rowCount: 1,
           command: 'INSERT',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -656,7 +669,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -687,7 +700,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -707,7 +720,7 @@ describe('ExportService Security Tests', () => {
           rows: [],
           rowCount: 1,
           command: 'UPDATE',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -740,7 +753,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -766,7 +779,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -791,7 +804,7 @@ describe('ExportService Security Tests', () => {
           rows: [],
           rowCount: 1,
           command: 'UPDATE',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -822,7 +835,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1003,10 +1016,10 @@ describe('ExportService Security Tests', () => {
 
       // Mock file system operations
       mockFs.existsSync.mockReturnValue(false);
-      mockFs.mkdirSync.mockImplementation(() => {});
+      mockFs.mkdirSync.mockImplementation(() => undefined);
       
       // Mock all database operations
-      mockQuery.mockResolvedValue({ rows: [], rowCount: 1, command: 'UPDATE', oid: null, fields: [] });
+      mockQuery.mockResolvedValue({ rows: [], rowCount: 1, command: 'UPDATE', oid: 0, fields: [] });
       
       // Mock the fetchFilteredGarments to return empty array (no processing needed)
       jest.spyOn(exportService as any, 'fetchFilteredGarments')
@@ -1076,7 +1089,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1087,8 +1100,9 @@ describe('ExportService Security Tests', () => {
 
       // Assert - JavaScript code should be safely serialized as strings
       const insertQuery = mockQuery.mock.calls[0];
-      const serializedOptions = insertQuery[1][3];
-      
+      expect(insertQuery).toBeDefined();
+      const serializedOptions = insertQuery![1]![3];
+
       const parsed = JSON.parse(serializedOptions);
       expect(typeof parsed.maliciousFunction).toBe('string');
       expect(typeof parsed.evalAttempt).toBe('string');
@@ -1137,7 +1151,10 @@ describe('ExportService Security Tests', () => {
       const massiveOptions: MLExportOptions = {
         format: 'coco',
         includeImages: true,
+        includeRawPolygons: false,
         includeMasks: true,
+        imageFormat: 'jpg',
+        compressionQuality: 90,
         garmentIds: Array.from({ length: 100000 }, (_, i) => `garment-${i}`), // 100k items
         categoryFilter: Array.from({ length: 10000 }, (_, i) => `category-${i}`) // 10k categories
       };
@@ -1146,7 +1163,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1158,7 +1175,8 @@ describe('ExportService Security Tests', () => {
 
       // Verify the large arrays were serialized
       const insertQuery = mockQuery.mock.calls[0];
-      const serializedOptions = insertQuery[1][3];
+      expect(insertQuery).toBeDefined();
+      const serializedOptions = insertQuery![1]![3];
       const parsed = JSON.parse(serializedOptions);
       
       expect(parsed.garmentIds).toHaveLength(100000);
@@ -1180,7 +1198,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1206,7 +1224,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1232,7 +1250,7 @@ describe('ExportService Security Tests', () => {
           rows: [],
           rowCount: 1,
           command: 'INSERT',
-          oid: null,
+          oid: 0,
           fields: []
         });
       }
@@ -1341,7 +1359,7 @@ describe('ExportService Security Tests', () => {
 
       // Mock file system operations
       mockFs.existsSync.mockReturnValue(false);
-      mockFs.mkdirSync.mockImplementation(() => {});
+      mockFs.mkdirSync.mockImplementation(() => undefined);
       mockFs.rmSync.mockImplementation(() => {});
 
       const batchJob = ExportMocks.createMockMLExportBatchJob();
@@ -1467,7 +1485,7 @@ describe('ExportService Security Tests', () => {
         rows: maliciousGarments,
         rowCount: 1,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1514,7 +1532,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1525,7 +1543,8 @@ describe('ExportService Security Tests', () => {
 
       // Assert - Privilege escalation attempts should be safely serialized
       const insertQuery = mockQuery.mock.calls[0];
-      const serializedOptions = insertQuery[1][3];
+      expect(insertQuery).toBeDefined();
+      const serializedOptions = insertQuery![1]![3];
       const parsed = JSON.parse(serializedOptions);
       
       expect(parsed.userId).toBe('admin'); // Attack data preserved but not acted upon
@@ -1557,7 +1576,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1568,7 +1587,8 @@ describe('ExportService Security Tests', () => {
 
       // Assert - Malicious content should be safely serialized as JSON
       const insertQuery = mockQuery.mock.calls[0];
-      const serializedOptions = insertQuery[1][3]; // Options parameter
+      expect(insertQuery).toBeDefined();
+      const serializedOptions = insertQuery?.[1]?.[3]; // Options parameter
       
       expect(typeof serializedOptions).toBe('string');
       expect(() => JSON.parse(serializedOptions)).not.toThrow();
@@ -1598,7 +1618,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1609,7 +1629,8 @@ describe('ExportService Security Tests', () => {
 
       // Assert - MongoDB operators should be safely serialized
       const insertQuery = mockQuery.mock.calls[0];
-      const serializedOptions = insertQuery[1][3];
+      expect(insertQuery).toBeDefined();
+      const serializedOptions = insertQuery![1]![3];
       
       expect(typeof serializedOptions).toBe('string');
       const parsed = JSON.parse(serializedOptions);
@@ -1635,7 +1656,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1660,7 +1681,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1688,7 +1709,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1712,7 +1733,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1737,7 +1758,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1768,7 +1789,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1794,7 +1815,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1819,7 +1840,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1845,7 +1866,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1877,7 +1898,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1888,7 +1909,8 @@ describe('ExportService Security Tests', () => {
         .resolves.toBeDefined();
 
       const insertQuery = mockQuery.mock.calls[0];
-      const serializedOptions = insertQuery[1][3];
+      expect(insertQuery).toBeDefined();
+      const serializedOptions = insertQuery![1]![3];
       const parsed = JSON.parse(serializedOptions);
       
       expect(parsed.isAdmin).toBe(true);
@@ -1919,7 +1941,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1956,7 +1978,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1983,7 +2005,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1994,7 +2016,8 @@ describe('ExportService Security Tests', () => {
         .resolves.toBeDefined();
 
       const insertQuery = mockQuery.mock.calls[0];
-      const serializedOptions = insertQuery[1][3];
+      expect(insertQuery).toBeDefined();
+      const serializedOptions = insertQuery![1]![3];
       const parsed = JSON.parse(serializedOptions);
       
       expect(parsed.description).toHaveLength(1000000);
@@ -2014,7 +2037,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -2047,7 +2070,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -2058,7 +2081,8 @@ describe('ExportService Security Tests', () => {
         .resolves.toBeDefined();
 
       const insertQuery = mockQuery.mock.calls[0];
-      const serializedOptions = insertQuery[1][3];
+      expect(insertQuery).toBeDefined();
+      const serializedOptions = insertQuery![1]![3];
       
       // JSON.stringify converts special numbers to null, "Infinity", etc.
       expect(typeof serializedOptions).toBe('string');
@@ -2081,7 +2105,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -2092,7 +2116,8 @@ describe('ExportService Security Tests', () => {
         .resolves.toBeDefined();
 
       const insertQuery = mockQuery.mock.calls[0];
-      const serializedOptions = insertQuery[1][3];
+      expect(insertQuery).toBeDefined();
+      const serializedOptions = insertQuery![1]![3];
       const parsed = JSON.parse(serializedOptions);
       
       expect(parsed.chinese).toBe('你好世界');
@@ -2115,7 +2140,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -2143,7 +2168,7 @@ describe('ExportService Security Tests', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -2177,7 +2202,7 @@ describe('ExportService Security Tests', () => {
           rows: [],
           rowCount: 1,
           command: 'INSERT',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -2209,7 +2234,7 @@ describe('ExportService Security Tests', () => {
       });
       
       // Mock all other operations to succeed
-      mockQuery.mockResolvedValue({ rows: [], rowCount: 1, command: 'UPDATE', oid: null, fields: [] });
+      mockQuery.mockResolvedValue({ rows: [], rowCount: 1, command: 'UPDATE', oid: 0, fields: [] });
       jest.spyOn(exportService as any, 'fetchFilteredGarments').mockResolvedValue([]);
       jest.spyOn(exportService as any, 'updateBatchJob').mockResolvedValue(undefined);
       jest.spyOn(exportService as any, 'exportCOCOFormat').mockResolvedValue('/mock/path');
@@ -2236,7 +2261,7 @@ describe('ExportService Security Tests', () => {
         .mockResolvedValue(undefined);
 
       // Mock file operations to succeed
-      mockFs.mkdirSync.mockImplementation(() => {});
+      mockFs.mkdirSync.mockImplementation(() => undefined);
       mockFs.rmSync.mockImplementation(() => {});
 
       await expect((exportService as any).processMLExport(resourceExhaustionJob))

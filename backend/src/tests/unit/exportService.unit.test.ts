@@ -15,7 +15,7 @@ jest.mock('path');
 jest.mock('archiver');
 jest.mock('sharp');
 jest.mock('uuid', () => ({
-  v4: jest.fn()
+  v4: jest.fn(() => 'job-456')
 }));
 
 const mockQuery = query as jest.MockedFunction<typeof query>;
@@ -23,7 +23,7 @@ const mockFs = fs as jest.Mocked<typeof fs>;
 const mockPath = path as jest.Mocked<typeof path>;
 const mockArchiver = archiver as jest.MockedFunction<typeof archiver>;
 const mockSharp = sharp as jest.MockedFunction<typeof sharp>;
-const mockUuidV4 = require('uuid').v4 as jest.MockedFunction<typeof import('uuid').v4>;
+const mockUuidV4 = jest.mocked(require('uuid').v4);
 
 describe('ExportService', () => {
   const mockUserId = 'user-123';
@@ -60,10 +60,10 @@ describe('ExportService', () => {
     mockSharp.mockReturnValue(mockSharpInstance as any);
 
     // Setup archiver mock with proper async handling
-    const mockArchiveInstance = {
+    const mockArchiveInstance: any = {
       on: jest.fn((event: string, callback: Function) => {
         if (event === 'close') {
-          setImmediate(callback);
+          setImmediate(callback as () => void);
         }
         return mockArchiveInstance;
       }),
@@ -75,10 +75,10 @@ describe('ExportService', () => {
     mockArchiver.mockReturnValue(mockArchiveInstance as any);
 
     // Setup createWriteStream mock
-    const mockWriteStream = {
+    const mockWriteStream: any = {
       on: jest.fn((event: string, callback: Function) => {
         if (event === 'close') {
-          setImmediate(callback);
+          setImmediate(callback as () => void);
         }
         return mockWriteStream;
       }),
@@ -116,7 +116,7 @@ describe('ExportService', () => {
         rows: testData,
         rowCount: testData.length,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -142,7 +142,7 @@ describe('ExportService', () => {
         rows: [],
         rowCount: 1,
         command: 'INSERT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -186,7 +186,7 @@ describe('ExportService', () => {
           rows: [],
           rowCount: 1,
           command: 'INSERT',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -224,7 +224,7 @@ describe('ExportService', () => {
         rows: [],
         rowCount: 1,
         command: 'UPDATE',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -248,7 +248,7 @@ describe('ExportService', () => {
         rows: [],
         rowCount: 0,
         command: 'UPDATE',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -279,7 +279,7 @@ describe('ExportService', () => {
         rows: [mockJobData],
         rowCount: 1,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -313,7 +313,7 @@ describe('ExportService', () => {
         rows: [],
         rowCount: 0,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -324,13 +324,13 @@ describe('ExportService', () => {
       expect(result).toBeNull();
     });
 
-    it('should handle malformed JSON in options field', async () => {
+    it('should handle malformed JSON in options field gracefully', async () => {
       // Arrange
       const mockJobData = {
         id: mockJobId,
         user_id: mockUserId,
         status: 'failed',
-        options: '{invalid json}',
+        options: '{invalid json}', // Malformed JSON
         progress: 0,
         total_items: 0,
         processed_items: 0,
@@ -345,12 +345,21 @@ describe('ExportService', () => {
         rows: [mockJobData],
         rowCount: 1,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
-      // Act & Assert
-      await expect(exportService.getBatchJob(mockJobId)).rejects.toThrow();
+      // Act
+      const result = await exportService.getBatchJob(mockJobId);
+
+      // Assert - Should handle malformed JSON gracefully, not throw
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe(mockJobId);
+      expect(result!.status).toBe('failed');
+      expect(result!.error).toBe('Invalid options');
+      
+      // FIXED: Now expects empty object instead of throwing
+      expect(result!.options).toEqual({});
     });
   });
 
@@ -392,7 +401,7 @@ describe('ExportService', () => {
         rows: mockJobs,
         rowCount: mockJobs.length,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -416,7 +425,7 @@ describe('ExportService', () => {
         rows: [],
         rowCount: 0,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -437,7 +446,7 @@ describe('ExportService', () => {
         rows: mockGarmentData,
         rowCount: mockGarmentData.length,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -471,7 +480,7 @@ describe('ExportService', () => {
         rows: [],
         rowCount: 0,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -509,7 +518,7 @@ describe('ExportService', () => {
         rows: mockGarmentData,
         rowCount: mockGarmentData.length,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -533,7 +542,7 @@ describe('ExportService', () => {
         rows: mockGarmentData,
         rowCount: 1,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -675,9 +684,9 @@ describe('ExportService', () => {
         
         // Set up mocks so the first call succeeds, second fails
         mockQuery
-          .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'UPDATE', oid: null, fields: [] }) // updateBatchJobStatus succeeds
+          .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'UPDATE', oid: 0, fields: [] }) // updateBatchJobStatus succeeds
           .mockRejectedValueOnce(processingError) // fetchFilteredGarments fails
-          .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'UPDATE', oid: null, fields: [] }); // error status update
+          .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'UPDATE', oid: 0, fields: [] }); // error status update
 
         // Act & Assert - Direct access to private method
         await expect((exportService as any).processMLExport(batchJob)).rejects.toThrow('Image processing failed');
@@ -711,7 +720,7 @@ describe('ExportService', () => {
           rows: mockGarments,
           rowCount: mockGarments.length,
           command: 'SELECT',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -760,7 +769,7 @@ describe('ExportService', () => {
           rows: mockGarments,
           rowCount: mockGarments.length,
           command: 'SELECT',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -800,7 +809,7 @@ describe('ExportService', () => {
           rows: mockGarments,
           rowCount: 1,
           command: 'SELECT',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -846,7 +855,7 @@ describe('ExportService', () => {
         const exportDir = '/tmp/test-export';
 
         // Mock the updateBatchJob calls that happen during COCO export
-        mockQuery.mockResolvedValue({ rows: [], rowCount: 1, command: 'UPDATE', oid: null, fields: [] });
+        mockQuery.mockResolvedValue({ rows: [], rowCount: 1, command: 'UPDATE', oid: 0, fields: [] });
 
         // Act - Direct access to private method
         const result = await (exportService as any).exportCOCOFormat(mockGarments, exportDir, batchJob);
@@ -885,7 +894,7 @@ describe('ExportService', () => {
         const exportDir = '/tmp/test-export';
 
         // Mock the updateBatchJob calls
-        mockQuery.mockResolvedValue({ rows: [], rowCount: 1, command: 'UPDATE', oid: null, fields: [] });
+        mockQuery.mockResolvedValue({ rows: [], rowCount: 1, command: 'UPDATE', oid: 0, fields: [] });
 
         // Act - Direct access to private method
         await (exportService as any).exportCOCOFormat(mockGarments, exportDir, batchJob);
@@ -976,7 +985,7 @@ describe('ExportService', () => {
           rows: [],
           rowCount: 1,
           command: 'INSERT',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -1008,7 +1017,7 @@ describe('ExportService', () => {
           rows: [],
           rowCount: 1,
           command: 'UPDATE',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -1033,7 +1042,7 @@ describe('ExportService', () => {
           rows: [],
           rowCount: 1,
           command: 'UPDATE',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -1064,7 +1073,7 @@ describe('ExportService', () => {
           rows: [],
           rowCount: 1,
           command: 'UPDATE',
-          oid: null,
+          oid: 0,
           fields: []
         });
 
@@ -1123,7 +1132,7 @@ describe('ExportService', () => {
         const mockWriteStream = { on: jest.fn().mockReturnThis() };
         mockFs.createWriteStream.mockReturnValue(mockWriteStream as any);
 
-        const mockArchiveInstance = {
+        const mockArchiveInstance: any = {
           on: jest.fn((event: string, callback: Function) => {
             if (event === 'error') {
               // Call error callback immediately
@@ -1274,7 +1283,7 @@ describe('ExportService', () => {
       const batchJob = ExportMocks.createMockMLExportBatchJob();
 
       // Mock successful database operations but failing file system
-      mockQuery.mockResolvedValue({ rows: [], rowCount: 1, command: 'UPDATE', oid: null, fields: [] });
+      mockQuery.mockResolvedValue({ rows: [], rowCount: 1, command: 'UPDATE', oid: 0, fields: [] });
       
       // Override mkdirSync to throw
       mockFs.mkdirSync.mockImplementation(() => {
@@ -1302,7 +1311,7 @@ describe('ExportService', () => {
         rows: validData,
         rowCount: 1,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 
@@ -1335,20 +1344,23 @@ describe('ExportService', () => {
       // Arrange
       const archiveError = new Error('Compression failed');
       
-      const mockArchive = {
-        on: jest.fn((event, callback) => {
-          if (event === 'error') {
-            setImmediate(() => callback(archiveError));
-          }
-          return mockArchive;
-        }),
+      const mockArchive: any = {
+        on: jest.fn(),
         pipe: jest.fn(),
         directory: jest.fn(),
         finalize: jest.fn()
       };
+      
+      // Set up the on method implementation after creation
+      mockArchive.on = jest.fn((event, callback) => {
+        if (event === 'error') {
+          setImmediate(() => callback(archiveError));
+        }
+        return mockArchive;
+      });
       mockArchiver.mockReturnValue(mockArchive as any);
 
-      const mockStream = { 
+      const mockStream: any = { 
         on: jest.fn((event, callback) => {
           if (event === 'close') {
             // Don't call close callback when error occurs
@@ -1385,9 +1397,9 @@ describe('ExportService', () => {
       // Create isolated spies for this test
       const updateBatchJobStatusSpy = jest.spyOn(exportService as any, 'updateBatchJobStatus').mockResolvedValue(undefined);
       const fetchFilteredGarmentsSpy = jest.spyOn(exportService as any, 'fetchFilteredGarments').mockResolvedValue([]); // Empty dataset
-      const updateBatchJobSpy = jest.spyOn(exportService as any, 'updateBatchJob').mockImplementation((job) => {
-        job.status = 'completed';
-        job.progress = 100;
+      const updateBatchJobSpy = jest.spyOn(exportService as any, 'updateBatchJob').mockImplementation((job: any) => {
+        (job as any).status = 'completed';
+        (job as any).progress = 100;
         return Promise.resolve();
       });
       const exportCOCOFormatSpy = jest.spyOn(exportService as any, 'exportCOCOFormat').mockResolvedValue('/tmp/export');
@@ -1489,8 +1501,8 @@ describe('ExportService', () => {
       const processMLExportSpy = jest.spyOn(exportService as any, 'processMLExport')
         .mockImplementation(async (job) => {
           // Simulate processing without actually doing it
-          job.status = 'completed';
-          job.progress = 100;
+          (job as any).status = 'completed';
+          (job as any).progress = 100;
           return;
         });
 
@@ -1514,9 +1526,9 @@ describe('ExportService', () => {
 
       // Mock successful job creation for all requests
       mockQuery
-        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: null, fields: [] })
-        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: null, fields: [] })
-        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: null, fields: [] });
+        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: 0, fields: [] })
+        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: 0, fields: [] })
+        .mockResolvedValueOnce({ rows: [], rowCount: 1, command: 'INSERT', oid: 0, fields: [] });
 
       // Mock processMLExport to prevent actual processing
       const processMLExportSpy = jest.spyOn(exportService as any, 'processMLExport').mockResolvedValue(undefined);
@@ -1559,13 +1571,13 @@ describe('ExportService', () => {
         rows: [], 
         rowCount: 1, 
         command: 'INSERT', 
-        oid: null, 
+        oid: 0, 
         fields: [] 
       });
 
       // Mock processMLExport to prevent actual background processing that could hang
       const processMLExportSpy = jest.spyOn(exportService as any, 'processMLExport')
-        .mockImplementation(async (batchJob) => {
+        .mockImplementation(async (batchJob: any) => {
           // Simulate successful processing
           batchJob.status = 'completed';
           batchJob.progress = 100;
@@ -1612,10 +1624,10 @@ describe('ExportService', () => {
       
       // Use separate mock setups for each call
       const createJobQuery = mockQuery.mockResolvedValueOnce({ 
-        rows: [], rowCount: 1, command: 'INSERT', oid: null, fields: [] 
+        rows: [], rowCount: 1, command: 'INSERT', oid: 0, fields: [] 
       });
       const cancelJobQuery = mockQuery.mockResolvedValueOnce({ 
-        rows: [], rowCount: 1, command: 'UPDATE', oid: null, fields: [] 
+        rows: [], rowCount: 1, command: 'UPDATE', oid: 0, fields: [] 
       });
 
       // Act
@@ -1678,7 +1690,7 @@ describe('ExportService', () => {
         rows: diverseGarmentData,
         rowCount: 5,
         command: 'SELECT',
-        oid: null,
+        oid: 0,
         fields: []
       });
 

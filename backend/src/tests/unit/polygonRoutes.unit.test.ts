@@ -111,13 +111,13 @@ const createTestApp = () => {
 
 const setupDefaultMocks = () => {
   // Default authentication - passes
-  mockAuthenticate.mockImplementation((req: any, res: any, next: any) => {
-    req.user = { 
-      id: uuidv4(), 
-      email: 'test@example.com' 
-    };
-    next();
-  });
+  mockAuthenticate.mockImplementation(async (req: any, res: any, next: any) => {
+  req.user = { 
+    id: uuidv4(), 
+    email: 'test@example.com' 
+  };
+  next();
+});
 
   // Default validation - passes (will be overridden in specific tests)
   mockValidate.mockImplementation((schema: any) => {
@@ -125,42 +125,52 @@ const setupDefaultMocks = () => {
   });
 
   // Reset controller mocks to default behavior
-  mockPolygonController.createPolygon.mockImplementation((req: any, res: any) => {
+  mockPolygonController.createPolygon.mockImplementation(async (req: any, res: any) => {
     // Use the actual request data to create realistic responses
     const mockPolygon = createMockPolygon({
       label: req.body.label || 'test_polygon',
       points: req.body.points || createValidPolygonPoints.triangle(),
       metadata: req.body.metadata || {}
     });
-    
+
+    await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
+
     res.status(201).json({
       status: 'success',
       data: { polygon: mockPolygon }
     });
   });
 
-  mockPolygonController.getImagePolygons.mockImplementation((req: any, res: any) => {
+  mockPolygonController.getImagePolygons.mockImplementation(async (req: any, res: any) => {
+    await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
+
     res.status(200).json({
       status: 'success',
       data: { polygons: [], count: 0 }
     });
   });
 
-  mockPolygonController.getPolygon.mockImplementation((req: any, res: any) => {
+  mockPolygonController.getPolygon.mockImplementation(async (req: any, res: any) => {
+    await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
+
     res.status(200).json({
       status: 'success',
       data: { polygon: createMockPolygon() }
     });
   });
 
-  mockPolygonController.updatePolygon.mockImplementation((req: any, res: any) => {
+  mockPolygonController.updatePolygon.mockImplementation(async (req: any, res: any) => {
+    await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
+
     res.status(200).json({
       status: 'success',
       data: { polygon: createMockPolygon(req.body) }
     });
   });
 
-  mockPolygonController.deletePolygon.mockImplementation((req: any, res: any) => {
+  mockPolygonController.deletePolygon.mockImplementation(async (req: any, res: any) => {
+    await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
+
     res.status(200).json({
       status: 'success',
       data: null,
@@ -182,7 +192,7 @@ describe('Polygon Routes - Unit Tests', () => {
     // Note: Don't call setupDefaultMocks here - let individual tests control validation
     
     // Only set up auth and controller defaults
-    mockAuthenticate.mockImplementation((req: any, res: any, next: any) => {
+    mockAuthenticate.mockImplementation(async (req: any, res: any, next: any) => {
       req.user = { 
         id: uuidv4(), 
         email: 'test@example.com' 
@@ -196,41 +206,51 @@ describe('Polygon Routes - Unit Tests', () => {
     });
 
     // Set up default controller behaviors
-    mockPolygonController.createPolygon.mockImplementation((req: any, res: any) => {
+    mockPolygonController.createPolygon.mockImplementation(async (req: any, res: any) => {
       const mockPolygon = createMockPolygon({
         label: req.body.label || 'test_polygon',
         points: req.body.points || createValidPolygonPoints.triangle(),
         metadata: req.body.metadata || {}
       });
-      
+
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
+
       res.status(201).json({
         status: 'success',
         data: { polygon: mockPolygon }
       });
     });
 
-    mockPolygonController.getImagePolygons.mockImplementation((req: any, res: any) => {
+    mockPolygonController.getImagePolygons.mockImplementation(async (req: any, res: any) => {
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
+
       res.status(200).json({
         status: 'success',
         data: { polygons: [], count: 0 }
       });
     });
 
-    mockPolygonController.getPolygon.mockImplementation((req: any, res: any) => {
+    mockPolygonController.getPolygon.mockImplementation(async (req: any, res: any) => {
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
+
       res.status(200).json({
         status: 'success',
         data: { polygon: createMockPolygon() }
       });
     });
 
-    mockPolygonController.updatePolygon.mockImplementation((req: any, res: any) => {
+    mockPolygonController.updatePolygon.mockImplementation(async (req: any, res: any) => {
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
+
       res.status(200).json({
         status: 'success',
         data: { polygon: createMockPolygon(req.body) }
       });
     });
 
-    mockPolygonController.deletePolygon.mockImplementation((req: any, res: any) => {
+    mockPolygonController.deletePolygon.mockImplementation(async (req: any, res: any) => {
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
+
       res.status(200).json({
         status: 'success',
         data: null,
@@ -258,7 +278,8 @@ describe('Polygon Routes - Unit Tests', () => {
         });
 
         const mockCreatedPolygon = createMockPolygon(polygonData);
-        mockPolygonController.createPolygon.mockImplementation((req, res) => {
+        mockPolygonController.createPolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(201).json({
             status: 'success',
             data: { polygon: mockCreatedPolygon }
@@ -395,7 +416,7 @@ describe('Polygon Routes - Unit Tests', () => {
         });
         
         // Mount route manually
-        testApp.post('/api/v1/polygons', testAuth, testValidate(), testController);
+        testApp.post('/api/v1/polygons', testAuth, testValidate({}), testController);
 
         const invalidData = {
           original_image_id: uuidv4(),
@@ -440,7 +461,7 @@ describe('Polygon Routes - Unit Tests', () => {
           res.status(201).json({ status: 'success', data: { polygon: {} } });
         });
         
-        testApp.post('/api/v1/polygons', testAuth, testValidate(), testController);
+        testApp.post('/api/v1/polygons', testAuth, testValidate({}), testController);
 
         const invalidData = {
           points: createValidPolygonPoints.triangle(),
@@ -525,12 +546,13 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should pass user information to controller', async () => {
         const testUser = { id: uuidv4(), email: 'test@example.com' };
         
-        mockAuthenticate.mockImplementationOnce((req: any, res: any, next: any) => {
+        mockAuthenticate.mockImplementationOnce(async (req: any, res: any, next: any) => {
           req.user = testUser;
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           next();
         });
 
-        mockPolygonController.createPolygon.mockImplementation((req, res) => {
+        mockPolygonController.createPolygon.mockImplementation(async (req, res) => {
           expect(req.user).toEqual(testUser);
           res.status(201).json({ status: 'success', data: { polygon: {} } });
         });
@@ -547,7 +569,7 @@ describe('Polygon Routes - Unit Tests', () => {
         const businessError = new Error('Image not found');
         (businessError as any).statusCode = 404;
 
-        mockPolygonController.createPolygon.mockImplementation((req, res) => {
+        mockPolygonController.createPolygon.mockImplementation(async (req, res) => {
           res.status(404).json({
             status: 'error',
             message: 'Image not found'
@@ -564,7 +586,8 @@ describe('Polygon Routes - Unit Tests', () => {
       });
 
       it('should handle validation errors from controller', async () => {
-        mockPolygonController.createPolygon.mockImplementation((req, res) => {
+        mockPolygonController.createPolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(422).json({
             status: 'error',
             message: 'Polygon geometry is invalid',
@@ -584,7 +607,8 @@ describe('Polygon Routes - Unit Tests', () => {
       });
 
       it('should handle database errors gracefully', async () => {
-        mockPolygonController.createPolygon.mockImplementation((req, res) => {
+        mockPolygonController.createPolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(500).json({
             status: 'error',
             message: 'Database connection failed'
@@ -628,7 +652,7 @@ describe('Polygon Routes - Unit Tests', () => {
           res.status(201).json({ status: 'success', data: { polygon: {} } });
         });
         
-        testApp.post('/api/v1/polygons', testAuth, testValidate(), testController);
+        testApp.post('/api/v1/polygons', testAuth, testValidate({}), testController);
 
         const response = await request(testApp)
           .post('/api/v1/polygons')
@@ -666,7 +690,7 @@ describe('Polygon Routes - Unit Tests', () => {
           res.status(201).json({ status: 'success', data: { polygon: {} } });
         });
         
-        testApp.post('/api/v1/polygons', testAuth, testValidate(), testController);
+        testApp.post('/api/v1/polygons', testAuth, testValidate({}), testController);
 
         const invalidData = {
           original_image_id: null,
@@ -716,7 +740,7 @@ describe('Polygon Routes - Unit Tests', () => {
           createMockPolygon({ original_image_id: imageId, label: 'polygon3' })
         ];
 
-        mockPolygonController.getImagePolygons.mockImplementation((req, res) => {
+        mockPolygonController.getImagePolygons.mockImplementation(async (req, res) => {
           expect(req.params.imageId).toBe(imageId);
           res.status(200).json({
             status: 'success',
@@ -741,7 +765,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should return empty array for image with no polygons', async () => {
         const imageId = uuidv4();
 
-        mockPolygonController.getImagePolygons.mockImplementation((req, res) => {
+        mockPolygonController.getImagePolygons.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(200).json({
             status: 'success',
             data: {
@@ -763,9 +788,10 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle pagination parameters', async () => {
         const imageId = uuidv4();
 
-        mockPolygonController.getImagePolygons.mockImplementation((req, res) => {
+        mockPolygonController.getImagePolygons.mockImplementation(async (req, res) => {
           expect(req.query.page).toBe('2');
           expect(req.query.limit).toBe('10');
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(200).json({
             status: 'success',
             data: {
@@ -793,8 +819,9 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle filtering by label', async () => {
         const imageId = uuidv4();
 
-        mockPolygonController.getImagePolygons.mockImplementation((req, res) => {
+        mockPolygonController.getImagePolygons.mockImplementation(async (req, res) => {
           expect(req.query.label).toBe('shirt');
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(200).json({
             status: 'success',
             data: {
@@ -818,7 +845,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle invalid image ID format', async () => {
         const invalidImageId = 'not-a-uuid';
 
-        mockPolygonController.getImagePolygons.mockImplementation((req, res) => {
+        mockPolygonController.getImagePolygons.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(400).json({
             status: 'error',
             message: 'Invalid image ID format'
@@ -835,7 +863,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle non-existent image ID', async () => {
         const nonExistentId = uuidv4();
 
-        mockPolygonController.getImagePolygons.mockImplementation((req, res) => {
+        mockPolygonController.getImagePolygons.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(404).json({
             status: 'error',
             message: 'Image not found'
@@ -867,7 +896,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle access to unauthorized images', async () => {
         const imageId = uuidv4();
 
-        mockPolygonController.getImagePolygons.mockImplementation((req, res) => {
+        mockPolygonController.getImagePolygons.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(403).json({
             status: 'error',
             message: 'Access denied to this image'
@@ -920,8 +950,9 @@ describe('Polygon Routes - Unit Tests', () => {
           label: 'test_polygon'
         });
 
-        mockPolygonController.getPolygon.mockImplementation((req, res) => {
+        mockPolygonController.getPolygon.mockImplementation(async (req, res) => {
           expect(req.params.id).toBe(polygonId);
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(200).json({
             status: 'success',
             data: { polygon: mockPolygon }
@@ -945,7 +976,8 @@ describe('Polygon Routes - Unit Tests', () => {
           metadata: createPolygonMetadataVariations.detailed
         });
 
-        mockPolygonController.getPolygon.mockImplementation((req, res) => {
+        mockPolygonController.getPolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(200).json({
             status: 'success',
             data: { polygon: mockPolygon }
@@ -971,7 +1003,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle invalid polygon ID format', async () => {
         const invalidId = 'not-a-uuid';
 
-        mockPolygonController.getPolygon.mockImplementation((req, res) => {
+        mockPolygonController.getPolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(400).json({
             status: 'error',
             message: 'Invalid polygon ID format'
@@ -988,7 +1021,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle non-existent polygon ID', async () => {
         const nonExistentId = uuidv4();
 
-        mockPolygonController.getPolygon.mockImplementation((req, res) => {
+        mockPolygonController.getPolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(404).json({
             status: 'error',
             message: 'Polygon not found'
@@ -1005,7 +1039,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle access to unauthorized polygons', async () => {
         const polygonId = uuidv4();
 
-        mockPolygonController.getPolygon.mockImplementation((req, res) => {
+        mockPolygonController.getPolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(403).json({
             status: 'error',
             message: 'Access denied to this polygon'
@@ -1033,9 +1068,10 @@ describe('Polygon Routes - Unit Tests', () => {
           label: 'updated_label'
         });
 
-        mockPolygonController.updatePolygon.mockImplementation((req, res) => {
+        mockPolygonController.updatePolygon.mockImplementation(async (req, res) => {
           expect(req.params.id).toBe(polygonId);
           expect(req.body.label).toBe('updated_label');
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(200).json({
             status: 'success',
             data: {
@@ -1063,8 +1099,9 @@ describe('Polygon Routes - Unit Tests', () => {
           points: newPoints
         });
 
-        mockPolygonController.updatePolygon.mockImplementation((req, res) => {
+        mockPolygonController.updatePolygon.mockImplementation(async (req, res) => {
           expect(req.body.points).toEqual(newPoints);
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(200).json({
             status: 'success',
             data: {
@@ -1095,8 +1132,9 @@ describe('Polygon Routes - Unit Tests', () => {
           metadata: newMetadata
         });
 
-        mockPolygonController.updatePolygon.mockImplementation((req, res) => {
+        mockPolygonController.updatePolygon.mockImplementation(async (req, res) => {
           expect(req.body.metadata).toEqual(newMetadata);
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(200).json({
             status: 'success',
             data: {
@@ -1120,8 +1158,9 @@ describe('Polygon Routes - Unit Tests', () => {
         const polygonId = uuidv4();
         const updateData = { label: 'partial_update' };
 
-        mockPolygonController.updatePolygon.mockImplementation((req, res) => {
+        mockPolygonController.updatePolygon.mockImplementation(async (req, res) => {
           expect(req.body).toEqual({ label: 'partial_update' });
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(200).json({
             status: 'success',
             data: {
@@ -1188,7 +1227,7 @@ describe('Polygon Routes - Unit Tests', () => {
         });
         
         const polygonId = uuidv4();
-        testApp.put(`/api/v1/polygons/${polygonId}`, testAuth, testValidate(), testController);
+        testApp.put(`/api/v1/polygons/${polygonId}`, testAuth, testValidate({}), testController);
 
         const invalidUpdate = {
           points: createInvalidPolygonPoints.insufficientPoints()
@@ -1207,7 +1246,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should reject self-intersecting polygon updates', async () => {
         const polygonId = uuidv4();
         
-        mockPolygonController.updatePolygon.mockImplementation((req, res) => {
+        mockPolygonController.updatePolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(422).json({
             status: 'error',
             message: 'Self-intersecting polygons are not allowed'
@@ -1242,7 +1282,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle non-existent polygon updates', async () => {
         const nonExistentId = uuidv4();
 
-        mockPolygonController.updatePolygon.mockImplementation((req, res) => {
+        mockPolygonController.updatePolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(404).json({
             status: 'error',
             message: 'Polygon not found'
@@ -1260,7 +1301,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle unauthorized updates', async () => {
         const polygonId = uuidv4();
 
-        mockPolygonController.updatePolygon.mockImplementation((req, res) => {
+        mockPolygonController.updatePolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(403).json({
             status: 'error',
             message: 'Not authorized to update this polygon'
@@ -1278,7 +1320,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle polygon locked for garment creation', async () => {
         const polygonId = uuidv4();
 
-        mockPolygonController.updatePolygon.mockImplementation((req, res) => {
+        mockPolygonController.updatePolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(409).json({
             status: 'error',
             message: 'Polygon is locked for garment creation'
@@ -1298,7 +1341,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle version conflicts', async () => {
         const polygonId = uuidv4();
 
-        mockPolygonController.updatePolygon.mockImplementation((req, res) => {
+        mockPolygonController.updatePolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(409).json({
             status: 'error',
             message: 'Version conflict - polygon was modified by another user'
@@ -1324,7 +1368,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should delete a polygon successfully', async () => {
         const polygonId = uuidv4();
 
-        mockPolygonController.deletePolygon.mockImplementation((req, res) => {
+        mockPolygonController.deletePolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           expect(req.params.id).toBe(polygonId);
           res.status(200).json({
             status: 'success',
@@ -1345,7 +1390,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should return deletion confirmation with metadata', async () => {
         const polygonId = uuidv4();
 
-        mockPolygonController.deletePolygon.mockImplementation((req, res) => {
+        mockPolygonController.deletePolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(200).json({
             status: 'success',
             data: {
@@ -1373,7 +1419,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle non-existent polygon deletion', async () => {
         const nonExistentId = uuidv4();
 
-        mockPolygonController.deletePolygon.mockImplementation((req, res) => {
+        mockPolygonController.deletePolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(404).json({
             status: 'error',
             message: 'Polygon not found'
@@ -1390,7 +1437,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle unauthorized deletion attempts', async () => {
         const polygonId = uuidv4();
 
-        mockPolygonController.deletePolygon.mockImplementation((req, res) => {
+        mockPolygonController.deletePolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(403).json({
             status: 'error',
             message: 'Not authorized to delete this polygon'
@@ -1407,7 +1455,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should prevent deletion of polygons with active garments', async () => {
         const polygonId = uuidv4();
 
-        mockPolygonController.deletePolygon.mockImplementation((req, res) => {
+        mockPolygonController.deletePolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(409).json({
             status: 'error',
             message: 'Cannot delete polygon with active garments',
@@ -1429,7 +1478,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should handle cascade deletion errors', async () => {
         const polygonId = uuidv4();
 
-        mockPolygonController.deletePolygon.mockImplementation((req, res) => {
+        mockPolygonController.deletePolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(500).json({
             status: 'error',
             message: 'Failed to delete related data'
@@ -1448,7 +1498,8 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should support soft delete with query parameter', async () => {
         const polygonId = uuidv4();
 
-        mockPolygonController.deletePolygon.mockImplementation((req, res) => {
+        mockPolygonController.deletePolygon.mockImplementation(async (req, res) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           expect(req.query.soft).toBe('true');
           res.status(200).json({
             status: 'success',
@@ -1486,14 +1537,25 @@ describe('Polygon Routes - Unit Tests', () => {
         ];
 
         let authCallCount = 0;
-        mockAuthenticate.mockImplementation((req: any, res: any, next: any) => {
+        mockAuthenticate.mockImplementation(async (req: any, res: any, next: any) => {
           authCallCount++;
           req.user = { id: uuidv4(), email: 'test@example.com' };
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           next();
         });
 
         for (const route of routes) {
-          const request_ = request(app)[route.method as keyof typeof request](route.path);
+          let request_: any;
+          if (route.method === 'post') {
+            request_ = request(app).post(route.path);
+          } else if (route.method === 'get') {
+            request_ = request(app).get(route.path);
+          } else if (route.method === 'put') {
+            request_ = request(app).put(route.path);
+          } else if (route.method === 'delete') {
+            request_ = request(app).delete(route.path);
+          }
+          
           if (route.body) {
             await request_.send(route.body);
           } else {
@@ -1507,13 +1569,15 @@ describe('Polygon Routes - Unit Tests', () => {
       it('should pass user context through entire middleware chain', async () => {
         const testUser = { id: uuidv4(), email: 'context@test.com', role: 'user' };
         
-        mockAuthenticate.mockImplementation((req: any, res: any, next: any) => {
+        mockAuthenticate.mockImplementation(async (req: any, res: any, next: any) => {
           req.user = testUser;
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           next();
         });
 
-        mockPolygonController.createPolygon.mockImplementation((req, res) => {
+        mockPolygonController.createPolygon.mockImplementation(async (req, res) => {
           expect(req.user).toEqual(testUser);
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           res.status(201).json({ status: 'success', data: { polygon: {} } });
         });
 
@@ -1600,7 +1664,8 @@ describe('Polygon Routes - Unit Tests', () => {
 
     describe('Error Middleware', () => {
       it('should handle uncaught errors in middleware chain', async () => {
-        mockAuthenticate.mockImplementationOnce((req: any, res: any, next: any) => {
+        mockAuthenticate.mockImplementationOnce(async (req: any, res: any, next: any) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           const error = new Error('Authentication service unavailable');
           (error as any).statusCode = 503;
           next(error);
@@ -1757,17 +1822,20 @@ describe('Polygon Routes - Unit Tests', () => {
 
     describe('Authorization Edge Cases', () => {
       it('should handle missing user context gracefully', async () => {
-        mockAuthenticate.mockImplementationOnce((req: any, res: any, next: any) => {
+        mockAuthenticate.mockImplementationOnce(async (req: any, res: any, next: any) => {
           // Don't set req.user
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           next();
         });
 
-        mockPolygonController.createPolygon.mockImplementation((req, res) => {
+        mockPolygonController.createPolygon.mockImplementation(async (req, res, next) => {
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async operation
           if (!req.user) {
-            return res.status(401).json({
+            res.status(401).json({
               status: 'error',
               message: 'User context missing'
             });
+            return;
           }
           res.status(201).json({ status: 'success', data: { polygon: {} } });
         });
