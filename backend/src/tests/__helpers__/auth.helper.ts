@@ -1,7 +1,24 @@
-// backend/src/__tests__/helpers/auth.helper.ts
+// /backend/src/__tests__/helpers/auth.helper.ts
 import { jest } from '@jest/globals';
 import { Request, Response, NextFunction } from 'express';
-import {
+import { TestDatabaseConnection } from '../../utils/testDatabaseConnection';
+import { createMockUserModel, 
+         createMockImageModel, 
+         createMockGarmentModel, 
+         createMockPolygonModel, 
+         createMockWardrobeModel, 
+         mockUser, 
+         mockImage, 
+         mockGarment, 
+         mockPolygon, 
+         mockWardrobe, 
+         createMockRequest, 
+         createMockResponse, 
+         createMockNext 
+} from '../__mocks__/auth.mock';
+
+// Re-export existing mock functionality
+export {
   mockUser,
   mockJwtPayload,
   createMockRequest,
@@ -21,6 +38,8 @@ import {
   mockWardrobe
 } from '../__mocks__/auth.mock';
 
+// ===== MOCK TESTING HELPERS (for unit tests) =====
+
 /**
  * Helper to set up all authentication-related mocks
  */
@@ -30,7 +49,6 @@ export const setupAuthMocks = () => {
     verify: jest.fn(),
     sign: jest.fn()
   };
-  setupJWTMocks(mockJWT);
 
   // Mock models
   const mockUserModel = createMockUserModel();
@@ -314,6 +332,59 @@ export const createRateLimitScenarios = (): TestScenario[] => [
     }
   )
 ];
+
+// ===== INTEGRATION TESTING HELPERS (for integration tests) =====
+
+/**
+ * Clean up auth-related test data
+ */
+export async function cleanupAuthTestData(): Promise<void> {
+  try {
+    // Clean up in the correct order to handle foreign key constraints
+    await TestDatabaseConnection.query('DELETE FROM user_oauth_providers WHERE created_at > NOW() - INTERVAL \'1 hour\'');
+    await TestDatabaseConnection.query('DELETE FROM users WHERE created_at > NOW() - INTERVAL \'1 hour\'');
+  } catch (error) {
+    console.warn('Failed to clean up auth test data:', error);
+  }
+}
+
+/**
+ * Generate unique email for testing
+ */
+export function generateTestEmail(prefix: string = 'test'): string {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(7);
+  return `${prefix}-${timestamp}-${random}@example.com`;
+}
+
+/**
+ * Generate test user data
+ */
+export function generateTestUser(emailPrefix?: string) {
+  return {
+    email: generateTestEmail(emailPrefix),
+    password: 'TestPass123!'
+  };
+}
+
+/**
+ * Wait for a specified amount of time (for testing async operations)
+ */
+export function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Create multiple unique test users
+ */
+export function generateMultipleTestUsers(count: number, prefix: string = 'user'): Array<{email: string, password: string}> {
+  return Array(count).fill(null).map((_, index) => ({
+    email: generateTestEmail(`${prefix}${index}`),
+    password: 'TestPass123!'
+  }));
+}
+
+// ===== UTILITY HELPERS (shared by all test types) =====
 
 /**
  * Helper to validate UUID format

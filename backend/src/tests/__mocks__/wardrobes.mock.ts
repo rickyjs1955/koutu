@@ -16,6 +16,7 @@ export const wardrobeMocks = {
       user_id: uuidv4(),
       name: 'Summer Collection',
       description: 'My favorite summer outfits and accessories',
+      is_default: false,
       created_at: now,
       updated_at: now,
       ...overrides
