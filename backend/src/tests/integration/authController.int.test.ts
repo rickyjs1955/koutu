@@ -289,6 +289,8 @@ describe('AuthController Integration Tests', () => {
         const weakPasswords = [
           'short',   // Less than 8 characters
           '1234567', // Exactly 7 characters
+          '12345678', // 8 chars but all numbers (weak pattern)
+          'password', // Common weak password
         ];
 
         for (const password of weakPasswords) {
@@ -301,8 +303,8 @@ describe('AuthController Integration Tests', () => {
             .expect(400);
 
           expect(response.body.status).toBe('error');
-          // Accept generic validation error since that's what your middleware returns
-          expect(response.body.message).toMatch(/validation|failed/i);
+          // Update to expect specific password validation messages from controller
+          expect(response.body.message).toMatch(/password|characters|weak|complexity/i);
         }
       });
 

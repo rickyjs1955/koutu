@@ -63,6 +63,7 @@ Backend:
 11. /backend/src/middlewares/auth.ts                        ✅Unit ✅Integration ✅Security
 12. /backend/src/middlewares/errorHandler.ts                ✅Unit ✅Integration ✅Security
 13. /backend/src/middlewares/validate.ts                    ✅Unit ✅Integration ✅Security
+    /backend/src/middlewares/security.ts                    ❌Unit ❌Integration 🔔Security
 14. /backend/src/models/userModel.ts                        ✅Unit ✅Integration ✅Security
 15. /backend/src/models/db.ts                               ✅Unit ✅Integration ✅Security
 16. /backend/src/models/imageModel.ts                       ✅Unit ✅Integration ✅Security

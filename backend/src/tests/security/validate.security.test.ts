@@ -6,20 +6,18 @@
  * Comprehensive security testing for validation middleware
  */
 
-import { beforeEach, afterEach, describe, it, expect } from '@jest/globals';
-import { Request, Response, NextFunction } from 'express';
+import { describe, it, expect } from '@jest/globals';
+import { Request, Response } from 'express';
 import { z } from 'zod';
 
 // Import validation middleware
 import {
-  validate,
   validateBody,
   validateQuery,
   validateParams,
   validateFile,
   validateUUIDParam,
   validateImageQuery,
-  createValidationMiddleware,
   validateAuthTypes,
   validateRequestTypes
 } from '../../middlewares/validate';
@@ -29,13 +27,7 @@ import {
   createMockRequest,
   createMockResponse,
   createMockNext,
-  TestSchema,
-  mockMaliciousData,
-  mockMaliciousFile,
-  expectValidationError,
-  expectApiError,
-  generateValidationScenarios
-} from '../__mocks__/validate.mock';
+  TestSchema} from '../__mocks__/validate.mock';
 
 import {
   setupValidationTestEnvironment,
@@ -44,7 +36,6 @@ import {
   testSecurityScenarios
 } from '../__helpers__/validate.helper';
 
-import { ApiError } from '../../utils/ApiError';
 
 describe('Validation Security Tests', () => {
   setupValidationTestEnvironment();

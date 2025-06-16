@@ -1,4 +1,4 @@
-// /backend/src/routes/authRoutes.ts - Complete version with type validation
+// /backend/src/routes/authRoutes.ts - Updated with security middleware
 import express from 'express';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
@@ -6,14 +6,22 @@ import { authController } from '../controllers/authController';
 import { authService } from '../services/authService';
 import { authenticate, requireAuth, rateLimitByUser } from '../middlewares/auth';
 import { validateAuthTypes, validateBody, validateRequestTypes } from '../middlewares/validate';
+import { securityMiddleware } from '../middlewares/security';
 
 import { ApiError } from '../utils/ApiError';
 
 const router = express.Router();
 
-// ==================== VALIDATION SCHEMAS ====================
+// ==================== APPLY SECURITY MIDDLEWARE ====================
 
-// Registration validation schema
+// Apply authentication-specific security to all routes
+securityMiddleware.auth.forEach(middleware => {
+  router.use(middleware as express.RequestHandler);
+});
+
+// ==================== UPDATED VALIDATION SCHEMAS ====================
+
+// Registration validation schema - REMOVED password validation (controller handles it)
 const RegisterSchema = z.object({
   email: z.string()
     .min(1, 'Email is required')
@@ -21,11 +29,11 @@ const RegisterSchema = z.object({
     .max(254, 'Email address is too long')
     .transform(email => email.toLowerCase().trim()),
   password: z.string()
-    .min(8, 'Password must be at least 8 characters long')
-    .max(128, 'Password cannot exceed 128 characters')
+    .min(1, 'Password is required')
+    // REMOVED: All password complexity validation - controller handles this
 });
 
-// Login validation schema
+// Login validation schema - REMOVED password validation (controller handles it)  
 const LoginSchema = z.object({
   email: z.string()
     .min(1, 'Email is required')
@@ -33,18 +41,19 @@ const LoginSchema = z.object({
     .transform(email => email.toLowerCase().trim()),
   password: z.string()
     .min(1, 'Password is required')
+    // REMOVED: All password validation - controller handles this
 });
 
-// Password update validation schema
+// Password update validation schema - REMOVED password validation (controller handles it)
 const UpdatePasswordSchema = z.object({
   currentPassword: z.string()
     .min(1, 'Current password is required'),
   newPassword: z.string()
-    .min(8, 'New password must be at least 8 characters long')
-    .max(128, 'New password cannot exceed 128 characters')
+    .min(1, 'New password is required')
+    // REMOVED: All password complexity validation - controller handles this
 });
 
-// Email update validation schema
+// Email update validation schema - KEPT as-is (no password complexity here)
 const UpdateEmailSchema = z.object({
   newEmail: z.string()
     .min(1, 'New email is required')
@@ -53,9 +62,10 @@ const UpdateEmailSchema = z.object({
     .transform(email => email.toLowerCase().trim()),
   password: z.string()
     .min(1, 'Password is required for email changes')
+    // REMOVED: Password complexity validation - controller handles this
 });
 
-// ==================== ENHANCED CONTROLLERS ====================
+// ==================== ENHANCED CONTROLLERS (UNCHANGED) ====================
 
 // Enhanced register controller using authService
 const enhancedRegister = async (req: Request, res: Response, next: NextFunction) => {
@@ -234,21 +244,21 @@ const validateToken = async (req: Request, res: Response, next: NextFunction) =>
   }
 };
 
-// ==================== ROUTES WITH TYPE VALIDATION ====================
+// ==================== ROUTES WITH UPDATED VALIDATION ====================
 
-// Public routes with enhanced validation
+// Public routes with enhanced validation but NO password complexity checks
 router.post('/register', 
   rateLimitByUser(5, 15 * 60 * 1000), // 5 attempts per 15 minutes
-  validateAuthTypes,                   // NEW: Type validation first
-  validateBody(RegisterSchema),        // Then schema validation
-  enhancedRegister
+  validateAuthTypes,                   // Type validation first
+  validateBody(RegisterSchema),        // Basic schema validation (no password complexity)
+  enhancedRegister                     // Controller handles ALL password validation
 );
 
 router.post('/login', 
   rateLimitByUser(10, 15 * 60 * 1000), // 10 attempts per 15 minutes
-  validateAuthTypes,                    // NEW: Type validation first
-  validateBody(LoginSchema),            // Then schema validation
-  enhancedLogin
+  validateAuthTypes,                    // Type validation first
+  validateBody(LoginSchema),            // Basic schema validation (no password complexity)
+  enhancedLogin                         // Controller handles ALL password validation
 );
 
 // Token validation endpoint (public but rate limited)
@@ -267,16 +277,16 @@ router.get('/profile', getUserProfile); // Alias for /me
 // Account management with additional rate limiting and type validation
 router.patch('/password', 
   rateLimitByUser(3, 60 * 60 * 1000), // 3 password changes per hour
-  validateRequestTypes,                 // NEW: General type validation
-  validateBody(UpdatePasswordSchema),   // Then schema validation
-  updatePassword
+  validateRequestTypes,                 // General type validation
+  validateBody(UpdatePasswordSchema),   // Basic schema validation (no password complexity)
+  updatePassword                        // Controller handles ALL password validation
 );
 
 router.patch('/email', 
   rateLimitByUser(2, 60 * 60 * 1000), // 2 email changes per hour
-  validateRequestTypes,                 // NEW: General type validation  
-  validateBody(UpdateEmailSchema),      // Then schema validation
-  updateEmail
+  validateRequestTypes,                 // General type validation  
+  validateBody(UpdateEmailSchema),      // Basic schema validation (no password complexity)
+  updateEmail                           // Controller handles password validation
 );
 
 // Authentication statistics
@@ -285,23 +295,23 @@ router.get('/stats', getAuthStats);
 // Account deactivation (highly restricted)
 router.delete('/account', 
   rateLimitByUser(1, 24 * 60 * 60 * 1000), // 1 attempt per day
-  validateRequestTypes,                      // NEW: Type validation for body
-  deactivateAccount
+  validateRequestTypes,                      // Type validation for body
+  deactivateAccount                          // Controller handles password validation
 );
 
-// ==================== BACKWARD COMPATIBILITY ====================
+// ==================== BACKWARD COMPATIBILITY (UNCHANGED) ====================
 
 // Keep original controller endpoints with type validation for legacy support
 router.post('/register-legacy', 
-  validateAuthTypes,                    // NEW: Add type validation
-  validateBody(RegisterSchema), 
-  authController.register
+  validateAuthTypes,                    // Add type validation
+  validateBody(RegisterSchema),         // Basic validation (no password complexity)
+  authController.register               // Original controller handles password validation
 );
 
 router.post('/login-legacy', 
-  validateAuthTypes,                    // NEW: Add type validation
-  validateBody(LoginSchema), 
-  authController.login
+  validateAuthTypes,                    // Add type validation
+  validateBody(LoginSchema),            // Basic validation (no password complexity)
+  authController.login                  // Original controller handles password validation
 );
 
 router.get('/me-legacy', 
