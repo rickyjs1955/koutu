@@ -603,7 +603,7 @@ describe('Validation Middleware Unit Tests', () => {
         expect(result.req.body.name).toBe(edgeCaseData.unicode.name);
       } else {
         // Validation failed - should be handled gracefully
-        const error = result.next.mock.calls[0][0];
+        const error = result.next.mock.calls[0][0] as unknown as ApiError;
         expect(error).toBeDefined();
       }
     });
@@ -799,7 +799,7 @@ describe('Validation Middleware Unit Tests', () => {
         const result = await testMiddlewareWithData(validateRequestTypes, maliciousData, 'body');
         expectMiddlewareError(result.next, 'TYPE_VALIDATION_ERROR', 400);
         
-        const error = result.next.mock.calls[0][0];
+        const error = result.next.mock.calls[0][0] as unknown as ApiError;
         expect(error.message).toContain("Field 'name' should be a string, received array");
       });
 
@@ -813,7 +813,7 @@ describe('Validation Middleware Unit Tests', () => {
         const result = await testMiddlewareWithData(validateRequestTypes, maliciousData, 'body');
         expectMiddlewareError(result.next, 'TYPE_VALIDATION_ERROR', 400);
         
-        const error = result.next.mock.calls[0][0];
+        const error = result.next.mock.calls[0][0] as unknown as ApiError;
         expect(error.message).toContain("Field 'email' should be a primitive value, received object");
       });
 
@@ -826,7 +826,7 @@ describe('Validation Middleware Unit Tests', () => {
         const result = await testMiddlewareWithData(validateRequestTypes, maliciousData, 'body');
         expectMiddlewareError(result.next, 'TYPE_VALIDATION_ERROR', 400);
         
-        const error = result.next.mock.calls[0][0];
+        const error = result.next.mock.calls[0][0] as unknown as ApiError;
         expect(error.message).toContain("Field 'callback' contains function, which is not allowed");
       });
 
@@ -839,7 +839,7 @@ describe('Validation Middleware Unit Tests', () => {
         const result = await testMiddlewareWithData(validateRequestTypes, maliciousData, 'body');
         expectMiddlewareError(result.next, 'TYPE_VALIDATION_ERROR', 400);
         
-        const error = result.next.mock.calls[0][0];
+        const error = result.next.mock.calls[0][0] as unknown as ApiError;
         expect(error.message).toContain("Field 'email' is explicitly undefined");
       });
 
@@ -910,7 +910,7 @@ describe('Validation Middleware Unit Tests', () => {
         const result = await testMiddlewareWithData(validateAuthTypes, invalidData, 'body');
         expectMiddlewareError(result.next, 'INVALID_EMAIL_TYPE', 400);
         
-        const error = result.next.mock.calls[0][0];
+        const error = result.next.mock.calls[0][0] as unknown as ApiError;
         expect(error.message).toBe('Email must be a string');
       });
 
@@ -923,7 +923,7 @@ describe('Validation Middleware Unit Tests', () => {
         const result = await testMiddlewareWithData(validateAuthTypes, invalidData, 'body');
         expectMiddlewareError(result.next, 'INVALID_PASSWORD_TYPE', 400);
         
-        const error = result.next.mock.calls[0][0];
+        const error = result.next.mock.calls[0][0] as unknown as ApiError;
         expect(error.message).toBe('Password must be a string');
       });
 
@@ -936,7 +936,7 @@ describe('Validation Middleware Unit Tests', () => {
         const result = await testMiddlewareWithData(validateAuthTypes, maliciousData, 'body');
         expectMiddlewareError(result.next, 'INVALID_EMAIL_TYPE', 400);
         
-        const error = result.next.mock.calls[0][0];
+        const error = result.next.mock.calls[0][0] as unknown as ApiError;
         // Update to match your actual error message
         expect(error.message).toMatch(/Email must be a string|Email cannot be an array/);
       });
@@ -950,7 +950,7 @@ describe('Validation Middleware Unit Tests', () => {
         const result = await testMiddlewareWithData(validateAuthTypes, maliciousData, 'body');
         expectMiddlewareError(result.next, 'INVALID_PASSWORD_TYPE', 400);
         
-        const error = result.next.mock.calls[0][0];
+        const error = result.next.mock.calls[0][0] as unknown as ApiError;
         // Update to match your actual error message
         expect(error.message).toMatch(/Password must be a string|Password cannot be an array/);
       });
@@ -964,7 +964,7 @@ describe('Validation Middleware Unit Tests', () => {
         const result = await testMiddlewareWithData(validateAuthTypes, maliciousData, 'body');
         expectMiddlewareError(result.next, 'INVALID_EMAIL_TYPE', 400);
         
-        const error = result.next.mock.calls[0][0];
+        const error = result.next.mock.calls[0][0] as unknown as ApiError;
         // Update to match your actual error message
         expect(error.message).toMatch(/Email must be a string|Email cannot be an object/);
       });
@@ -978,7 +978,7 @@ describe('Validation Middleware Unit Tests', () => {
         const result = await testMiddlewareWithData(validateAuthTypes, maliciousData, 'body');
         expectMiddlewareError(result.next, 'INVALID_PASSWORD_TYPE', 400);
         
-        const error = result.next.mock.calls[0][0];
+        const error = result.next.mock.calls[0][0] as unknown as ApiError;
         // Update to match your actual error message
         expect(error.message).toMatch(/Password must be a string|Password cannot be an object/);
       });

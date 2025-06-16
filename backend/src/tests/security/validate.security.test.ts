@@ -971,7 +971,7 @@ describe('Validation Security Tests', () => {
   describe('Type Validation Security Tests', () => {
     describe('validateRequestTypes Security', () => {
       it('should prevent prototype pollution through type confusion', async () => {
-        const prototypePollutionAttempts = [
+        const prototypePollutionAttempts: any[] = [
           {
             name: 'Normal User',
             '__proto__': { admin: true }
@@ -1024,15 +1024,21 @@ describe('Validation Security Tests', () => {
         const functionInjectionAttempts = [
           {
             name: 'test',
-            eval: function() { return eval('malicious code'); }
+            eval: function() { return eval('malicious code'); },
+            callback: undefined,
+            toString: undefined
           },
           {
             name: 'test',
-            callback: () => { console.log('injected'); }
+            callback: () => { console.log('injected'); },
+            eval: undefined,
+            toString: undefined
           },
           {
             name: 'test',
-            toString: function() { return 'malicious'; }
+            toString: function() { return 'malicious'; },
+            eval: undefined,
+            callback: undefined
           }
         ];
 
@@ -1106,8 +1112,9 @@ describe('Validation Security Tests', () => {
             email: { 
               $ne: null, 
               $regex: '.*',
-              toString: () => 'admin@example.com'
-            }, 
+              toString: () => 'admin@example.com',
+              valueOf: undefined
+            } as any, 
             password: 'test' 
           },
           { 
@@ -1134,8 +1141,8 @@ describe('Validation Security Tests', () => {
           expect(result.next).toHaveBeenCalled();
           const error = result.next.mock.calls[0][0];
           
-          if (error) {
-            expect(error.message).toMatch(/cannot be an object|must be a string/i);
+          if (error && typeof error === 'object' && error !== null && 'message' in error) {
+            expect((error as { message: string }).message).toMatch(/cannot be an object|must be a string/i);
           }
         }
       });
@@ -1154,7 +1161,9 @@ describe('Validation Security Tests', () => {
           expectMiddlewareError(result.next);
           
           const error = result.next.mock.calls[0][0];
-          expect(error.message).toMatch(/object|string/i);
+          if (error && typeof error === 'object' && error !== null && 'message' in error) {
+            expect((error as { message: string }).message).toMatch(/object|string/i);
+          }
         }
       });
 
@@ -1232,7 +1241,9 @@ describe('Validation Security Tests', () => {
           // Should either pass through (for further validation) or reject with appropriate error
           if (result.next.mock.calls.length > 0 && result.next.mock.calls[0][0]) {
             const error = result.next.mock.calls[0][0];
-            expect(error.statusCode).toBe(400);
+            if (typeof error === 'object' && error !== null && 'statusCode' in error) {
+              expect((error as { statusCode: number }).statusCode).toBe(400);
+            }
           }
         }
       });

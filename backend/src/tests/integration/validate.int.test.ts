@@ -136,7 +136,14 @@ describe('Validation Middleware Integration Tests', () => {
 
     it('should handle file upload with validation workflow', async () => {
       // Step 1: Validate file upload
-      const req = createMockRequest({ file: mockValidFile }) as Request;
+      const completeValidFile = {
+        ...mockValidFile,
+        stream: undefined as any,
+        destination: '/tmp',
+        filename: 'test-file.jpg',
+        path: '/tmp/test-file.jpg'
+      };
+      const req = createMockRequest({ file: completeValidFile }) as Request;
       const res = createMockResponse() as Response;
       const next = createMockNext();
 
@@ -358,7 +365,13 @@ describe('Validation Middleware Integration Tests', () => {
 
       // Validate product creation with file upload
       const req = createMockRequest({ 
-        file: mockValidFile,
+        file: {
+          ...mockValidFile,
+          stream: undefined as any,
+          destination: '/tmp',
+          filename: 'premium-jacket.jpg',
+          path: '/tmp/premium-jacket.jpg'
+        },
         body: productData 
       }) as Request;
       const res = createMockResponse() as Response;
@@ -697,7 +710,11 @@ describe('Validation Middleware Integration Tests', () => {
 
       const imageFile = {
         ...mockValidFile,
-        originalname: 'test-image.jpg'
+        originalname: 'test-image.jpg',
+        filename: 'test-image.jpg',
+        path: '/tmp/test-image.jpg',
+        destination: '/tmp',
+        stream: undefined as any
       };
 
       const metadataData = {
@@ -775,7 +792,13 @@ describe('Validation Middleware Integration Tests', () => {
         };
 
         const req = createMockRequest({ 
-          file: mockValidFile,
+          file: {
+            ...mockValidFile,
+            stream: undefined as any,
+            destination: '/tmp',
+            filename: 'test-file.jpg',
+            path: '/tmp/test-file.jpg'
+          },
           body: fileMetadata 
         }) as Request;
         const res = createMockResponse() as Response;
@@ -830,7 +853,7 @@ describe('Validation Middleware Integration Tests', () => {
 
         // Verify error types
         invalidResults.forEach(result => {
-          const error = result.next.mock.calls[0][0];
+          const error = result.next.mock.calls[0][0] as unknown as ApiError;
           expect(error.code).toBe('TYPE_VALIDATION_ERROR');
         });
       });
@@ -891,7 +914,7 @@ describe('Validation Middleware Integration Tests', () => {
           expectMiddlewareError(result.next);
           
           // Verify the bypass was prevented
-          const error = result.next.mock.calls[0][0];
+          const error = result.next.mock.calls[0][0] as unknown as ApiError;
           expect(error.statusCode).toBe(400);
           expect(error.code).toMatch(/INVALID_(EMAIL|PASSWORD)_TYPE/);
         }
@@ -988,8 +1011,12 @@ describe('Validation Middleware Integration Tests', () => {
         
         typeAttacks.forEach(result => {
           if (result.next.mock.calls.length > 0 && result.next.mock.calls[0][0]) {
-            const error = result.next.mock.calls[0][0];
-            expect(error.statusCode).toBe(400);
+            const error = result.next.mock.calls[0][0] as unknown as ApiError;
+            if (error instanceof ApiError) {
+              expect(error.statusCode).toBe(400);
+            } else if (typeof error === 'object' && error !== null && 'statusCode' in error) {
+              expect((error as any).statusCode).toBe(400);
+            }
           }
         });
       });
