@@ -1,13 +1,13 @@
-// /backend/src/routes/authRoutes.ts - Updated with proper validators and service integration
+// /backend/src/routes/authRoutes.ts - Complete version with type validation
 import express from 'express';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authController } from '../controllers/authController';
 import { authService } from '../services/authService';
 import { authenticate, requireAuth, rateLimitByUser } from '../middlewares/auth';
-import { validateBody } from '../middlewares/validate';
-import { ApiError } from '../utils/ApiError';
+import { validateAuthTypes, validateBody, validateRequestTypes } from '../middlewares/validate';
 
+import { ApiError } from '../utils/ApiError';
 
 const router = express.Router();
 
@@ -234,18 +234,20 @@ const validateToken = async (req: Request, res: Response, next: NextFunction) =>
   }
 };
 
-// ==================== ROUTES ====================
+// ==================== ROUTES WITH TYPE VALIDATION ====================
 
-// Public routes with rate limiting
+// Public routes with enhanced validation
 router.post('/register', 
   rateLimitByUser(5, 15 * 60 * 1000), // 5 attempts per 15 minutes
-  validateBody(RegisterSchema), 
+  validateAuthTypes,                   // NEW: Type validation first
+  validateBody(RegisterSchema),        // Then schema validation
   enhancedRegister
 );
 
 router.post('/login', 
   rateLimitByUser(10, 15 * 60 * 1000), // 10 attempts per 15 minutes
-  validateBody(LoginSchema), 
+  validateAuthTypes,                    // NEW: Type validation first
+  validateBody(LoginSchema),            // Then schema validation
   enhancedLogin
 );
 
@@ -262,16 +264,18 @@ router.use(authenticate, requireAuth);
 router.get('/me', getUserProfile);
 router.get('/profile', getUserProfile); // Alias for /me
 
-// Account management with additional rate limiting
+// Account management with additional rate limiting and type validation
 router.patch('/password', 
   rateLimitByUser(3, 60 * 60 * 1000), // 3 password changes per hour
-  validateBody(UpdatePasswordSchema), 
+  validateRequestTypes,                 // NEW: General type validation
+  validateBody(UpdatePasswordSchema),   // Then schema validation
   updatePassword
 );
 
 router.patch('/email', 
   rateLimitByUser(2, 60 * 60 * 1000), // 2 email changes per hour
-  validateBody(UpdateEmailSchema), 
+  validateRequestTypes,                 // NEW: General type validation  
+  validateBody(UpdateEmailSchema),      // Then schema validation
   updateEmail
 );
 
@@ -281,18 +285,21 @@ router.get('/stats', getAuthStats);
 // Account deactivation (highly restricted)
 router.delete('/account', 
   rateLimitByUser(1, 24 * 60 * 60 * 1000), // 1 attempt per day
+  validateRequestTypes,                      // NEW: Type validation for body
   deactivateAccount
 );
 
 // ==================== BACKWARD COMPATIBILITY ====================
 
-// Keep original controller endpoints for backward compatibility
+// Keep original controller endpoints with type validation for legacy support
 router.post('/register-legacy', 
+  validateAuthTypes,                    // NEW: Add type validation
   validateBody(RegisterSchema), 
   authController.register
 );
 
 router.post('/login-legacy', 
+  validateAuthTypes,                    // NEW: Add type validation
   validateBody(LoginSchema), 
   authController.login
 );

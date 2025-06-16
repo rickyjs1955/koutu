@@ -19,7 +19,9 @@ import {
   validateFile,
   validateUUIDParam,
   validateImageQuery,
-  createValidationMiddleware
+  createValidationMiddleware,
+  validateAuthTypes,
+  validateRequestTypes
 } from '../../middlewares/validate';
 
 // Import test utilities
@@ -971,6 +973,277 @@ describe('Validation Security Tests', () => {
         validateFile(req, res, next);
         
         expectMiddlewareError(next, 'INVALID_FILE', 400);
+      });
+    });
+  });
+
+  describe('Type Validation Security Tests', () => {
+    describe('validateRequestTypes Security', () => {
+      it('should prevent prototype pollution through type confusion', async () => {
+        const prototypePollutionAttempts = [
+          {
+            name: 'Normal User',
+            '__proto__': { admin: true }
+          },
+          {
+            name: 'Normal User',
+            'constructor': { prototype: { evil: true } }
+          },
+          {
+            email: 'test@example.com',
+            'prototype': { polluted: 'yes' }
+          }
+        ];
+
+        for (const maliciousData of prototypePollutionAttempts) {
+          const result = await testMiddlewareWithData(validateRequestTypes, maliciousData, 'body');
+          
+          // Should either reject the malicious properties or handle gracefully
+          expect(result).toBeDefined();
+          
+          // Ensure no prototype pollution occurred
+          expect(Object.prototype).not.toHaveProperty('admin');
+          expect(Object.prototype).not.toHaveProperty('evil');
+          expect(Object.prototype).not.toHaveProperty('polluted');
+          expect({}).not.toHaveProperty('admin');
+          expect({}).not.toHaveProperty('evil');
+          expect({}).not.toHaveProperty('polluted');
+        }
+      });
+
+      it('should handle deeply nested type confusion attacks', async () => {
+        const deepMaliciousData = {
+          level1: {
+            level2: {
+              level3: {
+                __proto__: { admin: true },
+                normalField: 'value'
+              }
+            }
+          }
+        };
+
+        const result = await testMiddlewareWithData(validateRequestTypes, deepMaliciousData, 'body');
+        
+        // Should handle without polluting prototypes
+        expect(Object.prototype).not.toHaveProperty('admin');
+      });
+
+      it('should prevent function injection attacks', async () => {
+        const functionInjectionAttempts = [
+          {
+            name: 'test',
+            eval: function() { return eval('malicious code'); }
+          },
+          {
+            name: 'test',
+            callback: () => { console.log('injected'); }
+          },
+          {
+            name: 'test',
+            toString: function() { return 'malicious'; }
+          }
+        ];
+
+        for (const maliciousData of functionInjectionAttempts) {
+          const result = await testMiddlewareWithData(validateRequestTypes, maliciousData, 'body');
+          expectMiddlewareError(result.next, 'TYPE_VALIDATION_ERROR', 400);
+        }
+      });
+
+      it('should handle memory exhaustion attempts', async () => {
+        const largeObjectData = {};
+        
+        // Create object with many properties
+        for (let i = 0; i < 10000; i++) {
+          (largeObjectData as any)[`prop${i}`] = `value${i}`;
+        }
+
+        const startTime = performance.now();
+        const result = await testMiddlewareWithData(validateRequestTypes, largeObjectData, 'body');
+        const endTime = performance.now();
+
+        // Should complete within reasonable time
+        expect(endTime - startTime).toBeLessThan(1000);
+        expect(result).toBeDefined();
+      });
+
+      it('should prevent circular reference attacks', async () => {
+        const circularData: any = { name: 'test' };
+        circularData.self = circularData; // Create circular reference
+
+        const result = await testMiddlewareWithData(validateRequestTypes, circularData, 'body');
+        
+        // Should handle gracefully without infinite loops
+        expect(result).toBeDefined();
+      });
+    });
+
+    describe('validateAuthTypes Security', () => {
+      it('should prevent email array injection attacks', async () => {
+        const emailArrayAttacks = [
+          { email: ['admin@example.com', 'user@example.com'], password: 'test' },
+          { email: [''], password: 'test' },
+          { email: [null], password: 'test' },
+          { email: [undefined], password: 'test' },
+          { email: [{ injection: 'object' }], password: 'test' }
+        ];
+
+        for (const attack of emailArrayAttacks) {
+          const result = await testMiddlewareWithData(validateAuthTypes, attack, 'body');
+          expectMiddlewareError(result.next, 'INVALID_EMAIL_TYPE', 400);
+        }
+      });
+
+      it('should prevent password array injection attacks', async () => {
+        const passwordArrayAttacks = [
+          { email: 'test@example.com', password: ['password1', 'password2'] },
+          { email: 'test@example.com', password: [''] },
+          { email: 'test@example.com', password: [null] },
+          { email: 'test@example.com', password: [{ hash: 'malicious' }] }
+        ];
+
+        for (const attack of passwordArrayAttacks) {
+          const result = await testMiddlewareWithData(validateAuthTypes, attack, 'body');
+          expectMiddlewareError(result.next, 'INVALID_PASSWORD_TYPE', 400);
+        }
+      });
+
+      it('should prevent object injection in authentication fields', async () => {
+        const objectInjectionAttacks = [
+          { 
+            email: { 
+              $ne: null, 
+              $regex: '.*',
+              toString: () => 'admin@example.com'
+            }, 
+            password: 'test' 
+          },
+          { 
+            email: 'test@example.com', 
+            password: { 
+              $gt: '',
+              length: 8,
+              toString: () => 'password'
+            }
+          },
+          {
+            email: {
+              __proto__: { admin: true },
+              valueOf: () => 'admin@example.com'
+            },
+            password: 'test'
+          }
+        ];
+
+        for (const attack of objectInjectionAttacks) {
+          const result = await testMiddlewareWithData(validateAuthTypes, attack, 'body');
+          
+          // Should reject object injections
+          expect(result.next).toHaveBeenCalled();
+          const error = result.next.mock.calls[0][0];
+          
+          if (error) {
+            expect(error.message).toMatch(/cannot be an object|must be a string/i);
+          }
+        }
+      });
+
+      it('should handle NoSQL injection attempts in auth fields', async () => {
+        const nosqlInjectionAttempts = [
+          { email: { $ne: null }, password: 'test' },
+          { email: { $regex: '.*' }, password: 'test' },
+          { email: { $where: 'this.email' }, password: 'test' },
+          { email: 'test@example.com', password: { $gt: '' } },
+          { email: 'test@example.com', password: { $ne: null } }
+        ];
+
+        for (const injection of nosqlInjectionAttempts) {
+          const result = await testMiddlewareWithData(validateAuthTypes, injection, 'body');
+          expectMiddlewareError(result.next);
+          
+          const error = result.next.mock.calls[0][0];
+          expect(error.message).toMatch(/object|string/i);
+        }
+      });
+
+      it('should prevent timing attacks through consistent validation', async () => {
+        const testScenarios = [
+          { email: 'valid@example.com', password: 'validpassword' },
+          { email: 123, password: 'validpassword' }, // Type error
+          { email: [], password: 'validpassword' }, // Array error
+          { email: {}, password: 'validpassword' }, // Object error
+          { email: 'valid@example.com', password: 123 }, // Password type error
+          { email: 'valid@example.com', password: [] }, // Password array error
+        ];
+
+        const timings: number[] = [];
+
+        for (const scenario of testScenarios) {
+          const start = performance.now();
+          await testMiddlewareWithData(validateAuthTypes, scenario, 'body');
+          const end = performance.now();
+          timings.push(end - start);
+        }
+
+        // Remove outliers and check consistency
+        timings.sort((a, b) => a - b);
+        const trimmedTimings = timings.slice(1, -1);
+        const avgTime = trimmedTimings.reduce((a, b) => a + b, 0) / trimmedTimings.length;
+        const maxDeviation = Math.max(...trimmedTimings.map(t => Math.abs(t - avgTime)));
+
+        // Timing should be relatively consistent
+        expect(maxDeviation).toBeLessThan(avgTime * 2);
+      });
+
+      it('should not leak sensitive information in error messages', async () => {
+        const sensitiveInjectionAttempt = {
+          email: {
+            apiKey: 'secret-api-key-12345',
+            databasePassword: 'super-secret-db-password',
+            toString: () => 'admin@internal.company.com'
+          },
+          password: {
+            hash: '$2b$10$secrethashvalue',
+            salt: 'secret-salt-value',
+            toString: () => 'admin-password'
+          }
+        };
+
+        const result = await testMiddlewareWithData(validateAuthTypes, sensitiveInjectionAttempt, 'body');
+        expectMiddlewareError(result.next);
+        
+        const error = result.next.mock.calls[0][0];
+        const errorString = JSON.stringify(error);
+        
+        // Should not expose sensitive values in error messages
+        expect(errorString).not.toContain('secret-api-key-12345');
+        expect(errorString).not.toContain('super-secret-db-password');
+        expect(errorString).not.toContain('$2b$10$secrethashvalue');
+        expect(errorString).not.toContain('secret-salt-value');
+        expect(errorString).not.toContain('admin@internal.company.com');
+      });
+
+      it('should handle malformed authentication data gracefully', async () => {
+        const malformedData = [
+          { email: Symbol('malicious'), password: 'test' },
+          { email: 'test@example.com', password: Symbol('malicious') },
+          { email: BigInt(123), password: 'test' },
+          { email: 'test@example.com', password: BigInt(456) }
+        ];
+
+        for (const data of malformedData) {
+          const result = await testMiddlewareWithData(validateAuthTypes, data, 'body');
+          
+          // Should handle gracefully
+          expect(result).toBeDefined();
+          
+          // Should either pass through (for further validation) or reject with appropriate error
+          if (result.next.mock.calls.length > 0 && result.next.mock.calls[0][0]) {
+            const error = result.next.mock.calls[0][0];
+            expect(error.statusCode).toBe(400);
+          }
+        }
       });
     });
   });

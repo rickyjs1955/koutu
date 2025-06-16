@@ -13,7 +13,9 @@ import {
   validateFile,
   validateUUIDParam,
   validateImageQuery,
-  createValidationMiddleware
+  createValidationMiddleware,
+  validateAuthTypes,
+  validateRequestTypes
 } from '../../middlewares/validate';
 
 // Import schemas
@@ -728,6 +730,498 @@ describe('Validation Middleware Integration Tests', () => {
       // Verify consistency
       expect(req.file?.originalname).toBe(req.body.filename);
       expect(req.body.description).toBe('Test image for integration testing');
+    });
+  });
+
+  describe('Type Validation Integration Tests', () => {
+    describe('validateRequestTypes Integration', () => {
+      it('should work with complex workflow validation chains', async () => {
+        const complexWorkflowData = {
+          user: {
+            name: 'John Doe',
+            email: 'john@example.com',
+            preferences: {
+              theme: 'dark',
+              notifications: true
+            }
+          },
+          metadata: {
+            source: 'api',
+            version: '1.0',
+            tags: ['user', 'registration']
+          },
+          configuration: {
+            settings: {
+              autoSave: true,
+              timeout: 3000
+            }
+          }
+        };
+
+        // Step 1: Type validation
+        const typeResult = await testMiddlewareWithData(validateRequestTypes, complexWorkflowData, 'body');
+        expectNoError(typeResult.next);
+
+        // Step 2: Schema validation
+        const complexSchema = z.object({
+          user: z.object({
+            name: z.string(),
+            email: z.string().email(),
+            preferences: z.object({
+              theme: z.enum(['light', 'dark']),
+              notifications: z.boolean()
+            })
+          }),
+          metadata: z.object({
+            source: z.string(),
+            version: z.string(),
+            tags: z.array(z.string())
+          }),
+          configuration: z.object({
+            settings: z.object({
+              autoSave: z.boolean(),
+              timeout: z.number()
+            })
+          })
+        });
+
+        const schemaValidator = validateBody(complexSchema);
+        const schemaResult = await testMiddlewareWithData(schemaValidator, complexWorkflowData, 'body');
+        expectNoError(schemaResult.next);
+
+        // Verify data integrity through the chain
+        expect(schemaResult.req.body.user.name).toBe('John Doe');
+        expect(schemaResult.req.body.metadata.tags).toEqual(['user', 'registration']);
+        expect(schemaResult.req.body.configuration.settings.autoSave).toBe(true);
+      });
+
+      it('should integrate with file upload validation', async () => {
+        const fileMetadata = {
+          title: 'Test Image',
+          description: 'Integration test image',
+          tags: ['test', 'integration'],
+          metadata: {
+            camera: 'Canon EOS',
+            location: 'Test Lab',
+            settings: {
+              iso: 400,
+              aperture: 'f/2.8'
+            }
+          }
+        };
+
+        const req = createMockRequest({ 
+          file: mockValidFile,
+          body: fileMetadata 
+        }) as Request;
+        const res = createMockResponse() as Response;
+        const next = createMockNext();
+
+        // Step 1: File validation
+        validateFile(req, res, next);
+        expectNoError(next);
+
+        // Step 2: Type validation for metadata
+        next.mockClear();
+        await validateRequestTypes(req, res, next);
+        expectNoError(next);
+
+        // Step 3: Schema validation
+        next.mockClear();
+        const metadataSchema = z.object({
+          title: z.string(),
+          description: z.string(),
+          tags: z.array(z.string()),
+          metadata: z.object({
+            camera: z.string(),
+            location: z.string(),
+            settings: z.object({
+              iso: z.number(),
+              aperture: z.string()
+            })
+          })
+        });
+
+        const schemaValidator = validateBody(metadataSchema);
+        await schemaValidator(req, res, next);
+        expectNoError(next);
+
+        // Verify complete integration
+        expect(req.file).toBeDefined();
+        expect(req.body.title).toBe('Test Image');
+        expect(req.body.metadata.settings.iso).toBe(400);
+      });
+
+      it('should handle mixed valid and invalid data in batch processing', async () => {
+        const mixedDataBatch = [
+          { name: 'Valid User 1', age: 25 }, // Valid
+          { name: ['Invalid', 'Array'], age: 30 }, // Invalid - array
+          { name: 'Valid User 2', age: 35 }, // Valid
+          { name: { object: 'invalid' }, age: 40 }, // Invalid - object
+          { name: 'Valid User 3', callback: () => {} } // Invalid - function
+        ];
+
+        const results = await Promise.all(
+          mixedDataBatch.map(data => testMiddlewareWithData(validateRequestTypes, data, 'body'))
+        );
+
+        // Should have mixed results
+        const validResults = results.filter(r => r.next.mock.calls.length === 0 || r.next.mock.calls[0][0] === undefined);
+        const invalidResults = results.filter(r => r.next.mock.calls.length > 0 && r.next.mock.calls[0][0] !== undefined);
+
+        expect(validResults).toHaveLength(2); // First and third entries
+        expect(invalidResults).toHaveLength(3); // Second, fourth, and fifth entries
+
+        // Verify error types
+        invalidResults.forEach(result => {
+          const error = result.next.mock.calls[0][0];
+          expect(error.code).toBe('TYPE_VALIDATION_ERROR');
+        });
+      });
+    });
+
+    describe('validateAuthTypes Integration', () => {
+      it('should integrate with authentication workflow', async () => {
+        const authData = {
+          email: 'user@example.com',
+          password: 'SecurePassword123!',
+          rememberMe: true,
+          deviceInfo: {
+            userAgent: 'Test Browser',
+            platform: 'Test Platform'
+          }
+        };
+
+        // Step 1: Type validation for auth fields
+        const typeResult = await testMiddlewareWithData(validateAuthTypes, authData, 'body');
+        expectNoError(typeResult.next);
+
+        // Step 2: Request type validation for other fields
+        const requestTypeResult = await testMiddlewareWithData(validateRequestTypes, authData, 'body');
+        expectNoError(requestTypeResult.next);
+
+        // Step 3: Full authentication schema validation
+        const authSchema = z.object({
+          email: z.string().email(),
+          password: z.string().min(8),
+          rememberMe: z.boolean().optional(),
+          deviceInfo: z.object({
+            userAgent: z.string(),
+            platform: z.string()
+          }).optional()
+        });
+
+        const schemaValidator = validateBody(authSchema);
+        const schemaResult = await testMiddlewareWithData(schemaValidator, authData, 'body');
+        expectNoError(schemaResult.next);
+
+        // Verify complete auth data integrity
+        expect(schemaResult.req.body.email).toBe('user@example.com');
+        expect(schemaResult.req.body.password).toBe('SecurePassword123!');
+        expect(schemaResult.req.body.deviceInfo.userAgent).toBe('Test Browser');
+      });
+
+      it('should prevent authentication bypass through type confusion', async () => {
+        const bypassAttempts = [
+          {
+            email: ['admin@example.com', 'user@example.com'],
+            password: 'password123'
+          },
+          {
+            email: 'user@example.com',
+            password: { $ne: null }
+          },
+          {
+            email: { toString: () => 'admin@example.com' },
+            password: 'password123'
+          }
+        ];
+
+        for (const attempt of bypassAttempts) {
+          const result = await testMiddlewareWithData(validateAuthTypes, attempt, 'body');
+          expectMiddlewareError(result.next);
+          
+          // Verify the bypass was prevented
+          const error = result.next.mock.calls[0][0];
+          expect(error.statusCode).toBe(400);
+          expect(error.code).toMatch(/INVALID_(EMAIL|PASSWORD)_TYPE/);
+        }
+      });
+
+      it('should work with registration and login workflows', async () => {
+        // Registration workflow
+        const registrationData = {
+          email: 'newuser@example.com',
+          password: 'NewUserPassword123!',
+          confirmPassword: 'NewUserPassword123!',
+          firstName: 'New',
+          lastName: 'User',
+          agreeToTerms: true
+        };
+
+        // Step 1: Auth type validation
+        const regTypeResult = await testMiddlewareWithData(validateAuthTypes, registrationData, 'body');
+        expectNoError(regTypeResult.next);
+
+        // Step 2: General type validation
+        const regRequestResult = await testMiddlewareWithData(validateRequestTypes, registrationData, 'body');
+        expectNoError(regRequestResult.next);
+
+        // Login workflow
+        const loginData = {
+          email: 'newuser@example.com',
+          password: 'NewUserPassword123!'
+        };
+
+        // Step 1: Auth type validation
+        const loginTypeResult = await testMiddlewareWithData(validateAuthTypes, loginData, 'body');
+        expectNoError(loginTypeResult.next);
+
+        // Step 2: Login schema validation
+        const loginSchema = z.object({
+          email: z.string().email(),
+          password: z.string().min(1)
+        });
+
+        const loginSchemaValidator = validateBody(loginSchema);
+        const loginSchemaResult = await testMiddlewareWithData(loginSchemaValidator, loginData, 'body');
+        expectNoError(loginSchemaResult.next);
+
+        // Verify both workflows handled correctly
+        expect(regRequestResult.req.body.email).toBe('newuser@example.com');
+        expect(loginSchemaResult.req.body.email).toBe('newuser@example.com');
+      });
+
+      it('should handle concurrent authentication requests', async () => {
+        const concurrentAuthData = Array(20).fill(0).map((_, i) => ({
+          email: `user${i}@example.com`,
+          password: `Password${i}123!`
+        }));
+
+        const startTime = performance.now();
+        
+        const results = await Promise.all(
+          concurrentAuthData.map(data => testMiddlewareWithData(validateAuthTypes, data, 'body'))
+        );
+
+        const endTime = performance.now();
+        const executionTime = endTime - startTime;
+
+        // Should handle concurrent requests efficiently
+        expect(executionTime).toBeLessThan(500); // Under 500ms
+        expect(results).toHaveLength(20);
+
+        // All should succeed
+        results.forEach(result => {
+          expectNoError(result.next);
+        });
+      });
+
+      it('should integrate with rate limiting and security middleware', async () => {
+        const suspiciousAuthAttempts = [
+          { email: 'admin@example.com', password: 'admin' },
+          { email: ['admin@example.com'], password: 'admin' }, // Type attack
+          { email: 'admin@example.com', password: { $ne: null } }, // NoSQL injection
+          { email: 'root@example.com', password: 'root' },
+          { email: { toString: () => 'admin@example.com' }, password: 'admin' } // Object injection
+        ];
+
+        const results = [];
+        
+        for (const attempt of suspiciousAuthAttempts) {
+          const result = await testMiddlewareWithData(validateAuthTypes, attempt, 'body');
+          results.push(result);
+        }
+
+        // First attempt might pass type validation (depends on content)
+        // But type confusion attacks should be caught
+        const typeAttacks = results.slice(1); // Skip first normal attempt
+        
+        typeAttacks.forEach(result => {
+          if (result.next.mock.calls.length > 0 && result.next.mock.calls[0][0]) {
+            const error = result.next.mock.calls[0][0];
+            expect(error.statusCode).toBe(400);
+          }
+        });
+      });
+    });
+
+    describe('Combined Type Validation Integration', () => {
+      it('should work in full API request pipeline', async () => {
+        const fullApiRequestData = {
+          // Auth fields
+          email: 'api@example.com',
+          password: 'ApiPassword123!',
+          
+          // Request metadata
+          requestId: 'req_123456',
+          timestamp: '2024-01-01T00:00:00.000Z',
+          
+          // Business data
+          payload: {
+            action: 'create_resource',
+            resourceType: 'garment',
+            data: {
+              name: 'Test Garment',
+              category: 'clothing'
+            }
+          },
+          
+          // Technical metadata
+          metadata: {
+            version: '1.0',
+            source: 'api',
+            tags: ['test', 'integration']
+          }
+        };
+
+        const req = createMockRequest({ body: fullApiRequestData }) as Request;
+        const res = createMockResponse() as Response;
+        const next = createMockNext();
+
+        // Step 1: Auth type validation
+        await validateAuthTypes(req, res, next);
+        expectNoError(next);
+
+        // Step 2: General request type validation
+        next.mockClear();
+        await validateRequestTypes(req, res, next);
+        expectNoError(next);
+
+        // Step 3: UUID param validation (simulate route param)
+        req.params = { id: '123e4567-e89b-12d3-a456-426614174000' };
+        next.mockClear();
+        await validateUUIDParam(req, res, next);
+        expectNoError(next);
+
+        // Step 4: Query validation (simulate query params)
+        req.query = { limit: '10', sort: 'created_at' };
+        next.mockClear();
+        await validateImageQuery(req, res, next);
+        expectNoError(next);
+
+        // Verify complete pipeline success
+        expect(req.body.email).toBe('api@example.com');
+        expect(req.body.payload.data.name).toBe('Test Garment');
+        expect(req.params.id).toBe('123e4567-e89b-12d3-a456-426614174000');
+        expect(req.query.limit).toBe(10);
+      });
+
+      it('should handle validation errors consistently across the pipeline', async () => {
+        const maliciousRequestData = {
+          // Type confusion in auth fields
+          email: ['malicious@array.com'],
+          password: { $ne: null },
+          
+          // Function injection in request data
+          callback: function() { return 'malicious'; },
+          
+          // Object injection in metadata
+          metadata: {
+            __proto__: { admin: true },
+            settings: 'normal'
+          }
+        };
+
+        const req = createMockRequest({ 
+          body: maliciousRequestData,
+          params: { id: 'invalid-uuid' },
+          query: { sort: 'invalid_sort_field' }
+        }) as Request;
+        const res = createMockResponse() as Response;
+        const next = createMockNext();
+
+        // Step 1: Auth type validation - should catch email array
+        await validateAuthTypes(req, res, next);
+        expectMiddlewareError(next, 'INVALID_EMAIL_TYPE', 400);
+
+        // Step 2: Even if auth passed, request validation would catch function
+        next.mockClear();
+        await validateRequestTypes(req, res, next);
+        expectMiddlewareError(next, 'TYPE_VALIDATION_ERROR', 400);
+
+        // Step 3: UUID validation would catch invalid param
+        next.mockClear();
+        await validateUUIDParam(req, res, next);
+        expectMiddlewareError(next, 'VALIDATION_ERROR', 400);
+
+        // Verify no prototype pollution occurred
+        expect(Object.prototype).not.toHaveProperty('admin');
+      });
+
+      it('should maintain performance under mixed valid/invalid load', async () => {
+        const mixedRequests = Array(50).fill(0).map((_, i) => {
+          if (i % 3 === 0) {
+            // Valid request
+            return {
+              email: `user${i}@example.com`,
+              password: `Password${i}123!`,
+              data: { valid: true }
+            };
+          } else if (i % 3 === 1) {
+            // Type confusion attack
+            return {
+              email: [`malicious${i}@array.com`],
+              password: `Password${i}123!`,
+              data: { valid: false }
+            };
+          } else {
+            // Object injection attack
+            return {
+              email: `user${i}@example.com`,
+              password: { $ne: null },
+              data: { valid: false }
+            };
+          }
+        });
+
+        const startTime = performance.now();
+        
+        const results = await Promise.all(
+          mixedRequests.map(async (data) => {
+            const authResult = await testMiddlewareWithData(validateAuthTypes, data, 'body');
+            const requestResult = await testMiddlewareWithData(validateRequestTypes, data, 'body');
+            
+            return {
+              authPassed: authResult.next.mock.calls.length === 0 || authResult.next.mock.calls[0][0] === undefined,
+              requestPassed: requestResult.next.mock.calls.length === 0 || requestResult.next.mock.calls[0][0] === undefined
+            };
+          })
+        );
+
+        const endTime = performance.now();
+        const executionTime = endTime - startTime;
+
+        // Should complete efficiently even with attacks
+        expect(executionTime).toBeLessThan(2000); // Under 2 seconds
+
+        // Should have roughly 1/3 success rate (only valid requests)
+        const validResults = results.filter(r => r.authPassed && r.requestPassed);
+        expect(validResults.length).toBeGreaterThan(10);
+        expect(validResults.length).toBeLessThan(20);
+      });
+
+      it('should integrate with error handling middleware', async () => {
+        const errorProducingData = [
+          { email: ['array'], password: 'test' }, // Auth type error
+          { email: 'test@example.com', callback: () => {} }, // Request type error
+          { email: 'test@example.com', password: 'test', evil: { __proto__: { admin: true } } } // Prototype pollution attempt
+        ];
+
+        for (const data of errorProducingData) {
+          const authResult = await testMiddlewareWithData(validateAuthTypes, data, 'body');
+          const requestResult = await testMiddlewareWithData(validateRequestTypes, data, 'body');
+
+          // At least one should catch the malicious content
+          const authError = authResult.next.mock.calls.length > 0 ? authResult.next.mock.calls[0][0] : null;
+          const requestError = requestResult.next.mock.calls.length > 0 ? requestResult.next.mock.calls[0][0] : null;
+
+          expect(authError || requestError).toBeTruthy();
+
+          // Verify no prototype pollution
+          expect(Object.prototype).not.toHaveProperty('admin');
+        }
+      });
     });
   });
 

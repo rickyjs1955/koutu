@@ -855,4 +855,273 @@ describe('authService', () => {
             });
         });
     });
+
+    describe('Enhanced Security Features', () => {
+        describe('Enhanced Password Validation', () => {
+            it('should reject specific weak password patterns', () => {
+            const weakPatterns = [
+                'weakpass',        // Exact match in weak patterns
+                'simple123',       // Exact match in weak patterns  
+                'nosymbols123',    // Exact match in weak patterns
+                'uppercase123',    // Exact match in weak patterns
+                'lowercase',       // Exact match in weak patterns
+                'nonumbers'        // Exact match in weak patterns
+            ];
+
+            for (const password of weakPatterns) {
+                expect(() => authService.validatePasswordStrength(password))
+                .toThrow(expect.objectContaining({
+                    message: 'Password must be at least 8 characters long'
+                }));
+            }
+            });
+
+            it('should reject repetitive character patterns', () => {
+            const repetitivePasswords = [
+                'AAA12345!',     // 3+ consecutive same chars
+                'password111',   // repetitive numbers
+                'TestTTT1!'      // repetitive letters
+            ];
+
+            for (const password of repetitivePasswords) {
+                expect(() => authService.validatePasswordStrength(password))
+                .toThrow(expect.objectContaining({
+                    message: expect.stringContaining('repeating characters')
+                }));
+            }
+            });
+
+            it('should reject keyboard walking patterns', () => {
+            const keyboardPasswords = [
+                'qwerty123!',
+                'asdf1234!', 
+                '1234abcd!'
+            ];
+
+            for (const password of keyboardPasswords) {
+                expect(() => authService.validatePasswordStrength(password))
+                .toThrow(expect.objectContaining({
+                    message: expect.stringContaining('keyboard patterns')
+                }));
+            }
+            });
+
+            it('should reject all-letters passwords regardless of length', () => {
+            const allLetterPasswords = [
+                'abcdefgh',        // 8 chars, all lowercase
+                'ABCDEFGH',        // 8 chars, all uppercase
+                'AbCdEfGh',        // 8 chars, mixed case but all letters
+                'abcdefghijklmn'   // longer, all letters
+            ];
+
+            for (const password of allLetterPasswords) {
+                expect(() => authService.validatePasswordStrength(password))
+                .toThrow(expect.objectContaining({
+                    message: 'Password must be at least 8 characters long'
+                }));
+            }
+            });
+
+            it('should reject all-numbers passwords regardless of length', () => {
+            const allNumberPasswords = [
+                '12345678',        // 8 digits
+                '123456789',       // 9 digits
+                '1234567890123'    // longer numbers
+            ];
+
+            for (const password of allNumberPasswords) {
+                expect(() => authService.validatePasswordStrength(password))
+                .toThrow(expect.objectContaining({
+                    message: 'Password must be at least 8 characters long'
+                }));
+            }
+            });
+
+            it('should allow strong passwords that pass all checks', () => {
+            const strongPasswords = [
+                'StrongP@ss123!',   // Mixed case, numbers, special chars
+                'MySecure#2024',    // Different pattern
+                'C0mplex!Pass'      // Another strong pattern
+            ];
+
+            for (const password of strongPasswords) {
+                expect(() => authService.validatePasswordStrength(password))
+                .not.toThrow();
+            }
+            });
+        });
+
+        describe('Timing Attack Prevention Methods', () => {
+            beforeEach(() => {
+            jest.clearAllMocks();
+            });
+
+            it('should have performDummyPasswordValidation method', async () => {
+            // Test that the method exists and runs without error
+            await expect(authService.performDummyPasswordValidation())
+                .resolves.not.toThrow();
+            });
+
+            it('should have ensureMinimumResponseTime method', async () => {
+            const startTime = Date.now();
+            
+            // Test with time that needs padding
+            await authService.ensureMinimumResponseTime(startTime, 100);
+            
+            const elapsed = Date.now() - startTime;
+            expect(elapsed).toBeGreaterThanOrEqual(95); // Allow small variance
+            });
+
+            it('should not add delay if minimum time already elapsed', async () => {
+            const pastTime = Date.now() - 200; // 200ms ago
+            const start = Date.now();
+            
+            await authService.ensureMinimumResponseTime(pastTime, 100);
+            
+            const elapsed = Date.now() - start;
+            expect(elapsed).toBeLessThan(50); // Should be very quick
+            });
+        });
+
+        describe('Enhanced Input Type Validation', () => {
+            it('should handle non-string email inputs in validateEmailFormat', () => {
+            const invalidInputs = [
+                123,
+                [],
+                {},
+                null,
+                undefined,
+                true,
+                false,
+                Symbol('email')
+            ];
+
+            for (const input of invalidInputs) {
+                expect(() => authService.validateEmailFormat(input as any))
+                .toThrow(expect.objectContaining({
+                    message: 'Email is required'
+                }));
+            }
+            });
+
+            it('should handle non-string password inputs in validatePasswordStrength', () => {
+            const invalidInputs = [
+                123,
+                [],
+                {},
+                null,
+                undefined,
+                true,
+                false,
+                Symbol('password')
+            ];
+
+            for (const input of invalidInputs) {
+                expect(() => authService.validatePasswordStrength(input as any))
+                .toThrow(expect.objectContaining({
+                    message: 'Password is required'
+                }));
+            }
+            });
+
+            it('should handle empty strings properly', () => {
+            // Empty email
+            expect(() => authService.validateEmailFormat(''))
+                .toThrow(expect.objectContaining({
+                message: 'Email cannot be empty'
+                }));
+
+            // Whitespace-only email
+            expect(() => authService.validateEmailFormat('   '))
+                .toThrow(expect.objectContaining({
+                message: 'Email cannot be empty'
+                }));
+            });
+        });
+
+        describe('Authorization Security Enhancement', () => {
+            it('should prevent cross-user password updates with requestingUserId', async () => {
+            const user1 = { 
+                id: 'user-1', 
+                email: 'user1@example.com', 
+                created_at: new Date() 
+            };
+            const user2 = { 
+                id: 'user-2', 
+                email: 'user2@example.com',
+                created_at: new Date() 
+            };
+
+            mockUserModel.findById.mockResolvedValue(user2);
+
+            // User 1 trying to update User 2's password
+            await expect(
+                authService.updatePassword({
+                userId: user2.id,
+                currentPassword: 'SomePassword123!',
+                newPassword: 'NewPassword123!',
+                requestingUserId: user1.id  // Different user!
+                })
+            ).rejects.toThrow(expect.objectContaining({
+                message: 'Users can only update their own passwords'
+            }));
+            });
+
+            it('should allow password updates when requestingUserId matches userId', async () => {
+            const user = { 
+                id: 'user-1', 
+                email: 'user1@example.com', 
+                created_at: new Date() 
+            };
+            const userWithPassword = {
+                ...user,
+                password_hash: 'hashed-password',
+                updated_at: new Date()
+            };
+
+            mockUserModel.findById.mockResolvedValue(user);
+            mockUserModel.hasPassword.mockResolvedValue(true);
+            mockUserModel.findByEmail.mockResolvedValue(userWithPassword);
+            mockUserModel.validatePassword.mockResolvedValue(true);
+            mockUserModel.updatePassword.mockResolvedValue(true);
+
+            const result = await authService.updatePassword({
+                userId: user.id,
+                currentPassword: 'CurrentPass123!',
+                newPassword: 'NewPassword123!',
+                requestingUserId: user.id  // Same user
+            });
+
+            expect(result).toEqual({ success: true });
+            });
+
+            it('should work without requestingUserId for backward compatibility', async () => {
+            const user = { 
+                id: 'user-1', 
+                email: 'user1@example.com', 
+                created_at: new Date() 
+            };
+            const userWithPassword = {
+                ...user,
+                password_hash: 'hashed-password',
+                updated_at: new Date()
+            };
+
+            mockUserModel.findById.mockResolvedValue(user);
+            mockUserModel.hasPassword.mockResolvedValue(true);
+            mockUserModel.findByEmail.mockResolvedValue(userWithPassword);
+            mockUserModel.validatePassword.mockResolvedValue(true);
+            mockUserModel.updatePassword.mockResolvedValue(true);
+
+            const result = await authService.updatePassword({
+                userId: user.id,
+                currentPassword: 'CurrentPass123!',
+                newPassword: 'NewPassword123!'
+                // No requestingUserId - should work for backward compatibility
+            });
+
+            expect(result).toEqual({ success: true });
+            });
+        });
+    });
 });

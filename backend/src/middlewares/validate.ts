@@ -310,6 +310,98 @@ export const instagramValidationMiddleware = async (
   }
 };
 
+/**
+ * Middleware to validate request body types and prevent type confusion attacks
+ */
+export const validateRequestTypes = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const body = req.body;
+    
+    if (!body || typeof body !== 'object') {
+      return next();
+    }
+
+    // Check for type confusion attacks
+    const typeErrors: string[] = [];
+    
+    Object.entries(body).forEach(([key, value]) => {
+      // Check for array injection where string expected
+      if (Array.isArray(value)) {
+        typeErrors.push(`Field '${key}' should be a string, received array`);
+      }
+      
+      // Check for object injection where primitive expected
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        // Allow nested objects for specific fields like 'metadata'
+        const allowedObjectFields = ['metadata', 'mask_data', 'points'];
+        if (!allowedObjectFields.includes(key)) {
+          typeErrors.push(`Field '${key}' should be a primitive value, received object`);
+        }
+      }
+      
+      // Check for function injection
+      if (typeof value === 'function') {
+        typeErrors.push(`Field '${key}' contains function, which is not allowed`);
+      }
+      
+      // Check for undefined injection (different from missing field)
+      if (value === undefined) {
+        typeErrors.push(`Field '${key}' is explicitly undefined`);
+      }
+    });
+
+    if (typeErrors.length > 0) {
+      return next(ApiError.badRequest(
+        'Type validation failed: ' + typeErrors.join(', '),
+        'TYPE_VALIDATION_ERROR'
+      ));
+    }
+
+    next();
+  } catch (error) {
+    next(ApiError.internal('Type validation error', 'TYPE_VALIDATION_ERROR', error as Error));
+  }
+};
+
+/**
+ * Specific middleware for authentication endpoints
+ */
+export const validateAuthTypes = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, password } = req.body || {};
+    
+    // Type validation with helpful error messages
+    if (email !== undefined && typeof email !== 'string') {
+      return next(ApiError.badRequest('Email must be a string', 'INVALID_EMAIL_TYPE'));
+    }
+    
+    if (password !== undefined && typeof password !== 'string') {
+      return next(ApiError.badRequest('Password must be a string', 'INVALID_PASSWORD_TYPE'));
+    }
+    
+    // Check for array/object injection specifically
+    if (Array.isArray(email)) {
+      return next(ApiError.badRequest('Email cannot be an array', 'INVALID_EMAIL_TYPE'));
+    }
+    
+    if (Array.isArray(password)) {
+      return next(ApiError.badRequest('Password cannot be an array', 'INVALID_PASSWORD_TYPE'));
+    }
+    
+    if (email !== null && typeof email === 'object') {
+      return next(ApiError.badRequest('Email cannot be an object', 'INVALID_EMAIL_TYPE'));
+    }
+    
+    if (password !== null && typeof password === 'object') {
+      return next(ApiError.badRequest('Password cannot be an object', 'INVALID_PASSWORD_TYPE'));
+    }
+
+    next();
+  } catch (error) {
+    next(ApiError.internal('Authentication type validation error', 'AUTH_TYPE_VALIDATION_ERROR', error as Error));
+  }
+};
+
 // Enhanced error messages for better UX
 export const instagramErrorMessages = {
   FILE_TOO_LARGE: 'Your image is too large. Please use an image under 8MB.',

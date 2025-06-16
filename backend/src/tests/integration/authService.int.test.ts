@@ -757,4 +757,98 @@ describe('authService Integration Tests', () => {
       });
     });
   });
+
+  describe('Enhanced Security Integration', () => {
+    describe('Timing Attack Prevention Integration', () => {
+      it('should maintain consistent response times in login flow', async () => {
+        const validUser = {
+          email: generateUniqueEmail('timing'),
+          password: 'ValidPass123!'
+        };
+
+        // Register a valid user
+        await authService.register(validUser);
+
+        const timings: number[] = [];
+
+        // Test login with non-existent user
+        for (let i = 0; i < 3; i++) {
+          const start = Date.now();
+          try {
+            await authService.login({
+              email: generateUniqueEmail('nonexistent'),
+              password: 'SomePassword123!'
+            });
+          } catch (error) {
+            // Expected to fail
+          }
+          timings.push(Date.now() - start);
+        }
+
+        // Test login with valid user but wrong password
+        for (let i = 0; i < 3; i++) {
+          const start = Date.now();
+          try {
+            await authService.login({
+              email: validUser.email,
+              password: 'WrongPassword123!'
+            });
+          } catch (error) {
+            // Expected to fail
+          }
+          timings.push(Date.now() - start);
+        }
+
+        // Check timing consistency
+        const avgTime = timings.reduce((a, b) => a + b, 0) / timings.length;
+        const maxDeviation = Math.max(...timings.map(t => Math.abs(t - avgTime)));
+        
+        // Should be reasonably consistent (within 100% of average)
+        expect(maxDeviation).toBeLessThan(avgTime);
+        
+        // All should meet minimum response time
+        timings.forEach(timing => {
+          expect(timing).toBeGreaterThanOrEqual(95); // Allow 5ms variance from 100ms
+        });
+      });
+    });
+
+    describe('Enhanced Password Validation Integration', () => {
+      it('should reject enhanced weak patterns in real registration flow', async () => {
+        const enhancedWeakPatterns = [
+          'qwerty123!',      // Keyboard pattern
+          'AAA12345!',       // Repetitive characters
+          'abcdefghijk',     // All letters, long
+          '123456789012'     // All numbers, long
+        ];
+
+        for (const password of enhancedWeakPatterns) {
+          await expect(
+            authService.register({
+              email: generateUniqueEmail('weakpattern'),
+              password
+            })
+          ).rejects.toThrow(ApiError);
+        }
+      });
+
+      it('should accept strong passwords in real registration flow', async () => {
+        const strongPasswords = [
+          'MyStr0ng!P@ssw0rd',
+          'C0mplex#Security2024',
+          'Un1que$Safe&Sound'
+        ];
+
+        for (const password of strongPasswords) {
+          const result = await authService.register({
+            email: generateUniqueEmail('strongpass'),
+            password
+          });
+          
+          expect(result.user.id).toBeDefined();
+          expect(result.token).toBeDefined();
+        }
+      });
+    });
+  });
 });
