@@ -9,12 +9,12 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { config } from '../config';
 import { sanitization } from '../utils/sanitize';
 
-type OAuthProvider = 'google' | 'microsoft' | 'github' | 'instagram';
+export type OAuthProvider = 'google' | 'microsoft' | 'github' | 'instagram';
 
-// Rate limiting for OAuth operations
+// Rate limiting for OAuth operations - separated by provider
 const oauthRateLimit = new Map<string, { count: number; resetTime: number }>();
 
-interface OAuthTokenResponse {
+export interface OAuthTokenResponse {
   access_token: string;
   id_token?: string;
   expires_in: number;
@@ -22,7 +22,7 @@ interface OAuthTokenResponse {
   token_type: string;
 }
 
-interface OAuthUserInfo {
+export interface OAuthUserInfo {
   id: string;
   email: string;
   name?: string;
@@ -131,6 +131,11 @@ export const oauthService = {
       const userInfoResponse = await axios.get(userInfoUrl, requestConfig);
       const userData = userInfoResponse.data;
 
+      // Handle null or empty responses
+      if (!userData) {
+        throw new Error('Invalid user info response');
+      }
+
       // Sanitize user data to prevent XSS
       const sanitizedUserInfo = this.sanitizeUserInfo(provider, userData);
       
@@ -218,7 +223,7 @@ export const oauthService = {
   },
   
   /**
-   * Validate OAuth state parameter
+   * Check OAuth rate limit per provider
    */
   async checkOAuthRateLimit(provider: string): Promise<void> {
     const key = `oauth_${provider}`;
@@ -226,6 +231,7 @@ export const oauthService = {
     const limit = oauthRateLimit.get(key);
     
     if (!limit || now > limit.resetTime) {
+      // Reset or initialize rate limit for this provider
       oauthRateLimit.set(key, { count: 1, resetTime: now + 60000 }); // 1 minute window
       return;
     }
@@ -238,15 +244,22 @@ export const oauthService = {
     oauthRateLimit.set(key, limit);
   },
 
+  /**
+   * Track failed OAuth attempts for monitoring
+   */
   async trackFailedOAuthAttempt(provider: string, reason: string): Promise<void> {
     try {
       console.warn(`Failed OAuth attempt for ${provider}: ${reason}`);
       // In production, store in database for monitoring
+      // You could add database logging here if needed
     } catch (error) {
       console.error('Error tracking failed OAuth attempt:', error);
     }
   },
 
+  /**
+   * Ensure minimum response time to prevent timing attacks
+   */
   async ensureMinimumResponseTime(startTime: number, minimumMs: number): Promise<void> {
     const elapsed = Date.now() - startTime;
     if (elapsed < minimumMs) {
@@ -254,7 +267,15 @@ export const oauthService = {
     }
   },
 
+  /**
+   * Sanitize user information from OAuth providers
+   */
   sanitizeUserInfo(provider: OAuthProvider, userData: any): OAuthUserInfo {
+    // Handle null or undefined userData
+    if (!userData) {
+      throw new Error('Invalid user data received from OAuth provider');
+    }
+
     switch (provider) {
       case 'google':
         return {
@@ -278,14 +299,37 @@ export const oauthService = {
           picture: sanitization.sanitizeUrl(userData.avatar_url)
         };
       case 'instagram':
+        const username = sanitization.sanitizeUserInput(userData.username) || '';
         return {
           id: sanitization.sanitizeUserInput(userData.id?.toString()),
-          email: `${sanitization.sanitizeUserInput(userData.username)}@instagram.local`,
-          name: sanitization.sanitizeUserInput(userData.username),
+          email: `${username}@instagram.local`,
+          name: username,
           picture: sanitization.sanitizeUrl(userData.profile_picture_url || '')
         };
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }
+  },
+
+  /**
+   * Reset rate limits for a specific provider (useful for testing)
+   */
+  resetRateLimit(provider?: string): void {
+    if (provider) {
+      oauthRateLimit.delete(`oauth_${provider}`);
+    } else {
+      oauthRateLimit.clear();
+    }
+  },
+
+  /**
+   * Get current rate limit status for a provider
+   */
+  getRateLimitStatus(provider: string): { count: number; resetTime: number } | null {
+    return oauthRateLimit.get(`oauth_${provider}`) || null;
   }
+};
+
+export const __testExports = {
+  oauthRateLimit
 };
