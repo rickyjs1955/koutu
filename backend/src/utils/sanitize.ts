@@ -722,6 +722,244 @@ class SanitizationModule {
     wrapWardrobeController = (controller: Function, operation: string) => {
         return this.wrapController(controller, `${operation} the wardrobe`);
     }
+
+    /**
+     * Sanitize email addresses for secure output
+     */
+    sanitizeEmail = (input: any): string => {
+        if (typeof input !== 'string') {
+            return '';
+        }
+
+        // Trim and convert to lowercase
+        let email = input.trim().toLowerCase();
+        
+        // Length check
+        if (email.length > 254) {
+            email = email.substring(0, 254);
+        }
+        
+        // Remove dangerous patterns
+        email = email
+            .replace(/<script[^>]*>.*?<\/script>/gis, '')
+            .replace(/<[^>]*>/g, '')
+            .replace(/javascript:/gi, '')
+            .replace(/data:/gi, '')
+            .replace(/[<>"/\\]/g, '') // Remove dangerous characters
+            .replace(/\s+/g, '') // Remove any whitespace
+            .trim();
+        
+        // Basic email format validation
+        const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+        
+        if (!emailRegex.test(email)) {
+            return '';
+        }
+        
+        // Additional security checks
+        if (email.includes('..') || email.startsWith('.') || email.endsWith('.')) {
+            return '';
+        }
+        
+        return email;
+    }
+
+    /**
+     * Sanitize URLs for secure redirects and display
+     */
+    sanitizeUrl = (input: any): string => {
+        if (typeof input !== 'string') {
+            return '';
+        }
+        
+        let url = input.trim();
+        
+        // Length check
+        if (url.length > 2048) {
+            url = url.substring(0, 2048);
+        }
+        
+        // Remove dangerous content
+        url = url
+            .replace(/<script[^>]*>.*?<\/script>/gis, '')
+            .replace(/<[^>]*>/g, '')
+            .replace(/[\x00-\x1f\x7f-\x9f]/g, '') // Remove control characters
+            .trim();
+        
+        // Handle empty URLs
+        if (!url) {
+            return '';
+        }
+        
+        try {
+            // Parse URL to validate structure
+            const urlObj = new URL(url);
+            
+            // Security checks
+            const allowedProtocols = ['http:', 'https:'];
+            if (!allowedProtocols.includes(urlObj.protocol)) {
+                return '';
+            }
+            
+            // Block dangerous patterns
+            const dangerousPatterns = [
+                /javascript:/i,
+                /data:/i,
+                /vbscript:/i,
+                /file:/i,
+                /ftp:/i
+            ];
+            
+            if (dangerousPatterns.some(pattern => pattern.test(url))) {
+                return '';
+            }
+            
+            // Additional security for OAuth context
+            if (url.includes('access_token=') || url.includes('client_secret=')) {
+                // Log security concern but don't expose the URL
+                console.warn('Potential credential exposure in URL sanitization');
+                return '';
+            }
+            
+            return urlObj.toString();
+        } catch (error) {
+            // If URL parsing fails, try to construct a safe relative URL
+            if (url.startsWith('/') && !url.startsWith('//')) {
+                // Relative URL - sanitize path
+                const sanitizedPath = url
+                    .replace(/\.\./g, '') // Remove path traversal
+                    .replace(/[<>"']/g, '') // Remove dangerous characters
+                    .replace(/\s+/g, '%20'); // Encode spaces
+                
+                return sanitizedPath;
+            }
+            
+            // Invalid URL format
+            return '';
+        }
+    }
+
+    /**
+     * Sanitize OAuth redirect URLs with additional security for OAuth flows
+     */
+    sanitizeOAuthRedirectUrl = (input: any, allowedDomains?: string[]): string => {
+        const sanitizedUrl = this.sanitizeUrl(input);
+        
+        if (!sanitizedUrl) {
+            return '';
+        }
+        
+        try {
+            const urlObj = new URL(sanitizedUrl);
+            
+            // Additional OAuth-specific security checks
+            if (allowedDomains && allowedDomains.length > 0) {
+                if (!allowedDomains.includes(urlObj.hostname)) {
+                    console.warn(`OAuth redirect URL domain not allowed: ${urlObj.hostname}`);
+                    return '';
+                }
+            }
+            
+            // OAuth-specific dangerous patterns
+            const oauthDangerousPatterns = [
+                /token=/i,
+                /access_token=/i,
+                /refresh_token=/i,
+                /client_secret=/i,
+                /password=/i
+            ];
+            
+            if (oauthDangerousPatterns.some(pattern => pattern.test(sanitizedUrl))) {
+                console.warn('OAuth redirect URL contains sensitive parameters');
+                return '';
+            }
+            
+            return sanitizedUrl;
+        } catch (error) {
+            return '';
+        }
+    }
+
+    /**
+     * Sanitize OAuth state parameter
+     */
+    sanitizeOAuthState = (input: any): string => {
+        if (typeof input !== 'string') {
+            return '';
+        }
+        
+        let state = input.trim();
+        
+        // Length check for state parameters
+        if (state.length > 128) {
+            state = state.substring(0, 128);
+        }
+        
+        // OAuth state should be alphanumeric with hyphens only
+        const stateRegex = /^[a-zA-Z0-9\-_]+$/;
+        if (!stateRegex.test(state)) {
+            return '';
+        }
+        
+        // Remove any remaining dangerous patterns
+        state = state
+            .replace(/javascript:/gi, '')
+            .replace(/data:/gi, '')
+            .replace(/<[^>]*>/g, '')
+            .replace(/['"<>]/g, '');
+        
+        return state;
+    }
+
+    /**
+     * Sanitize OAuth provider name
+     */
+    sanitizeOAuthProvider = (input: any): string => {
+        if (typeof input !== 'string') {
+            return '';
+        }
+        
+        const provider = input.toLowerCase().trim();
+        const validProviders = ['google', 'microsoft', 'github', 'instagram'];
+        
+        if (validProviders.includes(provider)) {
+            return provider;
+        }
+        
+        return '';
+    }
+
+    /**
+     * Sanitize OAuth authorization code
+     */
+    sanitizeOAuthCode = (input: any): string => {
+        if (typeof input !== 'string') {
+            return '';
+        }
+        
+        let code = input.trim();
+        
+        // Length check
+        if (code.length > 512) {
+            code = code.substring(0, 512);
+        }
+        
+        // Remove dangerous content
+        code = code
+            .replace(/<script[^>]*>.*?<\/script>/gis, '')
+            .replace(/<[^>]*>/g, '')
+            .replace(/javascript:/gi, '')
+            .replace(/data:/gi, '')
+            .replace(/[<>"']/g, '');
+        
+        // OAuth codes should be alphanumeric with some special characters
+        const codeRegex = /^[a-zA-Z0-9\-_\.%]+$/;
+        if (!codeRegex.test(code)) {
+            return '';
+        }
+        
+        return code;
+    }
 }
 
 // Export singleton instance

@@ -402,6 +402,40 @@ export const validateAuthTypes = (req: Request, res: Response, next: NextFunctio
   }
 };
 
+export const validateOAuthProvider = (req: Request, res: Response, next: NextFunction) => {
+  const { provider } = req.params;
+  const validProviders = ['google', 'microsoft', 'github', 'instagram'];
+  
+  if (!provider || !validProviders.includes(provider)) {
+    return next(ApiError.badRequest(`Invalid OAuth provider: ${provider}`));
+  }
+  
+  next();
+};
+
+export const validateOAuthTypes = (req: Request, res: Response, next: NextFunction) => {
+  // Handle null or undefined query object
+  if (!req.query || typeof req.query !== 'object') {
+    return next();
+  }
+
+  const { code, state, error } = req.query;
+  
+  // Check for array parameter pollution
+  if (Array.isArray(code) || Array.isArray(state) || Array.isArray(error)) {
+    return next(ApiError.badRequest('Invalid parameter format'));
+  }
+  
+  // Check for object parameter pollution
+  if ((code && typeof code === 'object') || 
+      (state && typeof state === 'object') || 
+      (error && typeof error === 'object')) {
+    return next(ApiError.badRequest('Invalid parameter format'));
+  }
+  
+  next();
+};
+
 // Enhanced error messages for better UX
 export const instagramErrorMessages = {
   FILE_TOO_LARGE: 'Your image is too large. Please use an image under 8MB.',

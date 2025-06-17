@@ -7,8 +7,12 @@ import { query } from '../models/db';
 import { ApiError } from '../utils/ApiError';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { config } from '../config';
+import { sanitization } from '../utils/sanitize';
 
 type OAuthProvider = 'google' | 'microsoft' | 'github' | 'instagram';
+
+// Rate limiting for OAuth operations
+const oauthRateLimit = new Map<string, { count: number; resetTime: number }>();
 
 interface OAuthTokenResponse {
   access_token: string;
@@ -30,14 +34,34 @@ export const oauthService = {
   /**
    * Exchange authorization code for tokens
    */
-  async exchangeCodeForTokens(
-    provider: OAuthProvider,
-    code: string
-  ): Promise<OAuthTokenResponse> {
-    const providerConfig = oauthConfig[provider];
+  async exchangeCodeForTokens(provider: OAuthProvider, code: string): Promise<OAuthTokenResponse> {
+    const startTime = Date.now();
     
+    // Validate input
+    if (!code || typeof code !== 'string' || code.trim().length === 0) {
+      throw ApiError.badRequest('Invalid authorization code');
+    }
+
+    // Rate limiting by provider to prevent abuse
+    await this.checkOAuthRateLimit(provider);
+
     try {
-      // Instagram uses different token exchange format
+      const providerConfig = oauthConfig[provider];
+      
+      // Enhanced request configuration with security headers
+      const requestConfig = {
+        timeout: 10000, // 10 second timeout
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'User-Agent': 'YourApp/1.0',
+          // Add security headers
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      };
+
+      let tokenResponse;
+      
       if (provider === 'instagram') {
         const formData = new URLSearchParams();
         formData.append('client_id', providerConfig.clientId);
@@ -46,116 +70,74 @@ export const oauthService = {
         formData.append('redirect_uri', providerConfig.redirectUri);
         formData.append('code', code);
 
-        const tokenResponse = await axios.post(
-          providerConfig.tokenUrl,
-          formData,
-          {
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              Accept: 'application/json'
-            }
-          }
-        );
-
-        return tokenResponse.data;
-      }
-
-      const tokenResponse = await axios.post(
-        providerConfig.tokenUrl,
-        {
+        tokenResponse = await axios.post(providerConfig.tokenUrl, formData, requestConfig);
+      } else {
+        tokenResponse = await axios.post(providerConfig.tokenUrl, {
           client_id: providerConfig.clientId,
           client_secret: providerConfig.clientSecret,
           code,
           grant_type: 'authorization_code',
           redirect_uri: providerConfig.redirectUri
-        },
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Accept: 'application/json'
-          }
-        }
-      );
+        }, requestConfig);
+      }
 
-      return tokenResponse.data;
-    } catch (error) {
-      console.error('OAuth token exchange error:', error);
-      throw new ApiError('Failed to exchange code for tokens', 500, 'OAUTH_TOKEN_ERROR');
+      // Validate token response structure
+      const tokens = tokenResponse.data;
+      if (!tokens.access_token || typeof tokens.access_token !== 'string') {
+        throw new Error('Invalid token response format');
+      }
+
+      // Ensure minimum response time
+      await this.ensureMinimumResponseTime(startTime, 100);
+      
+      return tokens;
+    } catch (error: any) {
+      await this.ensureMinimumResponseTime(startTime, 100);
+      
+      // Track failed attempt
+      await this.trackFailedOAuthAttempt(provider, 'token_exchange_failed');
+      
+      console.error('OAuth token exchange error:', error.message);
+      throw ApiError.internal('Failed to exchange code for tokens', 'OAUTH_TOKEN_ERROR');
     }
   },
 
   /**
    * Get user information from OAuth provider
    */
-  async getUserInfo(
-    provider: OAuthProvider,
-    accessToken: string
-  ): Promise<OAuthUserInfo> {
-    const providerConfig = oauthConfig[provider];
-    
+  async getUserInfo(provider: OAuthProvider, accessToken: string): Promise<OAuthUserInfo> {
+    // Validate access token
+    if (!accessToken || typeof accessToken !== 'string' || accessToken.trim().length === 0) {
+      throw ApiError.badRequest('Invalid access token');
+    }
+
     try {
+      const providerConfig = oauthConfig[provider];
       let userInfoUrl = providerConfig.userInfoUrl;
       
-      // Instagram requires specific fields parameter
       if (provider === 'instagram') {
         userInfoUrl = `${providerConfig.userInfoUrl}?fields=id,username,account_type`;
       }
 
-      const userInfoResponse = await axios.get(userInfoUrl, {
+      const requestConfig = {
+        timeout: 10000,
         headers: {
-          Authorization: `Bearer ${accessToken}`
+          Authorization: `Bearer ${accessToken}`,
+          'User-Agent': 'YourApp/1.0',
+          'Accept': 'application/json'
         }
-      });
+      };
 
-      // Normalize user info based on provider
+      const userInfoResponse = await axios.get(userInfoUrl, requestConfig);
       const userData = userInfoResponse.data;
 
-      switch (provider) {
-        case 'google':
-          return {
-            id: userData.sub,
-            email: userData.email,
-            name: userData.name,
-            picture: userData.picture
-          };
-        case 'microsoft':
-          return {
-            id: userData.sub,
-            email: userData.email,
-            name: userData.name,
-            picture: userData.picture
-          };
-        case 'github':
-          // GitHub doesn't return email in user info endpoint
-          const emailsResponse = await axios.get('https://api.github.com/user/emails', {
-            headers: {
-              Authorization: `Bearer ${accessToken}`
-            }
-          });
-          
-          const primaryEmail = emailsResponse.data.find((email: any) => email.primary)?.email;
-          
-          return {
-            id: userData.id.toString(),
-            email: primaryEmail || userData.email,
-            name: userData.name,
-            picture: userData.avatar_url
-          };
-        case 'instagram':
-          // Instagram Basic Display API doesn't provide email
-          // You might need to request it separately or use a placeholder
-          return {
-            id: userData.id.toString(),
-            email: `${userData.username}@instagram.local`, // Placeholder email
-            name: userData.username,
-            picture: userData.profile_picture_url || ''
-          };
-        default:
-          throw new Error(`Unsupported provider: ${provider}`);
-      }
-    } catch (error) {
-      console.error('OAuth user info error:', error);
-      throw new ApiError('Failed to get user info', 500, 'OAUTH_USER_INFO_ERROR');
+      // Sanitize user data to prevent XSS
+      const sanitizedUserInfo = this.sanitizeUserInfo(provider, userData);
+      
+      return sanitizedUserInfo;
+    } catch (error: any) {
+      console.error('OAuth user info error:', error.message);
+      throw ApiError.internal('Failed to get user info', 'OAUTH_USER_INFO_ERROR');
     }
   },
 
@@ -233,5 +215,77 @@ export const oauthService = {
             expiresIn: expiresInValue
         }
     );
+  },
+  
+  /**
+   * Validate OAuth state parameter
+   */
+  async checkOAuthRateLimit(provider: string): Promise<void> {
+    const key = `oauth_${provider}`;
+    const now = Date.now();
+    const limit = oauthRateLimit.get(key);
+    
+    if (!limit || now > limit.resetTime) {
+      oauthRateLimit.set(key, { count: 1, resetTime: now + 60000 }); // 1 minute window
+      return;
+    }
+    
+    if (limit.count >= 10) { // 10 attempts per minute per provider
+      throw ApiError.rateLimited('OAuth rate limit exceeded', 10, 60000);
+    }
+    
+    limit.count++;
+    oauthRateLimit.set(key, limit);
+  },
+
+  async trackFailedOAuthAttempt(provider: string, reason: string): Promise<void> {
+    try {
+      console.warn(`Failed OAuth attempt for ${provider}: ${reason}`);
+      // In production, store in database for monitoring
+    } catch (error) {
+      console.error('Error tracking failed OAuth attempt:', error);
+    }
+  },
+
+  async ensureMinimumResponseTime(startTime: number, minimumMs: number): Promise<void> {
+    const elapsed = Date.now() - startTime;
+    if (elapsed < minimumMs) {
+      await new Promise(resolve => setTimeout(resolve, minimumMs - elapsed));
+    }
+  },
+
+  sanitizeUserInfo(provider: OAuthProvider, userData: any): OAuthUserInfo {
+    switch (provider) {
+      case 'google':
+        return {
+          id: sanitization.sanitizeUserInput(userData.sub || userData.id),
+          email: sanitization.sanitizeEmail(userData.email),
+          name: sanitization.sanitizeUserInput(userData.name),
+          picture: sanitization.sanitizeUrl(userData.picture)
+        };
+      case 'microsoft':
+        return {
+          id: sanitization.sanitizeUserInput(userData.sub || userData.id),
+          email: sanitization.sanitizeEmail(userData.email),
+          name: sanitization.sanitizeUserInput(userData.name),
+          picture: sanitization.sanitizeUrl(userData.picture)
+        };
+      case 'github':
+        return {
+          id: sanitization.sanitizeUserInput(userData.id?.toString()),
+          email: sanitization.sanitizeEmail(userData.email),
+          name: sanitization.sanitizeUserInput(userData.name),
+          picture: sanitization.sanitizeUrl(userData.avatar_url)
+        };
+      case 'instagram':
+        return {
+          id: sanitization.sanitizeUserInput(userData.id?.toString()),
+          email: `${sanitization.sanitizeUserInput(userData.username)}@instagram.local`,
+          name: sanitization.sanitizeUserInput(userData.username),
+          picture: sanitization.sanitizeUrl(userData.profile_picture_url || '')
+        };
+      default:
+        throw new Error(`Unsupported provider: ${provider}`);
+    }
   }
 };
