@@ -402,6 +402,9 @@ export const validateAuthTypes = (req: Request, res: Response, next: NextFunctio
   }
 };
 
+/**
+ * Middleware to validate OAuth provider in request parameters
+ */
 export const validateOAuthProvider = (req: Request, res: Response, next: NextFunction) => {
   const { provider } = req.params;
   const validProviders = ['google', 'microsoft', 'github', 'instagram'];
@@ -413,6 +416,9 @@ export const validateOAuthProvider = (req: Request, res: Response, next: NextFun
   next();
 };
 
+/**
+ * Middleware to validate OAuth types in request query
+ */
 export const validateOAuthTypes = (req: Request, res: Response, next: NextFunction) => {
   // Handle null or undefined query object
   if (!req.query || typeof req.query !== 'object') {
