@@ -59,11 +59,11 @@ Backend:
 7.  /backend/src/controllers/wardrobeController.ts          ✅Unit ✅Integration ✅Security
 8.  /backend/src/controllers/exportController.ts            ✅Unit ✅Integration ✅Security
 9.  /backend/src/controllers/authController.ts              ✅Unit ✅Integration ✅Security
-10. /backend/src/controllers/oauthController.ts             ❌Unit ❌Integration ❌Security
+10. /backend/src/controllers/oauthController.ts             🛠️Unit 🛠️Integration 🛠️Security
 11. /backend/src/middlewares/auth.ts                        ✅Unit ✅Integration ✅Security
 12. /backend/src/middlewares/errorHandler.ts                ✅Unit ✅Integration ✅Security
 13. /backend/src/middlewares/validate.ts                    ✅Unit ✅Integration ✅Security
-    /backend/src/middlewares/security.ts                    ❌Unit ❌Integration 🔔Security
+    /backend/src/middlewares/security.ts                    ✅Unit ✅Integration 🔔Security
 14. /backend/src/models/userModel.ts                        ✅Unit ✅Integration ✅Security
 15. /backend/src/models/db.ts                               ✅Unit ✅Integration ✅Security
 16. /backend/src/models/imageModel.ts                       ✅Unit ✅Integration ✅Security
@@ -77,8 +77,8 @@ Backend:
 24. /backend/src/routes/wardrobeRoutes.ts                   ✅Unit ✅Integration ✅Security
 25. /backend/src/routes/exportRoutes.ts                     ✅Unit ✅Integration ✅Security
 26. /backend/src/routes/fileRoutes.ts                       ❌Unit ❌Integration ❌Security
-27. /backend/src/routes/authRoutes.ts                       🛠️Unit 🛠️Integration 🛠️Security
-28. /backend/src/routes/oauthRoutes.ts                      ❌Unit ❌Integration ❌Security
+27. /backend/src/routes/authRoutes.ts                       ✅Unit ✅Integration ✅Security
+28. /backend/src/routes/oauthRoutes.ts                      🛠️Unit 🛠️Integration 🛠️Security
 29. /backend/src/services/imageService.ts                   ✅Unit ✅Integration ✅Security
 30. /backend/src/services/imageProcessingService.ts         ✅Unit ✅Integration ✅Security
 31. /backend/src/services/polygonService.ts                 ✅Unit ✅Integration ✅Security
@@ -88,7 +88,7 @@ Backend:
 35. /backend/src/services/labelingService.ts                ✅Unit ✅Integration ✅Security
 36. /backend/src/services/storageService.ts                 ✅Unit ✅Integration ✅Security
 37. /backend/src/services/authService.ts                    ✅Unit ✅Integration ✅Security
-38. /backend/src/services/oauthService.ts                   ❌Unit ❌Integration ❌Security
+38. /backend/src/services/oauthService.ts                   🛠️Unit 🛠️Integration 🛠️Security
 39. /backend/src/services/InstagramApiService.ts            ✅Unit ✅Integration ✅Security
 40. /backend/src/utils/ApiError.ts                          ✅Unit ✅Integration ✅Security
 41. /backend/src/utils/dockerMigrationHelper.ts             ❌Unit ❌Integration ❌Security

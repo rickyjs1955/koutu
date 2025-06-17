@@ -207,8 +207,12 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
     return next();
   }
   
-  const token = req.headers['x-csrf-token'] as string;
-  const sessionToken = req.session?.csrfToken;
+  // Defensive programming: handle malformed request objects
+  const headers = req.headers || {};
+  const session = req.session || {};
+  
+  const token = headers['x-csrf-token'] as string;
+  const sessionToken = session.csrfToken;
   
   if (!token || !sessionToken || token !== sessionToken) {
     return res.status(403).json({

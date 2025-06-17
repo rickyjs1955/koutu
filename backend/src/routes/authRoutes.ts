@@ -25,23 +25,21 @@ securityMiddleware.auth.forEach(middleware => {
 const RegisterSchema = z.object({
   email: z.string()
     .min(1, 'Email is required')
-    .email('Invalid email format')
+    .regex(/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/, 'Invalid email format')
     .max(254, 'Email address is too long')
     .transform(email => email.toLowerCase().trim()),
   password: z.string()
     .min(1, 'Password is required')
-    // REMOVED: All password complexity validation - controller handles this
 });
 
 // Login validation schema - REMOVED password validation (controller handles it)  
 const LoginSchema = z.object({
   email: z.string()
     .min(1, 'Email is required')
-    .email('Invalid email format')
+    .regex(/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/, 'Invalid email format')
     .transform(email => email.toLowerCase().trim()),
   password: z.string()
     .min(1, 'Password is required')
-    // REMOVED: All password validation - controller handles this
 });
 
 // Password update validation schema - REMOVED password validation (controller handles it)
@@ -50,14 +48,13 @@ const UpdatePasswordSchema = z.object({
     .min(1, 'Current password is required'),
   newPassword: z.string()
     .min(1, 'New password is required')
-    // REMOVED: All password complexity validation - controller handles this
 });
 
 // Email update validation schema - KEPT as-is (no password complexity here)
 const UpdateEmailSchema = z.object({
   newEmail: z.string()
     .min(1, 'New email is required')
-    .email('Invalid email format')
+    .regex(/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/, 'Invalid email format')
     .max(254, 'Email address is too long')
     .transform(email => email.toLowerCase().trim()),
   password: z.string()
