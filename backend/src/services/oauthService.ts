@@ -39,6 +39,7 @@ export const oauthService = {
     
     // Validate input
     if (!code || typeof code !== 'string' || code.trim().length === 0) {
+      await this.ensureMinimumResponseTime(startTime, 100);
       throw ApiError.badRequest('Invalid authorization code');
     }
 
@@ -97,7 +98,10 @@ export const oauthService = {
       // Track failed attempt
       await this.trackFailedOAuthAttempt(provider, 'token_exchange_failed');
       
-      console.error('OAuth token exchange error:', error.message);
+      // Log error without sensitive information
+      this.logErrorSafely('OAuth token exchange error', error, ['client_secret', 'access_token', 'refresh_token']);
+      
+      // Return generic error to prevent information disclosure
       throw ApiError.internal('Failed to exchange code for tokens', 'OAUTH_TOKEN_ERROR');
     }
   },
@@ -106,8 +110,11 @@ export const oauthService = {
    * Get user information from OAuth provider
    */
   async getUserInfo(provider: OAuthProvider, accessToken: string): Promise<OAuthUserInfo> {
+    const startTime = Date.now();
+    
     // Validate access token
     if (!accessToken || typeof accessToken !== 'string' || accessToken.trim().length === 0) {
+      await this.ensureMinimumResponseTime(startTime, 100);
       throw ApiError.badRequest('Invalid access token');
     }
 
@@ -139,9 +146,15 @@ export const oauthService = {
       // Sanitize user data to prevent XSS
       const sanitizedUserInfo = this.sanitizeUserInfo(provider, userData);
       
+      await this.ensureMinimumResponseTime(startTime, 100);
       return sanitizedUserInfo;
     } catch (error: any) {
-      console.error('OAuth user info error:', error.message);
+      await this.ensureMinimumResponseTime(startTime, 100);
+      
+      // Log error without sensitive information (like access tokens)
+      this.logErrorSafely('OAuth user info error', error, ['access_token', 'bearer', 'token']);
+      
+      // Return generic error to prevent information disclosure
       throw ApiError.internal('Failed to get user info', 'OAUTH_USER_INFO_ERROR');
     }
   },
@@ -172,15 +185,16 @@ export const oauthService = {
       }
     }
     
-    // Create a new user
-    const newUser = await userModel.createOAuthUser({
+    // Create a new user with only necessary data (GDPR compliance)
+    const userData = {
       email: userInfo.email,
       name: userInfo.name,
       avatar_url: userInfo.picture,
       oauth_provider: provider,
       oauth_id: userInfo.id
-    });
+    };
     
+    const newUser = await userModel.createOAuthUser(userData);
     return newUser;
   },
   
@@ -249,11 +263,12 @@ export const oauthService = {
    */
   async trackFailedOAuthAttempt(provider: string, reason: string): Promise<void> {
     try {
-      console.warn(`Failed OAuth attempt for ${provider}: ${reason}`);
+      // Log without sensitive information
+      console.warn(`Failed OAuth attempt for provider: ${provider}, reason: ${reason}`);
       // In production, store in database for monitoring
       // You could add database logging here if needed
     } catch (error) {
-      console.error('Error tracking failed OAuth attempt:', error);
+      console.error('Error tracking failed OAuth attempt');
     }
   },
 
@@ -265,6 +280,43 @@ export const oauthService = {
     if (elapsed < minimumMs) {
       await new Promise(resolve => setTimeout(resolve, minimumMs - elapsed));
     }
+  },
+
+  /**
+   * Safely log errors without exposing sensitive information
+   */
+  logErrorSafely(message: string, error: any, sensitivePatterns: string[] = []): void {
+    let errorMessage = error?.message || 'Unknown error';
+    
+    // Remove sensitive information from error messages
+    const allSensitivePatterns = [
+      ...sensitivePatterns,
+      'password',
+      'secret',
+      'key',
+      'token',
+      'bearer',
+      /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, // IP addresses
+      /:\d{4,5}\b/g, // Port numbers
+      /\/[a-zA-Z]+\/[a-zA-Z]+\/[^\/\s]+/g, // File paths
+      'database',
+      'connection',
+      'ECONNREFUSED',
+      'client_secret',
+      'access_token',
+      'refresh_token'
+    ];
+    
+    allSensitivePatterns.forEach(pattern => {
+      if (typeof pattern === 'string') {
+        const regex = new RegExp(pattern, 'gi');
+        errorMessage = errorMessage.replace(regex, '[REDACTED]');
+      } else {
+        errorMessage = errorMessage.replace(pattern, '[REDACTED]');
+      }
+    });
+    
+    console.error(`${message}: ${errorMessage}`);
   },
 
   /**
@@ -294,8 +346,8 @@ export const oauthService = {
       case 'github':
         return {
           id: sanitization.sanitizeUserInput(userData.id?.toString()),
-          email: sanitization.sanitizeEmail(userData.email),
-          name: sanitization.sanitizeUserInput(userData.name),
+          email: sanitization.sanitizeEmail(userData.email || ''), // Handle null email
+          name: sanitization.sanitizeUserInput(userData.name || userData.login),
           picture: sanitization.sanitizeUrl(userData.avatar_url)
         };
       case 'instagram':
