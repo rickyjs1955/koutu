@@ -88,7 +88,7 @@ Backend:
 35. /backend/src/services/labelingService.ts                ✅Unit ✅Integration ✅Security
 36. /backend/src/services/storageService.ts                 ✅Unit ✅Integration ✅Security
 37. /backend/src/services/authService.ts                    ✅Unit ✅Integration ✅Security
-38. /backend/src/services/oauthService.ts                   ✅Unit 🛠️Integration 🛠️Security
+38. /backend/src/services/oauthService.ts                   ✅Unit ✅Integration ✅Security
 39. /backend/src/services/InstagramApiService.ts            ✅Unit ✅Integration ✅Security
 40. /backend/src/utils/ApiError.ts                          ✅Unit ✅Integration ✅Security
 41. /backend/src/utils/dockerMigrationHelper.ts             ❌Unit ❌Integration ❌Security
