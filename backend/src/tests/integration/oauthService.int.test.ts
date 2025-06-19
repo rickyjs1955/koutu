@@ -51,7 +51,8 @@ const executeDockerSafeAssertion = (dockerAssertion: () => void, manualAssertion
       dockerAssertion();
     } catch (error) {
       // Log Docker-specific issues but don't fail the test
-      console.warn(`Docker mode assertion adapted: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn(`Docker mode assertion adapted: ${errorMessage}`);
       expect(true).toBe(true); // Always passes in Docker mode
     }
   } else {
@@ -65,11 +66,12 @@ const executeDockerSafeTest = async (testFn: () => Promise<any>, fallbackAsserti
     try {
       return await testFn();
     } catch (error) {
-      const isKnownIssue = error.message.includes('foreign key') || 
-                           error.message.includes('duplicate key') ||
-                           error.message.includes('required') ||
-                           error.message.includes('violates') ||
-                           error.message.includes('Failed to exchange code for tokens');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isKnownIssue = errorMessage.includes('foreign key') || 
+                           errorMessage.includes('duplicate key') ||
+                           errorMessage.includes('required') ||
+                           errorMessage.includes('violates') ||
+                           errorMessage.includes('Failed to exchange code for tokens');
       
       if (isKnownIssue) {
         if (attempt < maxRetries) {
@@ -82,7 +84,7 @@ const executeDockerSafeTest = async (testFn: () => Promise<any>, fallbackAsserti
             fallbackAssertion();
           } else {
             // Default fallback - test that we properly handled the known issue
-            expect(error.message).toMatch(/foreign key|duplicate key|required|violates|Failed to exchange/);
+            expect(errorMessage).toMatch(/foreign key|duplicate key|required|violates|Failed to exchange/);
           }
           return { testPassed: true, usedFallback: true }; // Indicate test passed via fallback
         }
@@ -321,7 +323,8 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
           } catch (error) {
             // Instagram might fail in Docker mode due to missing email/OAuth requirements
             if (process.env.USE_DOCKER_TESTS === 'true') {
-              expect(error.message).toContain('required');
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              expect(errorMessage).toContain('required');
               return; // Skip the rest of the test for Instagram in Docker
             }
             throw error;
@@ -349,7 +352,7 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
               expect(user.id).toBe(existingUser.id);
             }
           } catch (error) {
-            if (process.env.USE_DOCKER_TESTS === 'true' && error.message.includes('foreign key')) {
+            if (process.env.USE_DOCKER_TESTS === 'true' && error instanceof Error && error.message.includes('foreign key')) {
               // Expected in Docker mode
               expect(error.message).toContain('foreign key');
               return;
@@ -562,8 +565,8 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
       const results = await Promise.all(promises);
       
       // Some should succeed, some should be rate limited if rate limiting is enabled
-      const successful = results.filter(r => !r.error);
-      const rateLimited = results.filter(r => r.error && r.message.includes('rate'));
+      const successful = results.filter(r => !('error' in r));
+      const rateLimited = results.filter(r => 'error' in r && r.message.includes('rate'));
       
       // At least some should succeed
       expect(successful.length).toBeGreaterThan(0);
@@ -657,7 +660,8 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
         expect(parseInt(oauthCount.rows[0].count)).toBeGreaterThanOrEqual(0);
       } catch (error) {
         // If there are foreign key constraint issues, that's what we're testing
-        expect(error.message).toContain('foreign key');
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        expect(errorMessage).toContain('foreign key');
       }
     });
 
@@ -813,7 +817,7 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
           const user = await oauthService.findOrCreateUser(provider, userInfo);
           users.push(user);
         } catch (error) {
-          if (process.env.USE_DOCKER_TESTS === 'true' && error.message.includes('foreign key')) {
+          if (process.env.USE_DOCKER_TESTS === 'true' && error instanceof Error && error.message.includes('foreign key')) {
             console.warn(`Docker mode: ${provider} OAuth failed due to foreign key constraint`);
             continue; // Skip this provider in Docker mode
           }
@@ -886,7 +890,7 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
         );
         
       } catch (error) {
-        if (process.env.USE_DOCKER_TESTS === 'true' && error.message.includes('foreign key')) {
+        if (process.env.USE_DOCKER_TESTS === 'true' && error instanceof Error && error.message.includes('foreign key')) {
           console.warn('Docker mode: Expected foreign key constraint error');
           expect(error.message).toContain('foreign key');
           return;
@@ -960,7 +964,8 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
         expect(parseInt(oauthCount.rows[0].count)).toBeGreaterThanOrEqual(0);
       } catch (error) {
         // Foreign key constraint violations indicate a service issue we're testing for
-        expect(error.message).toContain('foreign key');
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        expect(errorMessage).toContain('foreign key');
       }
     });
 
@@ -1042,7 +1047,7 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
             const userInfo = await oauthService.getUserInfo('google', tokens.access_token);
             return oauthService.findOrCreateUser('google', userInfo);
           } catch (error) {
-            if (isDockerMode() && error.message.includes('foreign key')) {
+            if (isDockerMode() && error instanceof Error && error.message.includes('foreign key')) {
               // Expected in Docker mode
               return null;
             }
@@ -1126,7 +1131,7 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
             const user = await oauthService.findOrCreateUser(provider, userInfo);
             users.push(user);
           } catch (error) {
-            if (isDockerMode() && error.message.includes('foreign key')) {
+            if (isDockerMode() && error instanceof Error && error.message.includes('foreign key')) {
               // Expected in Docker mode
               continue;
             }
@@ -1175,7 +1180,8 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
           users.push(user);
         } catch (error) {
           if (process.env.USE_DOCKER_TESTS === 'true') {
-            console.warn(`Docker mode: User ${i} creation failed: ${error.message}`);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.warn(`Docker mode: User ${i} creation failed: ${errorMessage}`);
             continue;
           }
           throw error;
@@ -1199,7 +1205,7 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
             () => expect(dbUser.rows).toHaveLength(1) // Verify database persistence
           );
           
-          if (!process.env.USE_DOCKER_TESTS === 'true') {
+          if (process.env.USE_DOCKER_TESTS !== 'true') {
             const dbOAuth = await TestDB.query(
               'SELECT * FROM user_oauth_providers WHERE user_id = $1',
               [user.id]
@@ -1304,7 +1310,8 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
             return oauthService.findOrCreateUser(provider, userInfo);
           } catch (error) {
             if (process.env.USE_DOCKER_TESTS === 'true') {
-              console.warn(`Concurrent flow ${i} failed in Docker mode: ${error.message}`);
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              console.warn(`Concurrent flow ${i} failed in Docker mode: ${errorMessage}`);
               return null; // Return null for failed attempts in Docker
             }
             throw error;
@@ -1422,8 +1429,8 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
       const endTime = Date.now();
 
       // Some should succeed, some might be rate limited
-      const successful = results.filter(r => !r.error);
-      const rateLimited = results.filter(r => r.error && r.message.includes('rate'));
+      const successful = results.filter(r => !('error' in r));
+      const rateLimited = results.filter(r => 'error' in r && r.message.includes('rate'));
 
       expect(successful.length).toBeGreaterThan(0);
 
@@ -1757,7 +1764,7 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
           expect(oauthProviders.rows[1].provider).toBe('google');
         }
       } catch (error) {
-        if (isDockerMode() && error.message.includes('foreign key')) {
+        if (isDockerMode() && error instanceof Error && error.message.includes('foreign key')) {
           // Expected in Docker mode
           expect(error.message).toContain('foreign key');
           return;
@@ -1945,7 +1952,8 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
       } catch (error) {
         // If there's still an error, make sure it's not about oauth_provider
         // The service now handles this properly
-        console.log('Unicode test error:', error.message);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.log('Unicode test error:', errorMessage);
         
         // The important part (Unicode preservation) already passed
         expect(userInfo.name).toContain('José');
@@ -2478,7 +2486,8 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
                 if (user.id) successCount++;
               } catch (error) {
                 // Log but continue
-                console.log(`  ⚠️ ${provider} failed: ${error.message}`);
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                console.log(`  ⚠️ ${provider} failed: ${errorMessage}`);
               }
             }
             
@@ -2739,7 +2748,7 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
       
       // Service should handle scope changes appropriately
       // The 'repo' scope might be filtered out by the service for security
-      expect(tokens2.scope.length).toBeGreaterThan(0);
+      expect(tokens2.scope && tokens2.scope.length).toBeGreaterThan(0);
     });
 
     it('should handle OAuth provider API rate limiting responses', async () => {
@@ -2762,7 +2771,7 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
         }, {
           'X-RateLimit-Limit': '60',
           'X-RateLimit-Remaining': '0',
-          'X-RateLimit-Reset': Math.floor(Date.now() / 1000) + 3600
+          'X-RateLimit-Reset': (Math.floor(Date.now() / 1000) + 3600).toString()
         });
 
       const tokens = await oauthService.exchangeCodeForTokens('github', testData.code);
@@ -2844,7 +2853,7 @@ describe('Comprehensive OAuth Integration Test Suite', () => {
         // Both should work but might be handled differently
         expect(enterpriseUser.id).not.toBe(consumerUser.id);
       } catch (error) {
-        if (isDockerMode() && error.message.includes('foreign key')) {
+        if (isDockerMode() && error instanceof Error && error.message.includes('foreign key')) {
           // Expected in Docker mode
           expect(error.message).toContain('foreign key');
           
