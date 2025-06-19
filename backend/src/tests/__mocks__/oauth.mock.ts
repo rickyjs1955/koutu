@@ -1,5 +1,7 @@
 // backend/src/__tests__/__mocks__/oauth.mock.ts - Fixed version with all issues resolved
 
+import { NextFunction } from "express";
+
 export class MockOAuthProcessEnv {
   private originalEnv: NodeJS.ProcessEnv;
 
@@ -544,6 +546,34 @@ export const oauthSecurityScenarios = [
   }
 ];
 
+// Mock the state management without the setInterval
+const mockOAuthStates: Record<string, { createdAt: number; redirectUrl?: string }> = {};
+
+// Mock controller implementation that matches the real interface
+export const oauthController = {
+  authorize: jest.fn(async (req: Request, res: Response, next: NextFunction) => {
+    // Mock implementation - tests will override this behavior
+  }),
+
+  callback: jest.fn(async (req: Request, res: Response, next: NextFunction) => {
+    // Mock implementation - tests will override this behavior
+  }),
+
+  getOAuthStatus: jest.fn(async (req: Request, res: Response, next: NextFunction) => {
+    // Mock implementation - tests will override this behavior
+  }),
+
+  unlinkProvider: jest.fn(async (req: Request, res: Response, next: NextFunction) => {
+    // Mock implementation - tests will override this behavior
+  }),
+
+  // Export the states for test manipulation
+  __getOAuthStates: () => mockOAuthStates,
+  __clearOAuthStates: () => {
+    Object.keys(mockOAuthStates).forEach(key => delete mockOAuthStates[key]);
+  }
+};
+
 export const setupOAuthMockImplementations = () => {
   // Setup any additional mock implementations if needed
 };
@@ -551,3 +581,6 @@ export const setupOAuthMockImplementations = () => {
 export const resetOAuthMocks = () => {
   // Reset any mocks if needed
 };
+
+// For backward compatibility
+export default oauthController;
