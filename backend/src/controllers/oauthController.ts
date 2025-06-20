@@ -1,24 +1,53 @@
-// /backend/src/controllers/oauthController.ts - Enhanced with Auth System Alignment
+// /backend/src/controllers/oauthController.ts - Enhanced with proper cleanup
 import { Request, Response, NextFunction } from 'express';
 import { oauthService } from '../services/oauthService';
-import { authService } from '../services/authService'; // ADDED: Import auth service for alignment
+import { authService } from '../services/authService';
 import { getAuthorizationUrl, OAuthProvider } from '../config/oauth';
 import { v4 as uuidv4 } from 'uuid';
 import { ApiError } from '../utils/ApiError';
 import { sanitization } from '@/utils/sanitize';
+import * as db from '../models/db';
 
 // Track OAuth state parameters to prevent CSRF attacks
 const oauthStates: Record<string, { createdAt: number, redirectUrl?: string }> = {};
 
-// Clean up expired states every hour
-setInterval(() => {
-  const now = Date.now();
-  Object.keys(oauthStates).forEach(state => {
-    if (now - oauthStates[state].createdAt > 3600000) { // 1 hour
-      delete oauthStates[state];
+// Store interval reference for cleanup
+let cleanupInterval: NodeJS.Timeout | null = null;
+
+// Helper to check if we're in test environment
+const isTestEnvironment = () => process.env.NODE_ENV === 'test';
+
+// Start cleanup interval (only in non-test environments)
+const startCleanupInterval = () => {
+  if (!isTestEnvironment() && !cleanupInterval) {
+    cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      Object.keys(oauthStates).forEach(state => {
+        if (now - oauthStates[state].createdAt > 3600000) { // 1 hour
+          delete oauthStates[state];
+        }
+      });
+    }, 3600000);
+
+    // Ensure interval doesn't prevent process exit
+    if (cleanupInterval.unref) {
+      cleanupInterval.unref();
     }
-  });
-}, 3600000);
+  }
+};
+
+// Stop cleanup interval
+const stopCleanupInterval = () => {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+};
+
+// Initialize cleanup on module load (non-test only)
+if (!isTestEnvironment()) {
+  startCleanupInterval();
+}
 
 // ENHANCED: Aligned with auth system validation patterns
 const validateOAuthInput = (provider: any, state: any, code: any) => {
@@ -76,10 +105,14 @@ const validateOAuthState = (state: string) => {
   }
 
   const stateData = oauthStates[state];
-  delete oauthStates[state]; // Remove used state
-
-  // Check state expiration (30 minutes max)
-  if (Date.now() - stateData.createdAt > 30 * 60 * 1000) {
+  
+  // Check state expiration BEFORE deleting (30 minutes max)
+  const isExpired = Date.now() - stateData.createdAt > 30 * 60 * 1000;
+  
+  // Always delete used state to prevent reuse
+  delete oauthStates[state];
+  
+  if (isExpired) {
     return { isValid: false, error: 'State parameter expired' };
   }
 
@@ -304,10 +337,24 @@ export const oauthController = {
 
       const { provider } = validateOAuthInput(req.params.provider, null, null);
       
+      // Type guard for OAuth provider
+      const isValidOAuthProvider = (provider: string): provider is OAuthProvider => {
+        return ['google', 'microsoft', 'github', 'instagram'].includes(provider);
+      };
+
+      if (!isValidOAuthProvider(provider)) {
+        await ensureMinimumResponseTime(startTime, 100);
+        return next(ApiError.badRequest(`Invalid OAuth provider: ${provider}`));
+      }
+      
       // Ensure user has password before unlinking OAuth
       const stats = await authService.getUserAuthStats(req.user.id);
       
-      if (!stats.hasPassword && stats.linkedProviders.length <= 1) {
+      // Check if user has a password and other auth methods
+      const hasPassword = stats.hasPassword || false;
+      const linkedProviders = stats.linkedProviders || [];
+      
+      if (!hasPassword && linkedProviders.length <= 1) {
         await ensureMinimumResponseTime(startTime, 100);
         return next(ApiError.businessLogic(
           'Cannot unlink the only authentication method. Please set a password first.',
@@ -316,19 +363,70 @@ export const oauthController = {
         ));
       }
 
-      // Implement unlink logic here (would need to add to oauthService)
-      // await oauthService.unlinkProvider(req.user.id, provider);
-      
-      await ensureMinimumResponseTime(startTime, 100);
-      
-      res.status(200).json({
-        status: 'success',
-        message: `Successfully unlinked ${provider} account`
-      });
+      // Check if provider is actually linked
+      if (linkedProviders.length > 0 && !linkedProviders.includes(provider)) {
+        await ensureMinimumResponseTime(startTime, 100);
+        return next(ApiError.notFound(`${provider} account not linked to your profile`));
+      }
+
+      // Implement unlink logic
+      try {
+        // Check if oauthService has unlinkProvider method
+        if (typeof oauthService.unlinkProvider === 'function') {
+          await oauthService.unlinkProvider(req.user.id, provider);
+        } else {
+          // Fallback: Direct database operation if service method doesn't exist
+          const result = await db.query(
+            'DELETE FROM user_oauth_providers WHERE user_id = $1 AND provider = $2 RETURNING id',
+            [req.user.id, provider]
+          );
+
+          if (result.rowCount === 0) {
+            await ensureMinimumResponseTime(startTime, 100);
+            return next(ApiError.notFound(`${provider} account not linked to your profile`));
+          }
+        }
+
+        await ensureMinimumResponseTime(startTime, 100);
+        
+        res.status(200).json({
+          status: 'success',
+          message: `Successfully unlinked ${provider} account`
+        });
+        
+      } catch (unlinkError) {
+        console.error('OAuth unlink error:', unlinkError);
+        await ensureMinimumResponseTime(startTime, 100);
+        next(ApiError.internal('Failed to unlink OAuth provider'));
+      }
       
     } catch (error) {
       await ensureMinimumResponseTime(startTime, 100);
       next(error);
     }
-  }
+  },
+
+  // Test utilities - only exposed in test environment
+  _testUtils: isTestEnvironment() ? {
+    clearStates: () => {
+      Object.keys(oauthStates).forEach(key => delete oauthStates[key]);
+    },
+    stopCleanup: () => {
+      stopCleanupInterval();
+    },
+    getStateCount: () => Object.keys(oauthStates).length,
+    // Add state for testing
+    addState: (state: string, data: { createdAt: number, redirectUrl?: string }) => {
+      oauthStates[state] = data;
+    },
+    // Get states for debugging
+    getStates: () => ({ ...oauthStates })
+  } : undefined
 };
+
+// Cleanup on process termination
+if (!isTestEnvironment()) {
+  process.on('SIGTERM', stopCleanupInterval);
+  process.on('SIGINT', stopCleanupInterval);
+  process.on('exit', stopCleanupInterval);
+}

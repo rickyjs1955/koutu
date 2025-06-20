@@ -828,6 +828,37 @@ export const cleanupOAuthTests = () => {
   jest.restoreAllMocks();
 };
 
+export const setupOAuthControllerTests = () => {
+  let oauthController: any;
+
+  const loadController = async () => {
+    // Clear module cache to ensure fresh import
+    delete require.cache[require.resolve('../../controllers/oauthController')];
+    
+    // Set test environment before importing
+    process.env.NODE_ENV = 'test';
+    
+    // Import controller
+    const controllerModule = await import('../../controllers/oauthController');
+    oauthController = controllerModule.oauthController;
+    
+    return oauthController;
+  };
+
+  const cleanupController = () => {
+    if (oauthController?._testUtils) {
+      oauthController._testUtils.stopCleanup();
+      oauthController._testUtils.clearStates();
+    }
+  };
+
+  return {
+    loadController,
+    cleanupController,
+    getController: () => oauthController
+  };
+};
+
 /**
  * Export default helper for easy importing
  */
@@ -848,4 +879,5 @@ export default {
   createComprehensiveOAuthTestScenarios,
   setupOAuthTestEnvironment,
   cleanupOAuthTests,
+  setupOAuthControllerTests
 };

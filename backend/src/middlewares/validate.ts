@@ -406,12 +406,26 @@ export const validateAuthTypes = (req: Request, res: Response, next: NextFunctio
  * Middleware to validate OAuth provider in request parameters
  */
 export const validateOAuthProvider = (req: Request, res: Response, next: NextFunction) => {
-  const { provider } = req.params;
+  const provider = req.params.provider;
   const validProviders = ['google', 'microsoft', 'github', 'instagram'];
   
-  if (!provider || !validProviders.includes(provider)) {
-    return next(ApiError.badRequest(`Invalid OAuth provider: ${provider}`));
+  if (!provider) {
+    return next(ApiError.badRequest('OAuth provider is required'));
   }
+  
+  // Type validation
+  if (Array.isArray(provider) || (typeof provider === 'object' && provider !== null)) {
+    return next(ApiError.badRequest('Invalid provider format'));
+  }
+  
+  const providerStr = String(provider).toLowerCase().trim();
+  
+  if (!validProviders.includes(providerStr)) {
+    return next(ApiError.badRequest(`Unsupported OAuth provider: ${providerStr}`));
+  }
+  
+  // Normalize provider in params
+  req.params.provider = providerStr;
   
   next();
 };
@@ -420,23 +434,31 @@ export const validateOAuthProvider = (req: Request, res: Response, next: NextFun
  * Middleware to validate OAuth types in request query
  */
 export const validateOAuthTypes = (req: Request, res: Response, next: NextFunction) => {
-  // Handle null or undefined query object
-  if (!req.query || typeof req.query !== 'object') {
-    return next();
+  // For OAuth callback, check query parameters
+  if (req.path.includes('/callback')) {
+    const { code, state, error } = req.query;
+    
+    // Check for type confusion attacks
+    if (code && (Array.isArray(code) || typeof code === 'object' && code !== null)) {
+      return next(ApiError.badRequest('Invalid authorization code format'));
+    }
+    
+    if (state && (Array.isArray(state) || typeof state === 'object' && state !== null)) {
+      return next(ApiError.badRequest('Invalid state parameter format'));
+    }
+    
+    if (error && (Array.isArray(error) || typeof error === 'object' && error !== null)) {
+      return next(ApiError.badRequest('Invalid error parameter format'));
+    }
   }
-
-  const { code, state, error } = req.query;
   
-  // Check for array parameter pollution
-  if (Array.isArray(code) || Array.isArray(state) || Array.isArray(error)) {
-    return next(ApiError.badRequest('Invalid parameter format'));
-  }
-  
-  // Check for object parameter pollution
-  if ((code && typeof code === 'object') || 
-      (state && typeof state === 'object') || 
-      (error && typeof error === 'object')) {
-    return next(ApiError.badRequest('Invalid parameter format'));
+  // For OAuth authorize, check redirect parameter
+  if (req.path.includes('/authorize')) {
+    const { redirect } = req.query;
+    
+    if (redirect && (Array.isArray(redirect) || typeof redirect === 'object' && redirect !== null)) {
+      return next(ApiError.badRequest('Invalid redirect parameter format'));
+    }
   }
   
   next();

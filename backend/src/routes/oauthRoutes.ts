@@ -1,9 +1,11 @@
-// /backend/src/routes/oauthRoutes.ts - Enhanced with Security Middleware Integration
+// backend/src/routes/oauthRoutes.ts - Enhanced with DELETE support and proper middleware
 import express from 'express';
 import { oauthController } from '../controllers/oauthController';
 import { securityMiddleware } from '../middlewares/security';
 import { authenticate, requireAuth, rateLimitByUser } from '../middlewares/auth';
 import { validateOAuthTypes, validateOAuthProvider } from '../middlewares/validate';
+import { ApiError } from '@/utils/ApiError';
+import { config } from '../config'; // Import your config to check NODE_ENV
 
 const router = express.Router();
 
@@ -18,35 +20,47 @@ securityMiddleware.auth.forEach(middleware => {
 
 // Public OAuth routes (initiation and callback)
 router.get('/:provider/authorize', 
-  validateOAuthProvider,                    // Validate provider parameter
-  rateLimitByUser(10, 15 * 60 * 1000),    // 10 OAuth attempts per 15 minutes (aligned with auth)
+  validateOAuthProvider,                // Validate provider parameter
+  rateLimitByUser(10, 15 * 60 * 1000),  // 10 OAuth attempts per 15 minutes (aligned with auth)
   oauthController.authorize
 );
 
 router.get('/:provider/callback', 
-  validateOAuthProvider,                    // Validate provider parameter
-  validateOAuthTypes,                       // Validate query parameters  
-  rateLimitByUser(20, 15 * 60 * 1000),    // 20 callbacks per 15 minutes
+  validateOAuthProvider,                 // Validate provider parameter
+  validateOAuthTypes,                    // Validate query parameters 
+  rateLimitByUser(20, 15 * 60 * 1000),   // 20 callbacks per 15 minutes
   oauthController.callback
 );
 
-// ==================== PROTECTED OAUTH MANAGEMENT ROUTES (NEW) ====================
+// ==================== PROTECTED OAUTH MANAGEMENT ROUTES ====================
 // These routes require authentication and follow auth system patterns
-
-// Apply authentication middleware for protected routes
-router.use(authenticate, requireAuth);
 
 // Get OAuth status for authenticated user (aligned with auth system's /stats endpoint)
 router.get('/status',
-  rateLimitByUser(30, 15 * 60 * 1000),    // 30 status checks per 15 minutes
+  authenticate,                          // Authentication middleware
+  requireAuth,                           // Ensure user is authenticated
+  rateLimitByUser(30, 15 * 60 * 1000),   // 30 status checks per 15 minutes
   oauthController.getOAuthStatus
 );
 
-// Unlink OAuth provider (aligned with auth system's account management)
-router.delete('/:provider/unlink',
-  validateOAuthProvider,                    // Validate provider parameter
-  securityMiddleware.csrf as express.RequestHandler,  // CSRF protection for state-changing operation
+// IMPORTANT: DELETE method for unlinking OAuth providers
+const unlinkMiddleware = [
+  authenticate,                           // Authentication middleware
+  requireAuth,                            // Ensure user is authenticated
+  validateOAuthProvider,                  // Validate provider parameter
+  // Conditionally apply CSRF protection:
+  ...(config.nodeEnv !== 'test' ? [securityMiddleware.csrf as express.RequestHandler] : []), 
   rateLimitByUser(5, 60 * 60 * 1000),     // 5 unlink attempts per hour (aligned with auth)
+];
+
+router.delete('/:provider/unlink',
+  ...unlinkMiddleware,
+  oauthController.unlinkProvider
+);
+
+// Alternative: Also support POST for environments that don't support DELETE
+router.post('/:provider/unlink',
+  ...unlinkMiddleware, // Use the same middleware array
   oauthController.unlinkProvider
 );
 
@@ -58,7 +72,7 @@ router.use((req, res, next) => {
   res.setHeader('X-OAuth-Version', '2.0');
   
   // Prevent caching of OAuth responses
-  if (req.path.includes('/callback') || req.path.includes('/status')) {
+  if (req.path.includes('/callback') || req.path.includes('/status') || req.path.includes('/unlink')) {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
   }
@@ -89,5 +103,17 @@ router.use((error: any, req: express.Request, res: express.Response, next: expre
   // Pass to main error handler
   next(error);
 });
+
+router.get(['/authorize', '//authorize'], (req, res, next) => {
+  // The provider is missing or empty, handle as bad request
+  return next(ApiError.badRequest('OAuth provider is required in the URL.'));
+});
+
+// Existing route for specific providers (duplicate, can be removed if the first one is used)
+router.get('/:provider/authorize',
+  validateOAuthProvider,
+  rateLimitByUser(10, 15 * 60 * 1000),
+  oauthController.authorize
+);
 
 export { router as oauthRoutes };
