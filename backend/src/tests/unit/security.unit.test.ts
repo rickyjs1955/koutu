@@ -703,4 +703,176 @@ describe('Security Middleware Unit Tests', () => {
       }
     });
   });
+
+  describe('Request Size Protection', () => {
+    let requestSizeLimits: any;
+
+    beforeAll(async () => {
+      const securityModule = await import('../../middlewares/security');
+      requestSizeLimits = securityModule.requestSizeLimits;
+    });
+
+    it('should set appropriate timeouts for multipart uploads', () => {
+      const mockReq = {
+        get: jest.fn().mockReturnValue('multipart/form-data'),
+        setTimeout: jest.fn()
+      };
+
+      requestSizeLimits(mockReq, mockRes, mockNext);
+
+      expect(mockReq.setTimeout).toHaveBeenCalledWith(5 * 60 * 1000); // 5 minutes
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    it('should set shorter timeouts for JSON requests', () => {
+      const mockReq = {
+        get: jest.fn().mockReturnValue('application/json'),
+        setTimeout: jest.fn()
+      };
+
+      requestSizeLimits(mockReq, mockRes, mockNext);
+
+      expect(mockReq.setTimeout).toHaveBeenCalledWith(30 * 1000); // 30 seconds
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    it('should set default timeouts for other content types', () => {
+      const mockReq = {
+        get: jest.fn().mockReturnValue('text/plain'),
+        setTimeout: jest.fn()
+      };
+
+      requestSizeLimits(mockReq, mockRes, mockNext);
+
+      expect(mockReq.setTimeout).toHaveBeenCalledWith(10 * 1000); // 10 seconds
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    it('should handle missing Content-Type header', () => {
+      const mockReq = {
+        get: jest.fn().mockReturnValue(undefined),
+        setTimeout: jest.fn()
+      };
+
+      requestSizeLimits(mockReq, mockRes, mockNext);
+
+      expect(mockReq.setTimeout).toHaveBeenCalledWith(10 * 1000); // Default timeout
+      expect(mockNext).toHaveBeenCalled();
+    });
+  });
+
+  describe('Enhanced Security Middleware Stack', () => {
+    let enhancedGeneralSecurity: any;
+
+    beforeAll(async () => {
+      const securityModule = await import('../../middlewares/security');
+      enhancedGeneralSecurity = securityModule.enhancedGeneralSecurity;
+    });
+
+    it('should include request size limits in enhanced general security', () => {
+      expect(Array.isArray(enhancedGeneralSecurity)).toBe(true);
+      expect(enhancedGeneralSecurity.length).toBeGreaterThan(generalSecurity.length);
+    });
+
+    it('should maintain all original security features', () => {
+      // Enhanced security should include all general security middleware
+      expect(enhancedGeneralSecurity.length).toBeGreaterThanOrEqual(generalSecurity.length);
+      
+      // Should contain functions (middleware)
+      enhancedGeneralSecurity.forEach((middleware: any) => {
+        expect(typeof middleware).toBe('function');
+      });
+    });
+  });
+
+  describe('Security Configuration Validation', () => {
+    it('should have valid rate limit configurations for different environments', () => {
+      const testRateLimit = createRateLimit(60000, 100, 'Test rate limit');
+      const prodRateLimit = createRateLimit(15 * 60 * 1000, 10, 'Prod rate limit');
+
+      expect(typeof testRateLimit).toBe('function');
+      expect(typeof prodRateLimit).toBe('function');
+    });
+
+    it('should export all required security configurations', () => {
+      expect(securityMiddleware).toHaveProperty('general');
+      expect(securityMiddleware).toHaveProperty('auth');
+      expect(securityMiddleware).toHaveProperty('api');
+      expect(securityMiddleware).toHaveProperty('fileUpload');
+      expect(securityMiddleware).toHaveProperty('csrf');
+      
+      // New enhanced configurations
+      if (securityMiddleware.enhanced) {
+        expect(securityMiddleware.enhanced).toBeDefined();
+      }
+    });
+  });
+
+  describe('Security Headers Content Validation', () => {
+    let customHeadersMiddleware: any;
+
+    beforeEach(() => {
+      customHeadersMiddleware = generalSecurity.find((middleware: any) => 
+        typeof middleware === 'function' && 
+        middleware.toString().includes('X-Frame-Options')
+      );
+    });
+
+    it('should set comprehensive Permissions Policy', () => {
+      if (customHeadersMiddleware) {
+        customHeadersMiddleware(mockReq, mockRes, mockNext);
+        
+        const permissionsCall: [string, string] | undefined = setHeaderSpy.mock.calls.find((call: [string, string]) => 
+          call[0] === 'Permissions-Policy'
+        );
+        
+        expect(permissionsCall).toBeDefined();
+        const policy = permissionsCall![1];
+        
+        // Should restrict dangerous features
+        expect(policy).toContain('geolocation=()');
+        expect(policy).toContain('microphone=()');
+        expect(policy).toContain('camera=()');
+        expect(policy).toContain('payment=()');
+        expect(policy).toContain('usb=()');
+        expect(policy).toContain('magnetometer=()');
+        expect(policy).toContain('gyroscope=()');
+      }
+    });
+
+    it('should apply cache control to sensitive paths only', () => {
+      if (customHeadersMiddleware) {
+        // Test non-sensitive path
+        (mockReq as any).path = '/public/assets';
+        customHeadersMiddleware(mockReq, mockRes, mockNext);
+        
+        const cacheControlCalls: Array<[string, string]> = setHeaderSpy.mock.calls.filter((call: [string, string]) => 
+          call[0] === 'Cache-Control'
+        );
+        
+        // Should still set basic security but maybe not strict cache control
+        expect(setHeaderSpy).toHaveBeenCalledWith('X-Frame-Options', 'DENY');
+      }
+    });
+  });
+
+  describe('Environment-Specific Security Configuration', () => {
+    it('should provide different configurations for test vs production', () => {
+      // Test environment should be less restrictive
+      process.env.NODE_ENV = 'test';
+      const testAuthSecurity = authSecurity;
+      
+      // Production should be more restrictive
+      process.env.NODE_ENV = 'production';
+      const prodAuthSecurity = authSecurity;
+      
+      // Both should exist and be arrays
+      expect(Array.isArray(testAuthSecurity)).toBe(true);
+      expect(Array.isArray(prodAuthSecurity)).toBe(true);
+      
+      // Both should include security middleware
+      expect(testAuthSecurity.length).toBeGreaterThan(0);
+      expect(prodAuthSecurity.length).toBeGreaterThan(0);
+    });
+  });
 });

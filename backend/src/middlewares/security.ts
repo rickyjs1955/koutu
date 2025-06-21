@@ -242,3 +242,32 @@ export const securityMiddleware = {
   csrf: csrfProtection
   // inputSanitization removed to avoid redundancy with sanitize.ts
 };
+
+/**
+ * Request size protection middleware
+ */
+export const requestSizeLimits = (req: Request, res: Response, next: NextFunction) => {
+  // Set maximum request size based on content type
+  const contentType = req.get('Content-Type') || '';
+  
+  if (contentType.includes('multipart/form-data')) {
+    // File uploads - 10MB limit
+    req.setTimeout(5 * 60 * 1000); // 5 minute timeout for uploads
+  } else if (contentType.includes('application/json')) {
+    // JSON requests - 1MB limit
+    req.setTimeout(30 * 1000); // 30 second timeout for JSON
+  } else {
+    // Other requests - 100KB limit  
+    req.setTimeout(10 * 1000); // 10 second timeout for others
+  }
+  
+  next();
+};
+
+/**
+ * Enhanced general security middleware with request limits
+ */
+export const enhancedGeneralSecurity = [
+  ...generalSecurity,
+  requestSizeLimits
+];

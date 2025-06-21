@@ -78,7 +78,7 @@ Backend:
 25. /backend/src/routes/exportRoutes.ts                     ✅Unit ✅Integration ✅Security
 26. /backend/src/routes/fileRoutes.ts                       ❌Unit ❌Integration ❌Security
 27. /backend/src/routes/authRoutes.ts                       ✅Unit ✅Integration ✅Security
-28. /backend/src/routes/oauthRoutes.ts                      ✅Unit 🛠️Integration 🛠️Security
+28. /backend/src/routes/oauthRoutes.ts                      ✅Unit ✅Integration ✅Security
 29. /backend/src/services/imageService.ts                   ✅Unit ✅Integration ✅Security
 30. /backend/src/services/imageProcessingService.ts         ✅Unit ✅Integration ✅Security
 31. /backend/src/services/polygonService.ts                 ✅Unit ✅Integration ✅Security

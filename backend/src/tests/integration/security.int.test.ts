@@ -1378,4 +1378,93 @@ describe('Security Middleware Integration Tests', () => {
       });
     });
   });
+
+  describe('Request Size Limits Integration', () => {
+  it('should enforce JSON payload size limits', async () => {
+    const largeJsonPayload = {
+      data: 'x'.repeat(2 * 1024 * 1024) // 2MB (exceeds 1MB limit)
+    };
+    
+    const response = await request(app)
+      .post('/test/upload')
+      .send(largeJsonPayload)
+      .expect(413); // Payload Too Large
+
+    expect(response.body.status).toBe('error');
+    expect(response.body.message).toMatch(/too large|payload/i);
+  });
+
+  it('should allow reasonable JSON payload sizes', async () => {
+    const reasonablePayload = {
+      data: 'x'.repeat(500 * 1024) // 500KB (under 1MB limit)
+    };
+    
+    const response = await request(app)
+      .post('/test/upload')
+      .send(reasonablePayload)
+      .expect(200);
+
+    expect(response.body.message).toBe('Upload endpoint');
+  });
+
+  it('should enforce URL-encoded payload size limits', async () => {
+    const largeFormData = 'field=' + 'x'.repeat(2 * 1024 * 1024); // 2MB
+    
+    const response = await request(app)
+      .post('/test/upload')
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .send(largeFormData)
+      .expect(413);
+
+    expect(response.body.status).toBe('error');
+  });
+
+  it('should limit parameter count to prevent parameter pollution', async () => {
+    // Create URL with excessive parameters
+    const manyParams = Array(200).fill(0).map((_, i) => `param${i}=value${i}`).join('&');
+    
+    const response = await request(app)
+      .post('/test/upload')
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .send(manyParams);
+
+    // Should either accept (200) or reject (400/413) but not crash
+    expect([200, 400, 413]).toContain(response.status);
+    expect(response.headers).toHaveProperty('x-frame-options', 'DENY');
+  });
+
+  it('should handle empty request bodies gracefully', async () => {
+    const response = await request(app)
+      .post('/test/upload')
+      .send('')
+      .expect(400); // Bad Request for empty body
+
+    expect(response.body.status).toBe('error');
+    expect(response.body.message).toMatch(/empty|body/i);
+  });
+
+  it('should apply different size limits for file uploads', async () => {
+    const fileUploadApp = createTestApp('fileUpload');
+    
+    const largeFileData = 'x'.repeat(12 * 1024 * 1024); // 12MB (exceeds 10MB file limit)
+    
+    const response = await request(fileUploadApp)
+      .post('/test/upload')
+      .send({ file: largeFileData });
+
+    // Should be rejected due to file upload size limits
+    expect([413, 400]).toContain(response.status);
+  });
+
+  it('should handle malformed Content-Length headers', async () => {
+    const response = await request(app)
+      .post('/test/upload')
+      .set('Content-Length', 'invalid')
+      .send({ data: 'test' });
+
+    // Should handle gracefully
+    expect([200, 400, 500]).toContain(response.status);
+    expect(response.headers).toHaveProperty('x-frame-options', 'DENY');
+  });
+});
 });
