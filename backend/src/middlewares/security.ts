@@ -1,15 +1,225 @@
-// backend/src/middlewares/security.ts
+// backend/src/middlewares/security.ts - Enhanced with path traversal protection
 import { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { config } from '../config';
+import { ApiError } from '../utils/ApiError';
+import path from 'path';
 
 // Extend the session interface to include csrfToken
 declare module 'express-session' {
   interface SessionData {
     csrfToken?: string;
   }
+}
+
+/**
+ * Path traversal protection middleware
+ * Protects against directory traversal attacks in URLs and parameters
+ */
+export const pathTraversalProtection = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Check URL path for traversal patterns
+    const urlPath = req.path;
+    if (containsTraversalPatterns(urlPath)) {
+      console.warn(`Path traversal attempt detected in URL: ${urlPath} from IP: ${req.ip}`);
+      return next(ApiError.forbidden(
+        'Path traversal not allowed',
+        'PATH_TRAVERSAL_DETECTED'
+      ));
+    }
+
+    // Check all path parameters for traversal patterns
+    for (const [key, value] of Object.entries(req.params)) {
+      if (typeof value === 'string' && containsTraversalPatterns(value)) {
+        console.warn(`Path traversal attempt in param ${key}: ${value} from IP: ${req.ip}`);
+        return next(ApiError.forbidden(
+          `Invalid path parameter: ${key}`,
+          'PATH_TRAVERSAL_DETECTED'
+        ));
+      }
+    }
+
+    // Check query parameters that might contain file paths
+    const pathQueryParams = ['filepath', 'path', 'file', 'dir', 'folder', 'location'];
+    for (const param of pathQueryParams) {
+      const value = req.query[param];
+      if (typeof value === 'string' && containsTraversalPatterns(value)) {
+        console.warn(`Path traversal attempt in query ${param}: ${value} from IP: ${req.ip}`);
+        return next(ApiError.forbidden(
+          `Invalid query parameter: ${param}`,
+          'PATH_TRAVERSAL_DETECTED'
+        ));
+      }
+    }
+
+    // Check request body for path-related fields
+    if (req.body && typeof req.body === 'object') {
+      const pathBodyFields = ['filepath', 'path', 'filename', 'directory', 'location'];
+      for (const field of pathBodyFields) {
+        const value = req.body[field];
+        if (typeof value === 'string' && containsTraversalPatterns(value)) {
+          console.warn(`Path traversal attempt in body ${field}: ${value} from IP: ${req.ip}`);
+          return next(ApiError.forbidden(
+            `Invalid field: ${field}`,
+            'PATH_TRAVERSAL_DETECTED'
+          ));
+        }
+      }
+    }
+
+    next();
+  } catch (error) {
+    console.error('Path traversal protection error:', error);
+    next(ApiError.internal('Security check failed'));
+  }
+};
+
+/**
+ * Enhanced path validation specifically for file operations
+ */
+export const filePathSecurity = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Extract filepath from params (common in file routes)
+    const filepath = req.params.filepath || req.params['0']; // '0' for wildcard routes
+    
+    if (!filepath) {
+      return next(); // No filepath to validate
+    }
+
+    // Comprehensive file path validation
+    const validation = validateFilePath(filepath);
+    
+    if (!validation.isValid) {
+      console.warn(`File path security violation: ${validation.reason} - Path: ${filepath} from IP: ${req.ip}`);
+      return next(ApiError.forbidden(
+        validation.reason,
+        'INVALID_FILE_PATH'
+      ));
+    }
+
+    // Sanitize and normalize the path - with proper type checking
+    if (validation.sanitizedPath) {
+      if (req.params.filepath) {
+        req.params.filepath = validation.sanitizedPath;
+      }
+      if (req.params['0']) {
+        req.params['0'] = validation.sanitizedPath;
+      }
+    }
+
+    next();
+  } catch (error) {
+    console.error('File path security error:', error);
+    next(ApiError.internal('File path security check failed'));
+  }
+};
+
+/**
+ * Check if a string contains path traversal patterns
+ */
+function containsTraversalPatterns(input: string): boolean {
+  if (!input || typeof input !== 'string') {
+    return false;
+  }
+
+  // Normalize the input for better detection
+  const normalized = input.toLowerCase().replace(/\\/g, '/');
+  
+  // Path traversal patterns to detect
+  const traversalPatterns = [
+    '../',           // Basic traversal
+    '..\\',          // Windows style
+    '%2e%2e%2f',     // URL encoded ../
+    '%2e%2e%5c',     // URL encoded ..\
+    '..%2f',         // Partial encoding
+    '..%5c',         // Partial encoding
+    '%252e%252e%252f', // Double encoded
+    '....//',        // Double dot bypass
+    '....\\\\',      // Windows double dot bypass
+    '..;/',          // Semicolon bypass
+    '..//',          // Extra slash
+    '..\\\\',        // Extra backslash
+  ];
+
+  // Check for any traversal patterns
+  for (const pattern of traversalPatterns) {
+    if (normalized.includes(pattern)) {
+      return true;
+    }
+  }
+
+  // Check for absolute paths (could be dangerous)
+  if (normalized.startsWith('/') || /^[a-z]:/i.test(normalized)) {
+    return true;
+  }
+
+  // Check for null bytes (can bypass some filters)
+  if (input.includes('\0') || input.includes('%00')) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Comprehensive file path validation
+ */
+function validateFilePath(filepath: string): {
+  isValid: boolean;
+  reason?: string;
+  sanitizedPath?: string;
+} {
+  if (!filepath || typeof filepath !== 'string') {
+    return { isValid: false, reason: 'Invalid file path format' };
+  }
+
+  // Check for traversal patterns
+  if (containsTraversalPatterns(filepath)) {
+    return { isValid: false, reason: 'Path traversal not allowed' };
+  }
+
+  // Check path length
+  if (filepath.length > 500) {
+    return { isValid: false, reason: 'File path too long' };
+  }
+
+  // Check for dangerous characters
+  const dangerousChars = /[<>:"|?*\x00-\x1f]/;
+  if (dangerousChars.test(filepath)) {
+    return { isValid: false, reason: 'Invalid characters in file path' };
+  }
+
+  // Normalize path separators
+  let normalized = filepath.replace(/\\/g, '/');
+  
+  // Remove leading slashes
+  normalized = normalized.replace(/^\/+/, '');
+  
+  // Remove trailing slashes
+  normalized = normalized.replace(/\/+$/, '');
+  
+  // Remove double slashes
+  normalized = normalized.replace(/\/+/g, '/');
+  
+  // Check if path becomes empty after normalization
+  if (!normalized) {
+    return { isValid: false, reason: 'Empty file path after normalization' };
+  }
+
+  // Validate file extension (if present)
+  const extension = path.extname(normalized).toLowerCase();
+  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp'];
+  
+  if (extension && !allowedExtensions.includes(extension)) {
+    return { isValid: false, reason: `File type not allowed: ${extension}` };
+  }
+
+  return {
+    isValid: true,
+    sanitizedPath: normalized
+  };
 }
 
 /**
@@ -37,9 +247,10 @@ const corsOptions = {
     'Content-Type',
     'Accept',
     'Authorization',
-    'X-CSRF-Token'
+    'X-CSRF-Token',
+    'X-Request-ID'
   ],
-  exposedHeaders: ['X-CSRF-Token'],
+  exposedHeaders: ['X-CSRF-Token', 'X-Request-ID'],
   maxAge: 86400 // 24 hours
 };
 
@@ -84,9 +295,29 @@ export const createRateLimit = (windowMs: number, max: number, message?: string)
 };
 
 /**
- * General security middleware
+ * Request ID middleware for tracking
+ */
+export const requestIdMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  const requestId = req.get('X-Request-ID') || generateRequestId();
+  req.headers['x-request-id'] = requestId;
+  res.set('X-Request-ID', requestId);
+  next();
+};
+
+function generateRequestId(): string {
+  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * General security middleware with path protection
  */
 export const generalSecurity = [
+  // Request tracking first
+  requestIdMiddleware,
+  
+  // Path traversal protection early in the chain
+  pathTraversalProtection,
+  
   // CORS
   cors(corsOptions),
   
@@ -131,6 +362,33 @@ export const generalSecurity = [
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
       res.setHeader('Surrogate-Control', 'no-store');
+    }
+    
+    next();
+  }
+];
+
+/**
+ * File-specific security middleware
+ */
+export const fileSecurity = [
+  ...generalSecurity,
+  
+  // Enhanced file path validation
+  filePathSecurity,
+  
+  // File-specific rate limiting
+  createRateLimit(60 * 1000, 50, 'Too many file requests'), // 50 per minute
+  
+  // File-specific headers
+  (req: Request, res: Response, next: NextFunction) => {
+    // Prevent execution of served files
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Download-Options', 'noopen');
+    
+    // Add cache headers for static files
+    if (req.path.match(/\.(jpg|jpeg|png|bmp|gif|webp)$/i)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
     }
     
     next();
@@ -226,24 +484,6 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
 };
 
 /**
- * Note: Input sanitization is handled by the dedicated sanitize.ts module
- * This avoids redundancy and ensures consistent sanitization across the app
- */
-
-/**
- * Complete security middleware stack for different use cases
- * Note: Input sanitization is handled by the dedicated sanitize.ts module
- */
-export const securityMiddleware = {
-  general: generalSecurity,
-  auth: authSecurity,
-  api: apiSecurity,
-  fileUpload: fileUploadSecurity,
-  csrf: csrfProtection
-  // inputSanitization removed to avoid redundancy with sanitize.ts
-};
-
-/**
  * Request size protection middleware
  */
 export const requestSizeLimits = (req: Request, res: Response, next: NextFunction) => {
@@ -262,6 +502,20 @@ export const requestSizeLimits = (req: Request, res: Response, next: NextFunctio
   }
   
   next();
+};
+
+/**
+ * Complete security middleware stack for different use cases
+ */
+export const securityMiddleware = {
+  general: generalSecurity,
+  auth: authSecurity,
+  api: apiSecurity,
+  fileUpload: fileUploadSecurity,
+  file: fileSecurity, // New: specific for file serving
+  csrf: csrfProtection,
+  pathTraversal: pathTraversalProtection, // Standalone for custom use
+  filePath: filePathSecurity // Standalone for file operations
 };
 
 /**

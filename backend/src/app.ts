@@ -57,8 +57,8 @@ app.use('/api/v1/wardrobes', wardrobeRoutes);
 app.use('/api/v1/export', exportRoutes);
 app.use('/api/v1/polygons', polygonRoutes);
 
-// File serving routes (apply file-specific security if needed)
-app.use('/api/v1/files', fileRoutes);
+// Apply file-specific security to file routes
+app.use(securityMiddleware.pathTraversal);
 
 // ==================== HEALTH CHECK ====================
 app.get('/health', (req, res) => {
