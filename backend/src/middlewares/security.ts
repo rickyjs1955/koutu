@@ -20,10 +20,16 @@ declare module 'express-session' {
  */
 export const pathTraversalProtection = (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Safely get request properties with fallbacks
+    const urlPath = req.path || req.url || '';
+    const params = req.params || {};
+    const query = req.query || {};
+    const body = req.body || {};
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+
     // Check URL path for traversal patterns
-    const urlPath = req.path;
     if (containsTraversalPatterns(urlPath)) {
-      console.warn(`Path traversal attempt detected in URL: ${urlPath} from IP: ${req.ip}`);
+      console.warn(`Path traversal attempt detected in URL: ${urlPath} from IP: ${ip}`);
       return next(ApiError.forbidden(
         'Path traversal not allowed',
         'PATH_TRAVERSAL_DETECTED'
@@ -31,9 +37,9 @@ export const pathTraversalProtection = (req: Request, res: Response, next: NextF
     }
 
     // Check all path parameters for traversal patterns
-    for (const [key, value] of Object.entries(req.params)) {
+    for (const [key, value] of Object.entries(params)) {
       if (typeof value === 'string' && containsTraversalPatterns(value)) {
-        console.warn(`Path traversal attempt in param ${key}: ${value} from IP: ${req.ip}`);
+        console.warn(`Path traversal attempt in param ${key}: ${value} from IP: ${ip}`);
         return next(ApiError.forbidden(
           `Invalid path parameter: ${key}`,
           'PATH_TRAVERSAL_DETECTED'
@@ -44,9 +50,9 @@ export const pathTraversalProtection = (req: Request, res: Response, next: NextF
     // Check query parameters that might contain file paths
     const pathQueryParams = ['filepath', 'path', 'file', 'dir', 'folder', 'location'];
     for (const param of pathQueryParams) {
-      const value = req.query[param];
+      const value = query[param];
       if (typeof value === 'string' && containsTraversalPatterns(value)) {
-        console.warn(`Path traversal attempt in query ${param}: ${value} from IP: ${req.ip}`);
+        console.warn(`Path traversal attempt in query ${param}: ${value} from IP: ${ip}`);
         return next(ApiError.forbidden(
           `Invalid query parameter: ${param}`,
           'PATH_TRAVERSAL_DETECTED'
@@ -55,12 +61,12 @@ export const pathTraversalProtection = (req: Request, res: Response, next: NextF
     }
 
     // Check request body for path-related fields
-    if (req.body && typeof req.body === 'object') {
+    if (body && typeof body === 'object') {
       const pathBodyFields = ['filepath', 'path', 'filename', 'directory', 'location'];
       for (const field of pathBodyFields) {
-        const value = req.body[field];
+        const value = body[field];
         if (typeof value === 'string' && containsTraversalPatterns(value)) {
-          console.warn(`Path traversal attempt in body ${field}: ${value} from IP: ${req.ip}`);
+          console.warn(`Path traversal attempt in body ${field}: ${value} from IP: ${ip}`);
           return next(ApiError.forbidden(
             `Invalid field: ${field}`,
             'PATH_TRAVERSAL_DETECTED'
@@ -77,7 +83,7 @@ export const pathTraversalProtection = (req: Request, res: Response, next: NextF
 };
 
 /**
- * Enhanced path validation specifically for file operations
+ * Enhanced file path validation specifically for file operations
  */
 export const filePathSecurity = (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -124,43 +130,49 @@ function containsTraversalPatterns(input: string): boolean {
     return false;
   }
 
-  // Normalize the input for better detection
-  const normalized = input.toLowerCase().replace(/\\/g, '/');
-  
-  // Path traversal patterns to detect
-  const traversalPatterns = [
-    '../',           // Basic traversal
-    '..\\',          // Windows style
-    '%2e%2e%2f',     // URL encoded ../
-    '%2e%2e%5c',     // URL encoded ..\
-    '..%2f',         // Partial encoding
-    '..%5c',         // Partial encoding
-    '%252e%252e%252f', // Double encoded
-    '....//',        // Double dot bypass
-    '....\\\\',      // Windows double dot bypass
-    '..;/',          // Semicolon bypass
-    '..//',          // Extra slash
-    '..\\\\',        // Extra backslash
-  ];
+  try {
+    // Normalize the input for better detection
+    const normalized = input.toLowerCase().replace(/\\/g, '/');
+    
+    // Path traversal patterns to detect
+    const traversalPatterns = [
+      '../',           // Basic traversal
+      '..\\',          // Windows style
+      '%2e%2e%2f',     // URL encoded ../
+      '%2e%2e%5c',     // URL encoded ..\
+      '..%2f',         // Partial encoding
+      '..%5c',         // Partial encoding
+      '%252e%252e%252f', // Double encoded
+      '....//',        // Double dot bypass
+      '....\\\\',      // Windows double dot bypass
+      '..;/',          // Semicolon bypass
+      '..//',          // Extra slash
+      '..\\\\',        // Extra backslash
+    ];
 
-  // Check for any traversal patterns
-  for (const pattern of traversalPatterns) {
-    if (normalized.includes(pattern)) {
+    // Check for any traversal patterns
+    for (const pattern of traversalPatterns) {
+      if (normalized.includes(pattern)) {
+        return true;
+      }
+    }
+
+    // Check for absolute paths (could be dangerous)
+    if (normalized.startsWith('/') || /^[a-z]:/i.test(normalized)) {
       return true;
     }
-  }
 
-  // Check for absolute paths (could be dangerous)
-  if (normalized.startsWith('/') || /^[a-z]:/i.test(normalized)) {
-    return true;
-  }
+    // Check for null bytes (can bypass some filters)
+    if (input.includes('\0') || input.includes('%00')) {
+      return true;
+    }
 
-  // Check for null bytes (can bypass some filters)
-  if (input.includes('\0') || input.includes('%00')) {
-    return true;
+    return false;
+  } catch (error) {
+    // If any error occurs in pattern checking, err on the side of caution
+    console.error('Error in traversal pattern detection:', error);
+    return true; // Block potentially malicious input
   }
-
-  return false;
 }
 
 /**
@@ -171,55 +183,60 @@ function validateFilePath(filepath: string): {
   reason?: string;
   sanitizedPath?: string;
 } {
-  if (!filepath || typeof filepath !== 'string') {
-    return { isValid: false, reason: 'Invalid file path format' };
-  }
+  try {
+    if (!filepath || typeof filepath !== 'string') {
+      return { isValid: false, reason: 'Invalid file path format' };
+    }
 
-  // Check for traversal patterns
-  if (containsTraversalPatterns(filepath)) {
-    return { isValid: false, reason: 'Path traversal not allowed' };
-  }
+    // Check for traversal patterns
+    if (containsTraversalPatterns(filepath)) {
+      return { isValid: false, reason: 'Path traversal not allowed' };
+    }
 
-  // Check path length
-  if (filepath.length > 500) {
-    return { isValid: false, reason: 'File path too long' };
-  }
+    // Check path length
+    if (filepath.length > 500) {
+      return { isValid: false, reason: 'File path too long' };
+    }
 
-  // Check for dangerous characters
-  const dangerousChars = /[<>:"|?*\x00-\x1f]/;
-  if (dangerousChars.test(filepath)) {
-    return { isValid: false, reason: 'Invalid characters in file path' };
-  }
+    // Check for dangerous characters
+    const dangerousChars = /[<>:"|?*\x00-\x1f]/;
+    if (dangerousChars.test(filepath)) {
+      return { isValid: false, reason: 'Invalid characters in file path' };
+    }
 
-  // Normalize path separators
-  let normalized = filepath.replace(/\\/g, '/');
-  
-  // Remove leading slashes
-  normalized = normalized.replace(/^\/+/, '');
-  
-  // Remove trailing slashes
-  normalized = normalized.replace(/\/+$/, '');
-  
-  // Remove double slashes
-  normalized = normalized.replace(/\/+/g, '/');
-  
-  // Check if path becomes empty after normalization
-  if (!normalized) {
-    return { isValid: false, reason: 'Empty file path after normalization' };
-  }
+    // Normalize path separators
+    let normalized = filepath.replace(/\\/g, '/');
+    
+    // Remove leading slashes
+    normalized = normalized.replace(/^\/+/, '');
+    
+    // Remove trailing slashes
+    normalized = normalized.replace(/\/+$/, '');
+    
+    // Remove double slashes
+    normalized = normalized.replace(/\/+/g, '/');
+    
+    // Check if path becomes empty after normalization
+    if (!normalized) {
+      return { isValid: false, reason: 'Empty file path after normalization' };
+    }
 
-  // Validate file extension (if present)
-  const extension = path.extname(normalized).toLowerCase();
-  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp'];
-  
-  if (extension && !allowedExtensions.includes(extension)) {
-    return { isValid: false, reason: `File type not allowed: ${extension}` };
-  }
+    // Validate file extension (if present)
+    const extension = path.extname(normalized).toLowerCase();
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp'];
+    
+    if (extension && !allowedExtensions.includes(extension)) {
+      return { isValid: false, reason: `File type not allowed: ${extension}` };
+    }
 
-  return {
-    isValid: true,
-    sanitizedPath: normalized
-  };
+    return {
+      isValid: true,
+      sanitizedPath: normalized
+    };
+  } catch (error) {
+    console.error('File path validation error:', error);
+    return { isValid: false, reason: 'File path validation failed' };
+  }
 }
 
 /**
@@ -227,16 +244,22 @@ function validateFilePath(filepath: string): {
  */
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    const allowedOrigins = (config as any).allowedOrigins || process.env.ALLOWED_ORIGINS?.split(',') || 
-    ['http://localhost:3000', 'http://localhost:5173'];
-    
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'), false);
+    try {
+      const allowedOrigins = (config as any).allowedOrigins || process.env.ALLOWED_ORIGINS?.split(',') || 
+      ['http://localhost:3000', 'http://localhost:5173'];
+      
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn(`CORS: Origin ${origin} not allowed`);
+        callback(new Error('Not allowed by CORS'), false);
+      }
+    } catch (error) {
+      console.error('CORS configuration error:', error);
+      callback(new Error('CORS configuration error'), false);
     }
   },
   credentials: true,
@@ -339,32 +362,41 @@ export const generalSecurity = [
   
   // Additional security headers
   (req: Request, res: Response, next: NextFunction) => {
-    // Prevent clickjacking
-    res.setHeader('X-Frame-Options', 'DENY');
-    
-    // Prevent MIME type sniffing
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    
-    // Enable XSS protection
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    
-    // Referrer policy
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    
-    // Feature policy (restrict browser features)
-    res.setHeader('Permissions-Policy', 
-      'geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=()'
-    );
-    
-    // Cache control for sensitive routes
-    if (req.path.includes('/auth/') || req.path.includes('/api/')) {
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-      res.setHeader('Surrogate-Control', 'no-store');
+    try {
+      // Safely get request properties
+      const path = req.path || req.url || '';
+      
+      // Prevent clickjacking
+      res.setHeader('X-Frame-Options', 'DENY');
+      
+      // Prevent MIME type sniffing
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      
+      // Enable XSS protection
+      res.setHeader('X-XSS-Protection', '1; mode=block');
+      
+      // Referrer policy
+      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+      
+      // Feature policy (restrict browser features)
+      res.setHeader('Permissions-Policy', 
+        'geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=()'
+      );
+      
+      // Cache control for sensitive routes
+      if (path.includes('/auth/') || path.includes('/api/')) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('Surrogate-Control', 'no-store');
+      }
+      
+      next();
+    } catch (error) {
+      console.error('Security headers middleware error:', error);
+      // Still proceed with the request even if headers fail
+      next();
     }
-    
-    next();
   }
 ];
 
@@ -487,21 +519,22 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
  * Request size protection middleware
  */
 export const requestSizeLimits = (req: Request, res: Response, next: NextFunction) => {
-  // Set maximum request size based on content type
-  const contentType = req.get('Content-Type') || '';
-  
-  if (contentType.includes('multipart/form-data')) {
-    // File uploads - 10MB limit
-    req.setTimeout(5 * 60 * 1000); // 5 minute timeout for uploads
-  } else if (contentType.includes('application/json')) {
-    // JSON requests - 1MB limit
-    req.setTimeout(30 * 1000); // 30 second timeout for JSON
-  } else {
-    // Other requests - 100KB limit  
-    req.setTimeout(10 * 1000); // 10 second timeout for others
+  try {
+    const contentType = req.get('Content-Type') || '';
+    
+    if (contentType.includes('multipart/form-data')) {
+      req.setTimeout(5 * 60 * 1000); // 5 minute timeout for uploads
+    } else if (contentType.includes('application/json')) {
+      req.setTimeout(30 * 1000); // 30 second timeout for JSON
+    } else {
+      req.setTimeout(10 * 1000); // 10 second timeout for others
+    }
+    
+    next();
+  } catch (error) {
+    console.error('Request size limits error:', error);
+    next(); // Continue even if timeout setting fails
   }
-  
-  next();
 };
 
 /**

@@ -1,5 +1,32 @@
 // backend/src/__tests__/middlewares/security.unit.test.ts
 
+process.env.NODE_ENV = 'test';
+process.env.ALLOWED_ORIGINS = 'http://localhost:3000,http://localhost:5173';
+
+jest.mock('../../utils/ApiError', () => ({
+  ApiError: {
+    forbidden: jest.fn((message, code) => ({
+      statusCode: 403,
+      message,
+      code,
+      name: 'ApiError'
+    })),
+    internal: jest.fn((message, code) => ({
+      statusCode: 500,
+      message,
+      code,
+      name: 'ApiError'
+    }))
+  }
+}));
+
+jest.mock('../../config', () => ({
+  config: {
+    nodeEnv: 'test',
+    allowedOrigins: ['http://localhost:3000', 'http://localhost:5173']
+  }
+}));
+
 import { Request, Response, NextFunction } from 'express';
 import { jest } from '@jest/globals';
 
@@ -34,38 +61,46 @@ describe('Security Middleware Unit Tests', () => {
   });
 
   beforeEach(() => {
-    // Create spies for response methods
-    setHeaderSpy = jest.fn();
-    statusSpy = jest.fn().mockReturnThis();
-    jsonSpy = jest.fn().mockReturnThis();
-    
-    mockReq = {
-      headers: {},
-      path: '/test',
-      method: 'GET',
-      ip: '127.0.0.1',
-      session: {
-        id: 'mock-session-id',
-        cookie: {} as any,
-        regenerate: jest.fn(),
-        destroy: jest.fn(),
-        reload: jest.fn(),
-        save: jest.fn(),
-        touch: jest.fn(),
-        resetMaxAge: jest.fn()
-      } as any,
-      get: jest.fn().mockReturnValue(undefined)
-    } as any;
-    
-    mockRes = {
-      setHeader: setHeaderSpy,
-      status: statusSpy,
-      json: jsonSpy,
-      set: jest.fn()
-    } as any;
-    
-    mockNext = jest.fn();
-  });
+  // Create spies for response methods
+  setHeaderSpy = jest.fn();
+  statusSpy = jest.fn().mockReturnThis();
+  jsonSpy = jest.fn().mockReturnThis();
+  
+  mockReq = {
+    headers: {},
+    path: '/test',  // Add default path
+    url: '/test',   // Add fallback URL
+    method: 'GET',
+    ip: '127.0.0.1',
+    params: {},     // Add params
+    query: {},      // Add query
+    body: {},       // Add body
+    connection: {   // Add connection for IP fallback
+      remoteAddress: '127.0.0.1'
+    },
+    session: {
+      id: 'mock-session-id',
+      cookie: {} as any,
+      regenerate: jest.fn(),
+      destroy: jest.fn(),
+      reload: jest.fn(),
+      save: jest.fn(),
+      touch: jest.fn(),
+      resetMaxAge: jest.fn()
+    } as any,
+    get: jest.fn().mockReturnValue(undefined),
+    setTimeout: jest.fn() // Add setTimeout mock
+  } as any;
+  
+  mockRes = {
+    setHeader: setHeaderSpy,
+    status: statusSpy,
+    json: jsonSpy,
+    set: jest.fn()
+  } as any;
+  
+  mockNext = jest.fn();
+});
 
   afterEach(() => {
     jest.clearAllMocks();
@@ -118,7 +153,7 @@ describe('Security Middleware Unit Tests', () => {
 
     it('should skip CSRF protection for login endpoint', () => {
       (mockReq as any).method = 'POST';
-      (mockReq as any) = '/auth/login';
+      (mockReq as any).path = '/auth/login'; // Correct assignment
       
       csrfProtection(mockReq as Request, mockRes as Response, mockNext);
       
@@ -873,6 +908,294 @@ describe('Security Middleware Unit Tests', () => {
       // Both should include security middleware
       expect(testAuthSecurity.length).toBeGreaterThan(0);
       expect(prodAuthSecurity.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Path Traversal Protection Unit Tests', () => {
+    let pathTraversalProtection: any;
+    let filePathSecurity: any;
+    let mockReq: Partial<Request>;
+    let mockRes: Partial<Response>;
+    let mockNext: NextFunction;
+
+    beforeAll(async () => {
+      // Mock ApiError
+      jest.doMock('../../utils/ApiError', () => ({
+        ApiError: {
+          forbidden: (message: string, code: string) => {
+            const error = new Error(message);
+            (error as any).statusCode = 403;
+            (error as any).code = code;
+            return error;
+          },
+          internal: (message: string) => {
+            const error = new Error(message);
+            (error as any).statusCode = 500;
+            return error;
+          }
+        }
+      }));
+
+      const securityModule = await import('../../middlewares/security');
+      pathTraversalProtection = securityModule.pathTraversalProtection;
+      filePathSecurity = securityModule.filePathSecurity;
+    });
+
+    beforeEach(() => {
+      mockReq = {
+        path: '/safe',
+        url: '/safe',
+        params: {},
+        query: {},
+        body: {},
+        ip: '127.0.0.1',
+        connection: { remoteAddress: '127.0.0.1' } as any
+      };
+      
+      mockRes = {};
+      mockNext = jest.fn();
+    });
+
+    afterEach(() => {
+      jest.clearAllMocks();
+    });
+
+    describe('Path Traversal Attack Detection', () => {
+      it('should block basic path traversal in URL', () => {
+        (mockReq as any).path = '/api/files/../../../etc/passwd';
+
+        pathTraversalProtection(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+          statusCode: 403,
+          code: 'PATH_TRAVERSAL_DETECTED'
+        }));
+      });
+
+      it('should block path traversal in parameters', () => {
+        (mockReq as any).params = { filepath: '../../../etc/passwd' };
+
+        pathTraversalProtection(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+          statusCode: 403,
+          code: 'PATH_TRAVERSAL_DETECTED'
+        }));
+      });
+
+      it('should block URL-encoded path traversal', () => {
+        (mockReq as any).params = { filepath: '%2e%2e%2f%2e%2e%2fetc%2fpasswd' };
+
+        pathTraversalProtection(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+          statusCode: 403,
+          code: 'PATH_TRAVERSAL_DETECTED'
+        }));
+      });
+
+      it('should block double-encoded path traversal', () => {
+        (mockReq as any).params = { filepath: '%252e%252e%252f%252e%252e%252fetc%252fpasswd' };
+
+        pathTraversalProtection(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+          statusCode: 403,
+          code: 'PATH_TRAVERSAL_DETECTED'
+        }));
+      });
+
+      it('should block Windows-style path traversal', () => {
+        (mockReq as any).params = { filepath: '..\\..\\windows\\system32' };
+
+        pathTraversalProtection(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+          statusCode: 403,
+          code: 'PATH_TRAVERSAL_DETECTED'
+        }));
+      });
+
+      it('should block null byte injection', () => {
+        (mockReq as any).params = { filepath: 'safe.txt\0../../../etc/passwd' };
+
+        pathTraversalProtection(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+          statusCode: 403,
+          code: 'PATH_TRAVERSAL_DETECTED'
+        }));
+      });
+
+      it('should block absolute paths', () => {
+        (mockReq as any).params = { filepath: '/etc/passwd' };
+
+        pathTraversalProtection(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+          statusCode: 403,
+          code: 'PATH_TRAVERSAL_DETECTED'
+        }));
+      });
+
+      it('should block creative bypass attempts', () => {
+        const bypassAttempts = [
+          '....//....//etc/passwd',
+          '..;/..;/etc/passwd',
+          '..///..//etc/passwd',
+          '..\\\\..\\\\windows\\system32'
+        ];
+
+        bypassAttempts.forEach(attempt => {
+          (mockNext as jest.MockedFunction<any>).mockClear();
+          (mockReq as any).params = { filepath: attempt };
+
+          pathTraversalProtection(mockReq as Request, mockRes as Response, mockNext);
+
+          expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+            statusCode: 403,
+            code: 'PATH_TRAVERSAL_DETECTED'
+          }));
+        });
+      });
+
+      it('should block traversal in path-related query parameters', () => {
+        (mockReq as any).query = { filepath: '../../../etc/passwd' };
+
+        pathTraversalProtection(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+          statusCode: 403,
+          code: 'PATH_TRAVERSAL_DETECTED'
+        }));
+      });
+
+      it('should block traversal in path-related body fields', () => {
+        (mockReq as any).body = { filename: '../../../etc/passwd' };
+
+        pathTraversalProtection(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+          statusCode: 403,
+          code: 'PATH_TRAVERSAL_DETECTED'
+        }));
+      });
+    });
+
+    describe('File Path Security Middleware', () => {
+      it('should allow valid file paths', () => {
+        (mockReq as any).params = { filepath: 'user123/images/photo.jpg' };
+
+        filePathSecurity(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith();
+        expect((mockReq as any).params.filepath).toBe('user123/images/photo.jpg');
+      });
+
+      it('should sanitize and normalize paths', () => {
+        (mockReq as any).params = { filepath: 'user123//images///photo.jpg' };
+
+        filePathSecurity(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith();
+        expect((mockReq as any).params.filepath).toBe('user123/images/photo.jpg');
+      });
+
+      it('should block traversal in file paths', () => {
+        (mockReq as any).params = { filepath: '../../../etc/passwd' };
+
+        filePathSecurity(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+          statusCode: 403,
+          code: 'INVALID_FILE_PATH'
+        }));
+      });
+
+      it('should block paths that are too long', () => {
+        (mockReq as any).params = { filepath: 'x'.repeat(501) };
+
+        filePathSecurity(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+          statusCode: 403,
+          code: 'INVALID_FILE_PATH'
+        }));
+      });
+
+      it('should block dangerous file extensions', () => {
+        const dangerousFiles = [
+          'malicious.exe',
+          'script.bat',
+          'virus.scr',
+          'trojan.com'
+        ];
+
+        dangerousFiles.forEach(filename => {
+          (mockNext as jest.MockedFunction<any>).mockClear();
+          (mockReq as any).params = { filepath: filename };
+
+          filePathSecurity(mockReq as Request, mockRes as Response, mockNext);
+
+          expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+            statusCode: 403,
+            code: 'INVALID_FILE_PATH'
+          }));
+        });
+      });
+
+      it('should allow safe file extensions', () => {
+        const safeFiles = [
+          'photo.jpg',
+          'image.jpeg',
+          'picture.png',
+          'graphic.bmp',
+          'animation.gif',
+          'modern.webp'
+        ];
+
+        safeFiles.forEach(filename => {
+          (mockNext as jest.MockedFunction<any>).mockClear();
+          (mockReq as any).params = { filepath: filename };
+
+          filePathSecurity(mockReq as Request, mockRes as Response, mockNext);
+
+          expect(mockNext).toHaveBeenCalledWith();
+        });
+      });
+
+      it('should block dangerous characters', () => {
+        const dangerousChars = ['<', '>', ':', '"', '|', '?', '*'];
+
+        dangerousChars.forEach(char => {
+          (mockNext as jest.MockedFunction<any>).mockClear();
+          (mockReq as any).params = { filepath: `file${char}name.jpg` };
+
+          filePathSecurity(mockReq as Request, mockRes as Response, mockNext);
+
+          expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
+            statusCode: 403,
+            code: 'INVALID_FILE_PATH'
+          }));
+        });
+      });
+
+      it('should handle wildcard parameter routes', () => {
+        (mockReq as any).params = { '0': 'user123/photo.jpg' };
+
+        filePathSecurity(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith();
+        expect((mockReq as any).params['0']).toBe('user123/photo.jpg');
+      });
+
+      it('should pass through when no filepath present', () => {
+        (mockReq as any).params = { id: '123' }; // No filepath
+
+        filePathSecurity(mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith();
+      });
     });
   });
 });
