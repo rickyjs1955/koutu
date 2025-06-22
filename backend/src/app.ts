@@ -25,7 +25,7 @@ securityMiddleware.general.forEach(middleware => {
 
 // ==================== BODY PARSING WITH SIZE LIMITS ====================
 // JSON parsing with size limits
-app.use(express.json({ 
+app.use(express.json({
   limit: '1mb',  // 1MB for JSON requests
   verify: (req, res, buf) => {
     // Additional validation can be added here
@@ -35,9 +35,9 @@ app.use(express.json({
   }
 }));
 
-// URL-encoded parsing with size limits  
-app.use(express.urlencoded({ 
-  extended: true, 
+// URL-encoded parsing with size limits
+app.use(express.urlencoded({
+  extended: true,
   limit: '1mb',  // 1MB for form data
   parameterLimit: 100  // Limit number of parameters
 }));
@@ -58,12 +58,13 @@ app.use('/api/v1/export', exportRoutes);
 app.use('/api/v1/polygons', polygonRoutes);
 
 // Apply file-specific security to file routes
-app.use(securityMiddleware.pathTraversal);
+// IMPORTANT: Mount fileRoutes with its specific path traversal middleware
+app.use('/api/v1/files', securityMiddleware.pathTraversal, fileRoutes);
 
 // ==================== HEALTH CHECK ====================
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'ok', 
+  res.status(200).json({
+    status: 'ok',
     storage: config.storageMode,
     security: {
       cors: 'enabled',
