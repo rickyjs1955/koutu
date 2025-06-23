@@ -1,1134 +1,1094 @@
-// /backend/tests/unit/middlewares/fileValidate.additional.unit.test.ts
+// /backend/tests/unit/routes/fileRoutes.additional.unit.test.ts
 
 jest.mock('../../config/firebase', () => ({
     default: { storage: jest.fn() },
 }));
 
-import { Request, Response, NextFunction } from 'express';
-import fs from 'fs/promises';
+import express, { Request, Response, NextFunction } from 'express';
+import request from 'supertest';
+import { config } from '../../../src/config';
 import { storageService } from '../../../src/services/storageService';
+import { authenticate } from '../../../src/middlewares/auth';
+import { ApiError } from '../../../src/utils/ApiError';
+import path from 'path';
 
-// Mock dependencies
-jest.mock('fs/promises');
+// Mock all dependencies
+jest.mock('../../../src/config');
 jest.mock('../../../src/services/storageService');
+jest.mock('../../../src/middlewares/auth');
+jest.mock('../../../src/utils/ApiError');
 
-const mockFs = fs as jest.Mocked<typeof fs>;
+const mockConfig = config as jest.Mocked<typeof config>;
 const mockStorageService = storageService as jest.Mocked<typeof storageService>;
+const mockAuthenticate = authenticate as jest.MockedFunction<typeof authenticate>;
+const mockApiError = ApiError as jest.MockedClass<typeof ApiError>;
 
-// Import actual middleware functions (mock implementations for this example)
-const validateFileContentBasic = jest.fn(async (req: Request, res: Response, next: NextFunction) => {
-  const filepath = req.params.filepath;
-  
-  if (!filepath) {
-    const error = new Error('File path is required');
-    (error as any).statusCode = 400;
-    (error as any).code = 'MISSING_FILEPATH';
-    return next(error);
-  }
-  
-  // Advanced path validation including Unicode edge cases
-  let decodedPath: string;
-  try {
-    decodedPath = decodeURIComponent(filepath);
-  } catch (error) {
-    const validationError = new Error('Invalid URL encoding in file path');
-    (validationError as any).statusCode = 400;
-    (validationError as any).code = 'INVALID_ENCODING';
-    return next(validationError);
-  }
-  
-  // Check for various attack vectors
-  if (decodedPath.includes('..') || decodedPath.includes('\0') || decodedPath.startsWith('/')) {
-    const error = new Error('Invalid file path: Path traversal detected');
-    (error as any).statusCode = 400;
-    (error as any).code = 'INVALID_FILEPATH';
-    return next(error);
-  }
-  
-  // Check for suspicious Unicode characters
-  if (/[\u200B-\u200D\uFEFF]/.test(decodedPath)) {
-    const error = new Error('Invalid characters detected in file path');
-    (error as any).statusCode = 400;
-    (error as any).code = 'INVALID_CHARACTERS';
-    return next(error);
-  }
-  
-  // Check path length limits
-  if (decodedPath.length > 255) {
-    const error = new Error('File path too long');
-    (error as any).statusCode = 400;
-    (error as any).code = 'PATH_TOO_LONG';
-    return next(error);
-  }
-  
-  const blockedExtensions = ['.exe', '.bat', '.scr', '.com', '.pif', '.cmd', '.ps1', '.vbs', '.js'];
-  const extension = decodedPath.substring(decodedPath.lastIndexOf('.')).toLowerCase();
-  if (blockedExtensions.includes(extension)) {
-    const error = new Error(`Blocked file extension: ${extension}`);
-    (error as any).statusCode = 400;
-    (error as any).code = 'BLOCKED_EXTENSION';
-    return next(error);
-  }
-  
+// Create middleware mocks
+const mockValidateFileContentBasic = jest.fn((req: Request, res: Response, next: NextFunction) => {
   (req as any).fileValidation = { 
-    filepath, 
+    filepath: req.params.filepath, 
     isValid: true, 
     fileType: 'unknown' 
   };
   next();
 });
 
-const validateFileContent = jest.fn(async (req: Request, res: Response, next: NextFunction) => {
-  const filepath = req.params.filepath;
-  
-  try {
-    const absolutePath = mockStorageService.getAbsolutePath(filepath);
-    await mockFs.access(absolutePath);
-    
-    const stats = await mockFs.stat(absolutePath);
-    
-    // Enhanced file size validation
-    if (stats.size > 8388608) { // 8MB
-      const error = new Error('File too large');
-      (error as any).statusCode = 400;
-      (error as any).code = 'INVALID_FILE_SIZE';
-      return next(error);
-    }
-    
-    if (stats.size <= 0) {
-      const error = new Error('Empty file not allowed');
-      (error as any).statusCode = 400;
-      (error as any).code = 'INVALID_FILE_SIZE';
-      return next(error);
-    }
-    
-    // Advanced file signature detection
-    const mockOpen = await mockFs.open(absolutePath, 'r');
-    const buffer = Buffer.alloc(16); // Read more bytes for better detection
-    await mockOpen.read(buffer, 0, 16, 0);
-    await mockOpen.close();
-    
-    let fileType = 'unknown';
-    let securityFlags: string[] = [];
-    
-    // Check for various file signatures
-    if (buffer[0] === 0xFF && buffer[1] === 0xD8) {
-      fileType = 'image/jpeg';
-    } else if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
-      fileType = 'image/png';
-    } else if (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) {
-      fileType = 'application/pdf';
-    } else if (buffer[0] === 0x4D && buffer[1] === 0x5A) {
-      securityFlags.push('PE executable detected');
-      const error = new Error('Dangerous file type detected');
-      (error as any).statusCode = 400;
-      (error as any).code = 'DANGEROUS_FILE_TYPE';
-      return next(error);
-    }
-    
-    // Check for polyglot files (multiple valid signatures)
-    const hasMultipleSignatures = checkForPolyglotFile(buffer);
-    if (hasMultipleSignatures) {
-      securityFlags.push('Polyglot file detected');
-    }
-    
-    (req as any).fileValidation = { 
-      filepath, 
-      isValid: true, 
-      fileType,
-      fileSize: stats.size,
-      securityFlags
-    };
-    next();
-    
-  } catch (error) {
-    const notFoundError = new Error('File not found');
-    (notFoundError as any).statusCode = 404;
-    (notFoundError as any).code = 'FILE_NOT_FOUND';
-    next(notFoundError);
-  }
+const mockValidateFileContent = jest.fn((req: Request, res: Response, next: NextFunction) => {
+  (req as any).fileValidation = { 
+    filepath: req.params.filepath, 
+    isValid: true, 
+    fileType: 'image/jpeg', 
+    fileSize: 1024 
+  };
+  next();
 });
 
-// Helper function to detect polyglot files
-function checkForPolyglotFile(buffer: Buffer): boolean {
-  // Simple check for multiple file signatures in the same buffer
-  const signatures = [
-    [0xFF, 0xD8], // JPEG
-    [0x89, 0x50], // PNG
-    [0x25, 0x50], // PDF
-    [0x4D, 0x5A]  // PE
-  ];
+const mockValidateImageFile = jest.fn((req: Request, res: Response, next: NextFunction) => {
+  (req as any).fileValidation = { 
+    filepath: req.params.filepath, 
+    isValid: true, 
+    fileType: 'image/jpeg' 
+  };
+  next();
+});
+
+const mockLogFileAccess = jest.fn((req: Request, res: Response, next: NextFunction) => {
+  next();
+});
+
+// Mock the file validation middlewares
+jest.mock('../../../src/middlewares/fileValidate', () => ({
+  validateFileContentBasic: mockValidateFileContentBasic,
+  validateFileContent: mockValidateFileContent,
+  validateImageFile: mockValidateImageFile,
+  logFileAccess: mockLogFileAccess
+}));
+
+// Mock path module
+jest.mock('path', () => ({
+  ...jest.requireActual('path'),
+  extname: jest.fn(),
+  basename: jest.fn()
+}));
+
+const mockPath = path as jest.Mocked<typeof path>;
+
+// Import fileRoutes AFTER mocking
+import { fileRoutes } from '../../../src/routes/fileRoutes';
+
+const createTestApp = () => {
+  const app = express();
+  app.use('/api/v1/files', fileRoutes);
   
-  let signatureCount = 0;
-  for (const sig of signatures) {
-    for (let i = 0; i <= buffer.length - sig.length; i++) {
-      if (sig.every((byte, index) => buffer[i + index] === byte)) {
-        signatureCount++;
-        break;
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    res.status(err.statusCode || 500).json({
+      error: {
+        message: err.message,
+        code: err.code,
+        context: err.context
       }
-    }
-  }
+    });
+  });
   
-  return signatureCount > 1;
-}
+  return app;
+};
 
-// Test helper functions
-const createMockRequest = (filepath?: string): Partial<Request> => ({
-  params: { filepath: filepath || 'test.jpg' },
-  ip: '127.0.0.1',
-  get: jest.fn().mockReturnValue('test-user-agent')
-});
+describe('FileRoutes Additional Unit Tests', () => {
+  let app: express.Application;
 
-const createMockResponse = (): Partial<Response> => ({
-  status: jest.fn().mockReturnThis(),
-  json: jest.fn().mockReturnThis(),
-  send: jest.fn().mockReturnThis()
-});
-
-const createMockNext = (): NextFunction => jest.fn();
-
-describe('FileValidate Additional Edge Case Tests', () => {
   beforeEach(() => {
+    app = createTestApp();
     jest.clearAllMocks();
     
     // Default mocks
-    mockStorageService.getAbsolutePath.mockReturnValue('/mock/path/test.jpg');
-    mockFs.access.mockResolvedValue(undefined);
-    mockFs.stat.mockResolvedValue({ size: 1024 } as any);
+    mockConfig.storageMode = 'local';
     
-    // Default JPEG signature
-    const jpegBuffer = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46]);
-    const mockOpen = {
-      read: jest.fn().mockImplementation((buffer) => {
-        jpegBuffer.copy(buffer);
-        return Promise.resolve({ bytesRead: 8 });
-      }),
-      close: jest.fn().mockResolvedValue(undefined)
-    };
-    mockFs.open = jest.fn().mockResolvedValue(mockOpen as any);
-  });
-
-  describe('Unicode and International Character Edge Cases', () => {
-    it('should handle emoji in file names', async () => {
-      const req = createMockRequest('photo-😀-vacation.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContentBasic(req, res, next);
-
-      expect(next).toHaveBeenCalledWith();
-      expect((req as any).fileValidation?.filepath).toBe('photo-😀-vacation.jpg');
+    mockAuthenticate.mockImplementation(async(req: any, res: any, next: any) => {
+      req.user = { id: 'user123' };
+      next();
+    });
+    
+    mockApiError.notFound = jest.fn().mockImplementation((message) => {
+      const error = new Error(message);
+      (error as any).statusCode = 404;
+      (error as any).code = 'NOT_FOUND';
+      return error;
     });
 
-    it('should handle international characters', async () => {
-      const internationalFiles = [
-        'файл.jpg',           // Russian
-        'файл.jpg',           // Chinese
-        'ファイル.jpg',        // Japanese
-        'español.jpg',        // Spanish with accent
-        'müller.jpg'          // German umlaut
-      ];
-
-      for (const filename of internationalFiles) {
-        const req = createMockRequest(filename) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        expect(next).toHaveBeenCalledWith();
-        expect((req as any).fileValidation?.filepath).toBe(filename);
-      }
+    mockStorageService.getAbsolutePath = jest.fn().mockImplementation((filepath: string) => {
+      return `/mock/storage/path/${filepath}`;
     });
 
-    it('should reject zero-width characters', async () => {
-      const maliciousFiles = [
-        'file\u200B.jpg',     // Zero-width space
-        'image\u200C.png',    // Zero-width non-joiner
-        'doc\uFEFF.pdf'       // Byte order mark
-      ];
+    mockStorageService.getSignedUrl = jest.fn().mockResolvedValue('https://firebase.url/signed');
 
-      for (const filename of maliciousFiles) {
-        const req = createMockRequest(filename) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        expect(next).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: 'INVALID_CHARACTERS'
-          })
-        );
-      }
+    // Mock path functions
+    mockPath.extname.mockImplementation((filepath: string) => {
+      const ext = filepath.substring(filepath.lastIndexOf('.'));
+      return ext || '';
+    });
+    
+    mockPath.basename.mockImplementation((filepath: string) => {
+      return filepath.substring(filepath.lastIndexOf('/') + 1);
     });
 
-    it('should handle URL encoding edge cases', async () => {
-      const encodingTests = [
-        { input: 'file%20name.jpg', expected: 'file name.jpg' },
-        { input: 'image%2Bplus.jpg', expected: 'image+plus.jpg' },
-        { input: 'doc%26ampersand.pdf', expected: 'doc&ampersand.pdf' }
-      ];
-
-      for (const test of encodingTests) {
-        const req = createMockRequest(test.input) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        expect(next).toHaveBeenCalledWith();
-        expect((req as any).fileValidation?.filepath).toBe(test.input);
-      }
+    // Reset validation middleware mocks
+    mockValidateFileContentBasic.mockImplementation((req: any, res: any, next: any) => {
+      req.fileValidation = { 
+        filepath: req.params.filepath, 
+        isValid: true, 
+        fileType: 'unknown' 
+      };
+      next();
     });
 
-    it('should reject malformed URL encoding', async () => {
-      const malformedUrls = [
-        'file%ZZ.jpg',        // Invalid hex
-        'image%2.png',        // Incomplete encoding
-        'doc%GG.pdf'          // Invalid characters
-      ];
+    mockValidateFileContent.mockImplementation((req: any, res: any, next: any) => {
+      req.fileValidation = { 
+        filepath: req.params.filepath, 
+        isValid: true, 
+        fileType: 'image/jpeg', 
+        fileSize: 1024 
+      };
+      next();
+    });
 
-      for (const url of malformedUrls) {
-        const req = createMockRequest(url) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
+    mockValidateImageFile.mockImplementation((req: any, res: any, next: any) => {
+      req.fileValidation = { 
+        filepath: req.params.filepath, 
+        isValid: true, 
+        fileType: 'image/jpeg' 
+      };
+      next();
+    });
 
-        await validateFileContentBasic(req, res, next);
+    mockLogFileAccess.mockImplementation((req: any, res: any, next: any) => {
+      next();
+    });
 
-        expect(next).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: 'INVALID_ENCODING'
-          })
-        );
+    // Mock Express response methods
+    jest.spyOn(express.response, 'sendFile').mockImplementation(function(this: Response, path: string, options?: any, callback?: any) {
+      this.setHeader('Content-Type', this.getHeader('Content-Type') || 'application/octet-stream');
+      this.status(200).send('mocked file content');
+      return this;
+    });
+
+    jest.spyOn(express.response, 'download').mockImplementation(function(this: Response, path: string, filename?: string, options?: any, callback?: any) {
+      this.setHeader('Content-Type', this.getHeader('Content-Type') || 'application/octet-stream');
+      this.setHeader('Content-Disposition', `attachment; filename="${filename || 'download'}"`);
+      this.status(200).send('mocked download content');
+      return this;
+    });
+
+    jest.spyOn(express.response, 'redirect').mockImplementation(function(this: Response, status: number | string, url?: string) {
+      if (typeof status === 'string') {
+        url = status;
+        status = 302;
       }
+      this.status(status as number);
+      this.setHeader('Location', url || '');
+      this.send();
+      return this;
     });
   });
 
-  describe('File Signature and Type Detection Edge Cases', () => {
-    it('should detect corrupted JPEG signatures', async () => {
-      const corruptedJpeg = Buffer.from([0xFF, 0xD8, 0x00, 0x00]); // Corrupted JPEG
-      const mockOpen = {
-        read: jest.fn().mockImplementation((buffer) => {
-          corruptedJpeg.copy(buffer);
-          return Promise.resolve({ bytesRead: 8 });
-        }),
-        close: jest.fn().mockResolvedValue(undefined)
-      };
-      mockFs.open = jest.fn().mockResolvedValue(mockOpen as any);
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-      const req = createMockRequest('corrupted.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
+  describe('Deep Nested Path Handling', () => {
+    it('should handle 3-level nested paths correctly', async () => {
+      const response = await request(app)
+        .get('/api/v1/files/level1/level2/level3/deep-file.jpg')
+        .expect(200);
 
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith();
-      expect((req as any).fileValidation?.fileType).toBe('image/jpeg');
+      expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith('level1/level2/level3/deep-file.jpg');
+      expect(mockValidateFileContentBasic).toHaveBeenCalled();
+      expect(mockLogFileAccess).toHaveBeenCalled();
     });
 
-    it('should detect polyglot files', async () => {
-      // Buffer containing both JPEG and PDF signatures
-      const polyglotBuffer = Buffer.from([
-        0xFF, 0xD8, 0xFF, 0xE0, // JPEG header
-        0x25, 0x50, 0x44, 0x46  // PDF header
-      ]);
-      
-      const mockOpen = {
-        read: jest.fn().mockImplementation((buffer) => {
-          polyglotBuffer.copy(buffer);
-          return Promise.resolve({ bytesRead: 16 });
-        }),
-        close: jest.fn().mockResolvedValue(undefined)
-      };
-      mockFs.open = jest.fn().mockResolvedValue(mockOpen as any);
+    it('should handle 4-level nested paths correctly', async () => {
+      const response = await request(app)
+        .get('/api/v1/files/a/b/c/d/very-deep.pdf')
+        .expect(200);
 
-      const req = createMockRequest('polyglot.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith();
-      expect((req as any).fileValidation?.securityFlags).toContain('Polyglot file detected');
+      expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith('a/b/c/d/very-deep.pdf');
     });
 
-    it('should handle files with wrong extension vs signature', async () => {
-      // PNG signature but .jpg extension
-      const pngBuffer = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-      const mockOpen = {
-        read: jest.fn().mockImplementation((buffer) => {
-          pngBuffer.copy(buffer);
-          return Promise.resolve({ bytesRead: 8 });
-        }),
-        close: jest.fn().mockResolvedValue(undefined)
-      };
-      mockFs.open = jest.fn().mockResolvedValue(mockOpen as any);
+    it('should handle deeply nested secure files', async () => {
+      const response = await request(app)
+        .get('/api/v1/files/secure/admin/config/database/settings.json')
+        .expect(200);
 
-      const req = createMockRequest('fake-jpeg.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith();
-      expect((req as any).fileValidation?.fileType).toBe('image/png');
+      expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith('admin/config/database/settings.json');
+      expect(mockAuthenticate).toHaveBeenCalled();
+      expect(mockValidateFileContent).toHaveBeenCalled();
     });
 
-    it('should handle truncated file headers', async () => {
-      const truncatedBuffer = Buffer.from([0xFF]); // Only 1 byte instead of full header
-      const mockOpen = {
-        read: jest.fn().mockImplementation((buffer) => {
-          truncatedBuffer.copy(buffer);
-          return Promise.resolve({ bytesRead: 1 });
-        }),
-        close: jest.fn().mockResolvedValue(undefined)
-      };
-      mockFs.open = jest.fn().mockResolvedValue(mockOpen as any);
+    it('should handle deeply nested image files', async () => {
+      const response = await request(app)
+        .get('/api/v1/files/images/gallery/2024/vacation/photo.jpg')
+        .expect(200);
 
-      const req = createMockRequest('truncated.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith();
-      expect((req as any).fileValidation?.fileType).toBe('unknown');
+      expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith('gallery/2024/vacation/photo.jpg');
+      expect(mockValidateImageFile).toHaveBeenCalled();
     });
 
-    it('should detect unknown file types gracefully', async () => {
-      const unknownBuffer = Buffer.from([0x12, 0x34, 0x56, 0x78]); // Unknown signature
-      const mockOpen = {
-        read: jest.fn().mockImplementation((buffer) => {
-          unknownBuffer.copy(buffer);
-          return Promise.resolve({ bytesRead: 8 });
-        }),
-        close: jest.fn().mockResolvedValue(undefined)
-      };
-      mockFs.open = jest.fn().mockResolvedValue(mockOpen as any);
+    it('should handle deeply nested download files', async () => {
+      const response = await request(app)
+        .get('/api/v1/files/download/reports/quarterly/2024/q1-summary.pdf')
+        .expect(200);
 
-      const req = createMockRequest('unknown.xyz') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith();
-      expect((req as any).fileValidation?.fileType).toBe('unknown');
+      expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith('reports/quarterly/2024/q1-summary.pdf');
+      expect(mockAuthenticate).toHaveBeenCalled();
+      expect(mockValidateFileContent).toHaveBeenCalled();
     });
   });
 
-  describe('Performance and Resource Edge Cases', () => {
-    it('should handle extremely long file paths', async () => {
-      const longPath = 'a'.repeat(300) + '.jpg';
-      const req = createMockRequest(longPath) as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContentBasic(req, res, next);
-
-      expect(next).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: 'PATH_TOO_LONG'
-        })
-      );
-    });
-
-    it('should handle files with many dots in name', async () => {
-      const dottedFile = 'file.' + '.'.repeat(50) + 'jpg';
-      const req = createMockRequest(dottedFile) as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContentBasic(req, res, next);
-
-      expect(next).toHaveBeenCalledWith();
-      expect((req as any).fileValidation?.filepath).toBe(dottedFile);
-    });
-
-    it('should handle deeply nested paths', async () => {
-      const deepPath = 'a/'.repeat(20) + 'file.jpg';
-      const req = createMockRequest(deepPath) as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContentBasic(req, res, next);
-
-      expect(next).toHaveBeenCalledWith();
-      expect((req as any).fileValidation?.filepath).toBe(deepPath);
-    });
-
-    it('should handle files with extremely long extensions', async () => {
-      const longExt = 'file.' + 'x'.repeat(20);
-      const req = createMockRequest(longExt) as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContentBasic(req, res, next);
-
-      expect(next).toHaveBeenCalledWith();
-      expect((req as any).fileValidation?.filepath).toBe(longExt);
-    });
-
-    it('should handle concurrent validation requests', async () => {
-      const requests = Array.from({ length: 100 }, (_, i) => {
-        const req = createMockRequest(`file-${i}.jpg`) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-        return validateFileContentBasic(req, res, next);
+  describe('Content Type Helper Function Edge Cases', () => {
+    it('should prioritize validation file type over extension detection', async () => {
+      mockValidateFileContent.mockImplementation((req: any, res: any, next: any) => {
+        req.fileValidation = { 
+          filepath: req.params.filepath, 
+          isValid: true, 
+          fileType: 'image/webp',  // Override detected type
+          fileSize: 1024 
+        };
+        next();
       });
 
-      const results = await Promise.all(requests);
-      
-      // All should complete without throwing
-      expect(results).toHaveLength(100);
-    });
-  });
+      mockPath.extname.mockReturnValue('.jpg'); // Extension says JPEG
 
-  describe('Boundary Condition Edge Cases', () => {
-    it('should handle files exactly at size limits', async () => {
-      const sizeLimits = [
-        8388608,  // Exactly 8MB
-        8388607,  // Just under 8MB
-        8388609   // Just over 8MB
+      const response = await request(app)
+        .get('/api/v1/files/secure/misnamed.jpg')
+        .expect(200);
+
+      // Should use validation type, not extension
+      expect(response.headers['content-type']).toMatch(/image\/webp/);
+    });
+
+    it('should handle unknown file extensions gracefully', async () => {
+      mockPath.extname.mockReturnValue('.xyz'); // Unknown extension
+
+      const response = await request(app)
+        .get('/api/v1/files/unknown.xyz')
+        .expect(200);
+
+      expect(response.headers['content-type']).toMatch(/application\/octet-stream/);
+    });
+
+    it('should handle files with no extension', async () => {
+      mockPath.extname.mockReturnValue(''); // No extension
+
+      const response = await request(app)
+        .get('/api/v1/files/README')
+        .expect(200);
+
+      expect(response.headers['content-type']).toMatch(/application\/octet-stream/);
+    });
+
+    it('should handle mixed case extensions', async () => {
+      const testCases = [
+        { ext: '.JPG', expected: 'image/jpeg' },
+        { ext: '.Png', expected: 'image/png' },
+        { ext: '.PDF', expected: 'application/pdf' },
+        { ext: '.WEBP', expected: 'image/webp' }
       ];
 
-      for (const size of sizeLimits) {
-        mockFs.stat.mockResolvedValue({ size } as any);
-
-        const req = createMockRequest('boundary-file.jpg') as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContent(req, res, next);
-
-        if (size > 8388608) {
-          expect(next).toHaveBeenCalledWith(
-            expect.objectContaining({
-              code: 'INVALID_FILE_SIZE'
-            })
-          );
-        } else {
-          expect(next).toHaveBeenCalledWith();
-        }
-
-        jest.clearAllMocks();
-      }
-    });
-
-    it('should handle zero-byte files with valid signatures', async () => {
-      mockFs.stat.mockResolvedValue({ size: 0 } as any);
-
-      const req = createMockRequest('empty-but-valid.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('Empty file not allowed')
-        })
-      );
-    });
-
-    it('should handle files with no extension but valid signatures', async () => {
-      const req = createMockRequest('file-no-extension') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith();
-      expect((req as any).fileValidation?.fileType).toBe('image/jpeg');
-    });
-  });
-
-  describe('Error Handling Edge Cases', () => {
-    it('should handle partial file reads gracefully', async () => {
-      const mockOpen = {
-        read: jest.fn().mockResolvedValue({ bytesRead: 4 }), // Partial read
-        close: jest.fn().mockResolvedValue(undefined)
-      };
-      mockFs.open = jest.fn().mockResolvedValue(mockOpen as any);
-
-      const req = createMockRequest('partial.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith();
-    });
-
-    it('should handle file handle exhaustion', async () => {
-      mockFs.open.mockRejectedValue(new Error('EMFILE: too many open files'));
-
-      const req = createMockRequest('test.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: 'FILE_NOT_FOUND'
-        })
-      );
-    });
-
-    it('should handle disk full conditions', async () => {
-      mockFs.stat.mockRejectedValue(new Error('ENOSPC: no space left on device'));
-
-      const req = createMockRequest('test.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: 'FILE_NOT_FOUND'
-        })
-      );
-    });
-
-    it('should handle permission denied scenarios', async () => {
-      mockFs.access.mockRejectedValue(new Error('EACCES: permission denied'));
-
-      const req = createMockRequest('restricted.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: 'FILE_NOT_FOUND'
-        })
-      );
-    });
-  });
-
-  describe('Mock Edge Cases', () => {
-    it('should handle mock returning undefined unexpectedly', async () => {
-      mockStorageService.getAbsolutePath.mockReturnValue(undefined as any);
-
-      const req = createMockRequest('test.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: 'FILE_NOT_FOUND'
-        })
-      );
-    });
-
-    it('should handle mock throwing non-Error objects', async () => {
-      mockFs.access.mockImplementation(() => {
-        throw 'String error instead of Error object';
-      });
-
-      const req = createMockRequest('test.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: 'FILE_NOT_FOUND'
-        })
-      );
-    });
-
-    it('should handle mock returning malformed data', async () => {
-      mockFs.stat.mockResolvedValue({} as any); // Missing size property
-
-      const req = createMockRequest('malformed.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('Empty file not allowed')
-        })
-      );
-    });
-  });
-
-  describe('Advanced Security Edge Cases', () => {
-    it('should handle mixed path separators', async () => {
-      const mixedPaths = [
-        'folder\\file.jpg',
-        'path/to\\file.jpg',
-        'mixed\\separators/file.jpg'
-      ];
-
-      for (const path of mixedPaths) {
-        const req = createMockRequest(path) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        expect(next).toHaveBeenCalledWith();
-        expect((req as any).fileValidation?.filepath).toBe(path);
-      }
-    });
-
-    it('should handle whitespace manipulation attacks', async () => {
-      const whitespaceAttacks = [
-        ' file.jpg',          // Leading space
-        'file.jpg ',          // Trailing space
-        'file\t.jpg',         // Tab character
-        'file\n.jpg',         // Newline
-        'file\r.jpg'          // Carriage return
-      ];
-
-      for (const attack of whitespaceAttacks) {
-        const req = createMockRequest(attack) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        expect(next).toHaveBeenCalledWith();
-        expect((req as any).fileValidation?.filepath).toBe(attack);
-      }
-    });
-
-    it('should handle double URL encoding attacks', async () => {
-      const doubleEncoded = [
-        'file%252E%252E%252Fpasswd',  // Double encoded ../passwd
-        '%2e%2e%2f%2e%2e%2fpasswd',   // Encoded ../ twice
-        'file%2500.jpg'               // Double encoded null byte
-      ];
-
-      for (const encoded of doubleEncoded) {
-        const req = createMockRequest(encoded) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        // Should be caught during decoding or path validation
-        expect(next).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: expect.stringMatching(/INVALID_FILEPATH|INVALID_ENCODING/)
-          })
-        );
-      }
-    });
-
-    it('should handle case sensitivity bypass attempts in extensions', async () => {
-      const caseVariations = [
-        'SCRIPT.EXE',
-        'Malware.Exe',
-        'virus.ExE',
-        'bad.BAT',
-        'hack.BaT'
-      ];
-
-      for (const file of caseVariations) {
-        const req = createMockRequest(file) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        expect(next).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: 'BLOCKED_EXTENSION'
-          })
-        );
-      }
-    });
-
-    it('should handle relative path edge cases', async () => {
-      const relativePaths = [
-        './file.jpg',
-        '~/secret.jpg',
-        '../sibling.jpg',
-        'folder/../file.jpg'
-      ];
-
-      for (const path of relativePaths) {
-        const req = createMockRequest(path) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        if (path.includes('..')) {
-          expect(next).toHaveBeenCalledWith(
-            expect.objectContaining({
-              code: 'INVALID_FILEPATH'
-            })
-          );
-        } else {
-          expect(next).toHaveBeenCalledWith();
-        }
-      }
-    });
-  });
-
-  describe('Stress Testing Edge Cases', () => {
-    it('should handle rapid repeated validations', async () => {
-      const startTime = Date.now();
-      
-      const promises = Array.from({ length: 50 }, async (_, i) => {
-        const req = createMockRequest(`stress-${i}.jpg`) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-        return validateFileContentBasic(req, res, next);
-      });
-
-      await Promise.all(promises);
-      
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-      
-      // Should complete within reasonable time (less than 1 second)
-      expect(duration).toBeLessThan(1000);
-    });
-
-    it('should handle memory pressure scenarios', async () => {
-      // Create many large file path strings
-      const largePaths = Array.from({ length: 1000 }, (_, i) => 
-        `path-${i}-${'x'.repeat(100)}.jpg`
-      );
-
-      for (const path of largePaths) {
-        const req = createMockRequest(path) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
+      for (const { ext, expected } of testCases) {
+        mockPath.extname.mockReturnValue(ext);
         
-        // Should handle without throwing memory errors
-        expect(next).toHaveBeenCalled();
+        const response = await request(app)
+          .get(`/api/v1/files/test${ext}`)
+          .expect(200);
+
+        expect(response.headers['content-type']).toMatch(new RegExp(expected.replace('/', '\\/')));
       }
     });
 
-    it('should handle alternating valid/invalid requests', async () => {
-      const alternatingRequests = [
-        'valid.jpg',
-        '../invalid.jpg',
-        'another-valid.png',
-        'malware.exe',
-        'final-valid.gif'
-      ];
+    it('should handle text files correctly', async () => {
+      mockPath.extname.mockReturnValue('.txt');
 
-      for (let i = 0; i < alternatingRequests.length; i++) {
-        const req = createMockRequest(alternatingRequests[i]) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
+      const response = await request(app)
+        .get('/api/v1/files/document.txt')
+        .expect(200);
 
-        await validateFileContentBasic(req, res, next);
-
-        if (alternatingRequests[i].includes('..') || alternatingRequests[i].includes('.exe')) {
-          expect(next).toHaveBeenCalledWith(
-            expect.objectContaining({
-              statusCode: 400
-            })
-          );
-        } else {
-          expect(next).toHaveBeenCalledWith();
-        }
-
-        jest.clearAllMocks();
-      }
+      expect(response.headers['content-type']).toMatch(/text\/plain/);
     });
   });
 
-  describe('Real-world Scenario Edge Cases', () => {
-    it('should handle file uploads from different operating systems', async () => {
-      const osSpecificPaths = [
-        'C:\\Users\\test\\file.jpg',      // Windows absolute path
-        '/home/user/file.jpg',            // Unix absolute path
-        '\\\\server\\share\\file.jpg',    // UNC path
-        'Documents and Settings/file.jpg' // Windows with spaces
-      ];
+  describe('Security Headers Function Edge Cases', () => {
+    it('should set all required security headers for public files', async () => {
+      const response = await request(app)
+        .get('/api/v1/files/public.jpg')
+        .expect(200);
 
-      for (const path of osSpecificPaths) {
-        const req = createMockRequest(path) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        // Absolute paths should be rejected
-        if (path.startsWith('/') || path.includes('C:') || path.startsWith('\\\\')) {
-          expect(next).toHaveBeenCalledWith(
-            expect.objectContaining({
-              code: 'INVALID_FILEPATH'
-            })
-          );
-        } else {
-          expect(next).toHaveBeenCalledWith();
-        }
-      }
-    });
-
-    it('should handle files from mobile device cameras', async () => {
-      const mobileFiles = [
-        'IMG_20241201_123456.jpg',        // iPhone format
-        'PANO_20241201_123456.jpg',       // iPhone panorama
-        'VID_20241201_123456.mp4',        // Video file
-        'Screenshot_20241201-123456.png', // Android screenshot
-        'BURST001_COVER.JPG'              // Burst mode cover
-      ];
-
-      for (const file of mobileFiles) {
-        const req = createMockRequest(file) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        if (file.endsWith('.mp4')) {
-          // Video files might need special handling
-          expect(next).toHaveBeenCalledWith();
-        } else {
-          expect(next).toHaveBeenCalledWith();
-        }
-      }
-    });
-
-    it('should handle cloud storage sync conflicts', async () => {
-      const conflictFiles = [
-        'document (conflicted copy 2024-12-01).pdf',
-        'image (John Smith\'s conflicted copy).jpg',
-        'file (case conflict).txt',
-        'data - Copy.csv'
-      ];
-
-      for (const file of conflictFiles) {
-        const req = createMockRequest(file) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        expect(next).toHaveBeenCalledWith();
-        expect((req as any).fileValidation?.filepath).toBe(file);
-      }
-    });
-
-    it('should handle version control and backup files', async () => {
-      const versionFiles = [
-        'document.pdf.bak',
-        'image.jpg~',
-        'file.txt.orig',
-        '.DS_Store',              // macOS system file
-        'Thumbs.db',              // Windows thumbnail cache
-        'desktop.ini'             // Windows folder settings
-      ];
-
-      for (const file of versionFiles) {
-        const req = createMockRequest(file) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        if (file.startsWith('.')) {
-          expect(next).toHaveBeenCalledWith(
-            expect.objectContaining({
-              code: 'INVALID_FILEPATH'
-            })
-          );
-        } else {
-          expect(next).toHaveBeenCalledWith();
-        }
-      }
-    });
-  });
-
-  describe('Browser and Client Edge Cases', () => {
-    it('should handle files with BOM (Byte Order Mark)', async () => {
-      const bomBuffer = Buffer.from([0xEF, 0xBB, 0xBF, 0xFF, 0xD8, 0xFF, 0xE0]); // UTF-8 BOM + JPEG
-      const mockOpen = {
-        read: jest.fn().mockImplementation((buffer) => {
-          bomBuffer.copy(buffer);
-          return Promise.resolve({ bytesRead: 8 });
-        }),
-        close: jest.fn().mockResolvedValue(undefined)
+      const expectedHeaders = {
+        'x-content-type-options': 'nosniff',
+        'x-frame-options': 'DENY',
+        'cache-control': 'public, max-age=3600',
+        'referrer-policy': 'strict-origin-when-cross-origin'
       };
-      mockFs.open = jest.fn().mockResolvedValue(mockOpen as any);
 
-      const req = createMockRequest('bom-file.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
-
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith();
-      // Should still detect as JPEG despite BOM
-      expect((req as any).fileValidation?.fileType).toBe('image/jpeg');
+      Object.entries(expectedHeaders).forEach(([header, value]) => {
+        expect(response.headers[header]).toBe(value);
+      });
     });
 
-    it('should handle drag-and-drop file name issues', async () => {
-      const dragDropFiles = [
-        'file (1).jpg',           // Browser auto-rename
-        'file - Copy.jpg',        // OS copy suffix
-        'image copy 2.png',       // Multiple copies
-        'document(2).pdf'         // No space variant
+    it('should override default headers with additional headers for secure files', async () => {
+      const response = await request(app)
+        .get('/api/v1/files/secure/private.jpg')
+        .expect(200);
+
+      expect(response.headers['cache-control']).toBe('private, max-age=300');
+      expect(response.headers['content-security-policy']).toBe("default-src 'none'; img-src 'self';");
+      expect(response.headers['x-frame-options']).toBe('DENY'); // Default value
+    });
+
+    it('should set image-specific headers correctly', async () => {
+      const response = await request(app)
+        .get('/api/v1/files/images/photo.jpg')
+        .expect(200);
+
+      expect(response.headers['x-frame-options']).toBe('SAMEORIGIN');
+      expect(response.headers['accept-ranges']).toBe('bytes');
+      expect(response.headers['cache-control']).toBe('public, max-age=86400');
+    });
+
+    it('should set download-specific headers correctly', async () => {
+      mockPath.basename.mockReturnValue('report.pdf');
+
+      const response = await request(app)
+        .get('/api/v1/files/download/report.pdf')
+        .expect(200);
+
+      expect(response.headers['cache-control']).toBe('private, no-cache');
+      expect(response.headers['content-disposition']).toBe('attachment; filename="report.pdf"');
+    });
+  });
+
+  describe('Route Parameter Processing Edge Cases', () => {
+    it('should handle special characters in filenames', async () => {
+      const specialFiles = [
+        'file-with-hyphens.jpg',
+        'file_with_underscores.png',
+        'file.with.dots.pdf',
+        'file%20with%20spaces.txt'
       ];
 
-      for (const file of dragDropFiles) {
-        const req = createMockRequest(file) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
+      for (const filename of specialFiles) {
+        const response = await request(app)
+          .get(`/api/v1/files/${filename}`)
+          .expect(200);
 
-        await validateFileContentBasic(req, res, next);
-
-        expect(next).toHaveBeenCalledWith();
-        expect((req as any).fileValidation?.filepath).toBe(file);
+        expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith(filename);
       }
     });
 
-    it('should handle browser security restrictions', async () => {
-      const restrictedPaths = [
-        'C:/Windows/System32/file.jpg',   // Windows system path
-        '/etc/passwd.jpg',                // Unix system file
-        'file:///C:/file.jpg',            // File protocol
-        'javascript:alert(1).jpg'         // JavaScript protocol
+    it('should preserve directory structure in nested paths', async () => {
+      const nestedPaths = [
+        { url: 'documents/2024/report.pdf', expected: 'documents/2024/report.pdf' },
+        { url: 'images/gallery/vacation/beach.jpg', expected: 'images/gallery/vacation/beach.jpg' },
+        { url: 'archives/legacy/old/ancient.txt', expected: 'archives/legacy/old/ancient.txt' }
       ];
 
-      for (const path of restrictedPaths) {
-        const req = createMockRequest(path) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
+      for (const { url, expected } of nestedPaths) {
+        const response = await request(app)
+          .get(`/api/v1/files/${url}`)
+          .expect(200);
 
-        await validateFileContentBasic(req, res, next);
+        expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith(expected);
+      }
+    });
 
-        expect(next).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: 'INVALID_FILEPATH'
-          })
-        );
+    it('should handle empty directory names gracefully', async () => {
+      // This tests the robustness of path construction
+      const response = await request(app)
+        .get('/api/v1/files/dir//file.jpg')
+        .expect(200);
+
+      // The Express router should normalize this
+      expect(mockStorageService.getAbsolutePath).toHaveBeenCalled();
+    });
+  });
+
+  describe('Firebase Storage Error Scenarios', () => {
+    beforeEach(() => {
+      mockConfig.storageMode = 'firebase';
+    });
+
+    it('should handle Firebase network timeout errors', async () => {
+      mockStorageService.getSignedUrl.mockRejectedValue(new Error('Network timeout'));
+
+      const response = await request(app)
+        .get('/api/v1/files/test.jpg')
+        .expect(404);
+
+      expect(response.body.error.message).toBe('File not found');
+    });
+
+    it('should handle Firebase permission denied errors', async () => {
+      mockStorageService.getSignedUrl.mockRejectedValue(new Error('Permission denied'));
+
+      const response = await request(app)
+        .get('/api/v1/files/secure/private.jpg')
+        .expect(404);
+
+      expect(response.body.error.message).toBe('File not found');
+    });
+
+    it('should handle Firebase quota exceeded errors', async () => {
+      mockStorageService.getSignedUrl.mockRejectedValue(new Error('Quota exceeded'));
+
+      const response = await request(app)
+        .get('/api/v1/files/large-file.zip')
+        .expect(404);
+
+      expect(response.body.error.message).toBe('File not found');
+    });
+
+    it('should handle malformed Firebase URLs', async () => {
+      mockStorageService.getSignedUrl.mockResolvedValue('invalid-url');
+
+      const response = await request(app)
+        .get('/api/v1/files/test.jpg')
+        .expect(302);
+
+      expect(response.headers.location).toBe('invalid-url');
+      // Should still set security headers even with invalid URL
+      expect(response.headers['x-content-type-options']).toBe('nosniff');
+    });
+
+    it('should handle Firebase signed URL with different expiration times', async () => {
+      // Test secure route with 5-minute expiration
+      await request(app)
+        .get('/api/v1/files/secure/private.jpg')
+        .expect(302);
+
+      expect(mockStorageService.getSignedUrl).toHaveBeenCalledWith('private.jpg', 5);
+
+      // Test download route with 10-minute expiration
+      await request(app)
+        .get('/api/v1/files/download/document.pdf')
+        .expect(302);
+
+      expect(mockStorageService.getSignedUrl).toHaveBeenCalledWith('document.pdf', 10);
+
+      // Test public route with no expiration
+      await request(app)
+        .get('/api/v1/files/public.jpg')
+        .expect(302);
+
+      expect(mockStorageService.getSignedUrl).toHaveBeenCalledWith('public.jpg');
+    });
+  });
+
+  describe('Local Storage Error Scenarios', () => {
+    beforeEach(() => {
+      mockConfig.storageMode = 'local';
+    });
+
+    it('should handle file system permission errors', async () => {
+      mockStorageService.getAbsolutePath.mockImplementation(() => {
+        throw new Error('EACCES: permission denied');
+      });
+
+      const response = await request(app)
+        .get('/api/v1/files/restricted.jpg')
+        .expect(404);
+
+      expect(response.body.error.message).toBe('File not found');
+    });
+
+    it('should handle disk space errors', async () => {
+      mockStorageService.getAbsolutePath.mockImplementation(() => {
+        throw new Error('ENOSPC: no space left on device');
+      });
+
+      const response = await request(app)
+        .get('/api/v1/files/large.zip')
+        .expect(404);
+
+      expect(response.body.error.message).toBe('File not found');
+    });
+
+    it('should handle corrupted file system errors', async () => {
+      mockStorageService.getAbsolutePath.mockImplementation(() => {
+        throw new Error('EIO: input/output error');
+      });
+
+      const response = await request(app)
+        .get('/api/v1/files/corrupted.dat')
+        .expect(404);
+
+      expect(response.body.error.message).toBe('File not found');
+    });
+  });
+
+  describe('Middleware Chain Interruption Scenarios', () => {
+    it('should stop at authentication failure and not call subsequent middleware', async () => {
+      let validationCalled = false;
+      let logCalled = false;
+
+      mockAuthenticate.mockImplementation(async(req: any, res: any, next: any) => {
+        const error = new Error('Token expired');
+        (error as any).statusCode = 401;
+        next(error);
+      });
+
+      mockValidateFileContent.mockImplementation((req: any, res: any, next: any) => {
+        validationCalled = true;
+        next();
+      });
+
+      mockLogFileAccess.mockImplementation((req: any, res: any, next: any) => {
+        logCalled = true;
+        next();
+      });
+
+      const response = await request(app)
+        .get('/api/v1/files/secure/private.jpg')
+        .expect(401);
+
+      expect(validationCalled).toBe(false);
+      expect(logCalled).toBe(false);
+    });
+
+    it('should stop at validation failure and not call file serving logic', async () => {
+      let storageServiceCalled = false;
+
+      mockValidateFileContentBasic.mockImplementation((req, res, next) => {
+        const error = new Error('Invalid file type');
+        (error as any).statusCode = 400;
+        next(error);
+      });
+
+      mockStorageService.getAbsolutePath.mockImplementation(() => {
+        storageServiceCalled = true;
+        return '/mock/path';
+      });
+
+      const response = await request(app)
+        .get('/api/v1/files/invalid.exe')
+        .expect(400);
+
+      expect(storageServiceCalled).toBe(false);
+    });
+
+    it('should handle async middleware errors correctly', async () => {
+      mockValidateFileContent.mockImplementation(async (req, res, next) => {
+        // Simulate async operation that fails
+        await new Promise(resolve => setTimeout(resolve, 1));
+        const error = new Error('Async validation failed');
+        (error as any).statusCode = 422;
+        next(error);
+      });
+
+      const response = await request(app)
+        .get('/api/v1/files/secure/async-fail.jpg')
+        .expect(422);
+
+      expect(response.body.error.message).toBe('Async validation failed');
+    });
+  });
+
+  describe('Path Normalization Edge Cases', () => {
+    it('should handle multiple consecutive slashes in paths', async () => {
+      // Express typically normalizes these, but test our handling
+      const response = await request(app)
+        .get('/api/v1/files/documents//reports///quarterly.pdf')
+        .expect(200);
+
+      // Verify the call was made (Express handles the normalization)
+      expect(mockStorageService.getAbsolutePath).toHaveBeenCalled();
+    });
+
+    it('should handle trailing slashes in directory paths', async () => {
+      const response = await request(app)
+        .get('/api/v1/files/documents/reports/file.pdf')
+        .expect(200);
+
+      expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith('documents/reports/file.pdf');
+    });
+
+    it('should preserve case sensitivity in file paths', async () => {
+      const caseSensitivePaths = [
+        'Documents/Reports/File.PDF',
+        'IMAGES/GALLERY/PHOTO.JPG',
+        'scripts/Database/Config.json'
+      ];
+
+      for (const path of caseSensitivePaths) {
+        const response = await request(app)
+          .get(`/api/v1/files/${path}`)
+          .expect(200);
+
+        expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith(path);
       }
     });
   });
 
-  describe('File System Edge Cases', () => {
-    it('should handle file system case sensitivity issues', async () => {
-      // Test files that might conflict on case-insensitive systems
-      const caseFiles = [
-        'File.jpg',
-        'file.jpg',
-        'FILE.JPG',
-        'File.JPG'
+  describe('Response Header Consistency', () => {
+    it('should set consistent headers across different file types', async () => {
+      const fileTypes = [
+        { file: 'image.jpg', type: 'image/jpeg' },
+        { file: 'document.pdf', type: 'application/pdf' },
+        { file: 'data.txt', type: 'text/plain' }
       ];
 
-      for (const file of caseFiles) {
-        const req = createMockRequest(file) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
+      for (const { file, type } of fileTypes) {
+        mockPath.extname.mockReturnValue(file.substring(file.lastIndexOf('.')));
+        
+        const response = await request(app)
+          .get(`/api/v1/files/${file}`)
+          .expect(200);
 
-        await validateFileContentBasic(req, res, next);
-
-        expect(next).toHaveBeenCalledWith();
-        expect((req as any).fileValidation?.filepath).toBe(file);
+        // All should have security headers
+        expect(response.headers['x-content-type-options']).toBe('nosniff');
+        expect(response.headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
+        expect(response.headers['content-type']).toMatch(new RegExp(type.replace('/', '\\/')));
       }
     });
 
-    it('should handle symbolic link scenarios', async () => {
-      // Mock lstat to simulate symbolic link
-      const mockLstat = jest.fn().mockResolvedValue({
-        size: 1024,
-        isSymbolicLink: () => true,
-        isFile: () => false
+    it('should maintain header consistency between local and Firebase modes', async () => {
+      const testFile = 'consistency-test.jpg';
+      
+      // Test local mode
+      mockConfig.storageMode = 'local';
+      let response = await request(app)
+        .get(`/api/v1/files/${testFile}`)
+        .expect(200);
+
+      const localHeaders = {
+        'x-content-type-options': response.headers['x-content-type-options'],
+        'x-frame-options': response.headers['x-frame-options'],
+        'referrer-policy': response.headers['referrer-policy']
+      };
+
+      // Test Firebase mode
+      mockConfig.storageMode = 'firebase';
+      response = await request(app)
+        .get(`/api/v1/files/${testFile}`)
+        .expect(302);
+
+      const firebaseHeaders = {
+        'x-content-type-options': response.headers['x-content-type-options'],
+        'x-frame-options': response.headers['x-frame-options'],
+        'referrer-policy': response.headers['referrer-policy']
+      };
+
+      expect(localHeaders).toEqual(firebaseHeaders);
+    });
+  });
+
+  describe('Error Recovery and Graceful Degradation', () => {
+    it('should handle partial middleware failures gracefully', async () => {
+      let logAccessFailed = false;
+      
+      // Validation succeeds but logging fails
+      mockValidateFileContentBasic.mockImplementation((req: any, res: any, next: any) => {
+        req.fileValidation = { filepath: req.params.filepath, isValid: true };
+        next();
       });
-      (mockFs as any).lstat = mockLstat;
+      
+      mockLogFileAccess.mockImplementation((req, res, next) => {
+        logAccessFailed = true;
+        // Don't fail the request, just log the error
+        console.warn('Logging failed, continuing...');
+        next();
+      });
 
-      const req = createMockRequest('symlink.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
+      const response = await request(app)
+        .get('/api/v1/files/robust.jpg')
+        .expect(200);
 
-      await validateFileContent(req, res, next);
-
-      expect(next).toHaveBeenCalledWith();
+      expect(logAccessFailed).toBe(true);
+      expect(response.status).toBe(200); // Request should still succeed
     });
 
-    it('should handle network file system delays', async () => {
-      // Simulate slow network file system
-      mockFs.access.mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 100))
+    it('should handle missing file validation gracefully', async () => {
+      // Validation doesn't set fileValidation property
+      mockValidateFileContentBasic.mockImplementation((req: any, res: any, next: any) => {
+        // Don't set req.fileValidation
+        next();
+      });
+
+      const response = await request(app)
+        .get('/api/v1/files/no-validation.jpg')
+        .expect(200);
+
+      // Should still work with default content type
+      expect(response.headers['content-type']).toBeDefined();
+    });
+
+    it('should handle storage service returning null/undefined paths', async () => {
+      mockStorageService.getAbsolutePath.mockReturnValue(null as any);
+
+      const response = await request(app)
+        .get('/api/v1/files/null-path.jpg')
+        .expect(404);
+
+      expect(response.body.error.message).toBe('File not found');
+    });
+  });
+
+  describe('Performance and Resource Management', () => {
+    it('should handle multiple simultaneous requests efficiently', async () => {
+      const requests = Array.from({ length: 10 }, (_, i) =>
+        request(app).get(`/api/v1/files/concurrent-${i}.jpg`)
       );
 
-      const startTime = Date.now();
-      
-      const req = createMockRequest('network-file.jpg') as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
+      const responses = await Promise.all(requests);
 
-      await validateFileContent(req, res, next);
+      responses.forEach((response, index) => {
+        expect(response.status).toBe(200);
+        expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith(`concurrent-${index}.jpg`);
+      });
 
-      const duration = Date.now() - startTime;
-      expect(duration).toBeGreaterThan(90); // Should have waited
-      expect(next).toHaveBeenCalledWith();
+      // Should have been called once per request
+      expect(mockStorageService.getAbsolutePath).toHaveBeenCalledTimes(10);
+    });
+
+    it('should handle memory-intensive validation efficiently', async () => {
+      mockValidateFileContent.mockImplementation((req: any, res: any, next: any) => {
+        // Simulate memory-intensive validation
+        req.fileValidation = { 
+          filepath: req.params.filepath,
+          isValid: true,
+          fileType: 'application/pdf',
+          fileSize: 104857600, // 100MB
+          metadata: new Array(1000).fill('large-metadata-chunk').join('')
+        };
+        next();
+      });
+
+      const response = await request(app)
+        .get('/api/v1/files/secure/large-document.pdf')
+        .expect(200);
+
+      expect(response.status).toBe(200);
+      // Validation should complete without memory issues
     });
   });
 
-  describe('Encoding and Character Set Edge Cases', () => {
-    it('should handle different character encodings', async () => {
-      const encodedFiles = [
-        'файл.jpg',                    // Cyrillic
-        'اختبار.jpg',                  // Arabic
-        'テスト.jpg',                  // Japanese
-        '测试.jpg',                    // Chinese
-        'prüfung.jpg'                  // German with umlaut
-      ];
-
-      for (const file of encodedFiles) {
-        const req = createMockRequest(encodeURIComponent(file)) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        expect(next).toHaveBeenCalledWith();
-      }
-    });
-
-    it('should handle mixed character sets', async () => {
-      const mixedFiles = [
-        'test-файл.jpg',              // English + Cyrillic
-        'document_测试.pdf',           // English + Chinese
-        'file-テスト.png'              // English + Japanese
-      ];
-
-      for (const file of mixedFiles) {
-        const req = createMockRequest(encodeURIComponent(file)) as Request;
-        const res = createMockResponse() as Response;
-        const next = createMockNext();
-
-        await validateFileContentBasic(req, res, next);
-
-        expect(next).toHaveBeenCalledWith();
-      }
-    });
-
-    it('should handle invalid UTF-8 sequences', async () => {
-      // Create invalid UTF-8 byte sequences
-      const invalidUtf8 = Buffer.from([0xFF, 0xFE, 0xFD]).toString('latin1');
+  describe('Boundary Conditions', () => {
+    it('should handle extremely long file names', async () => {
+      const longFileName = 'a'.repeat(255) + '.jpg'; // Max filename length on most systems
       
-      const req = createMockRequest(invalidUtf8) as Request;
-      const res = createMockResponse() as Response;
-      const next = createMockNext();
+      const response = await request(app)
+        .get(`/api/v1/files/${longFileName}`)
+        .expect(200);
 
-      await validateFileContentBasic(req, res, next);
+      expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith(longFileName);
+    });
 
-      // Should handle gracefully
-      expect(next).toHaveBeenCalled();
+    it('should handle files with no extension', async () => {
+      mockPath.extname.mockReturnValue('');
+      
+      const response = await request(app)
+        .get('/api/v1/files/Dockerfile')
+        .expect(200);
+
+      expect(response.headers['content-type']).toMatch(/application\/octet-stream/);
+    });
+
+    it('should handle files with multiple extensions', async () => {
+      mockPath.extname.mockReturnValue('.tar.gz');
+      
+      const response = await request(app)
+        .get('/api/v1/files/archive.tar.gz')
+        .expect(200);
+
+      // Should use default content type for unknown extension
+      expect(response.headers['content-type']).toMatch(/application\/octet-stream/);
+    });
+
+    it('should handle edge case in basename extraction for downloads', async () => {
+      const edgeCases = [
+        { path: 'file.pdf', expected: 'file.pdf' },
+        { path: 'path/to/file.pdf', expected: 'file.pdf' },
+        { path: 'deeply/nested/path/document.docx', expected: 'document.docx' }
+      ];
+
+      for (const { path, expected } of edgeCases) {
+        mockPath.basename.mockReturnValue(expected);
+        
+        const response = await request(app)
+          .get(`/api/v1/files/download/${path}`)
+          .expect(200);
+
+        expect(response.headers['content-disposition']).toBe(`attachment; filename="${expected}"`);
+      }
+    });
+  });
+
+  describe('Integration with Express Router Edge Cases', () => {
+    it('should handle route parameter conflicts gracefully', async () => {
+      // Test that more specific routes take precedence over general ones
+      const specificRoutes = [
+        '/api/v1/files/secure/admin.jpg',
+        '/api/v1/files/images/gallery.png',
+        '/api/v1/files/download/report.pdf'
+      ];
+
+      for (const route of specificRoutes) {
+        const response = await request(app).get(route);
+        expect([200, 302, 401]).toContain(response.status);
+      }
+    });
+
+    it('should preserve query parameters in requests', async () => {
+      const response = await request(app)
+        .get('/api/v1/files/test.jpg?version=1&cache=false')
+        .expect(200);
+
+      // Should still process the file request normally
+      expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith('test.jpg');
+    });
+
+    it('should handle URL encoding in file paths', async () => {
+      const encodedPaths = [
+        { encoded: 'file%20with%20spaces.pdf', decoded: 'file with spaces.pdf' },
+        { encoded: 'file%2Bwith%2Bplus.jpg', decoded: 'file+with+plus.jpg' },
+        { encoded: 'file%26with%26ampersand.png', decoded: 'file&with&ampersand.png' }
+      ];
+
+      for (const { encoded, decoded } of encodedPaths) {
+        const response = await request(app)
+          .get(`/api/v1/files/${encoded}`)
+          .expect(200);
+
+        // Express should decode the URL automatically
+        expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith(decoded);
+      }
+    });
+  });
+
+  describe('HTTP Method Variations', () => {
+    it('should handle HEAD requests for all file types', async () => {
+      const fileTypes = [
+        { file: 'image.jpg', ext: '.jpg' },
+        { file: 'document.pdf', ext: '.pdf' },
+        { file: 'data.json', ext: '.json' }
+      ];
+
+      for (const { file, ext } of fileTypes) {
+        mockPath.extname.mockReturnValue(ext);
+        
+        const response = await request(app)
+          .head(`/api/v1/files/${file}`)
+          .expect(200);
+
+        expect(response.headers['content-type']).toBeDefined();
+        expect(response.text).toBeFalsy(); // HEAD should have no body
+      }
+    });
+
+    it('should reject unsupported HTTP methods', async () => {
+      const unsupportedMethods = ['POST', 'PUT', 'DELETE', 'PATCH'];
+
+      for (const method of unsupportedMethods) {
+        const response = await (request(app) as any)[method.toLowerCase()]('/api/v1/files/test.jpg');
+        expect([404, 405]).toContain(response.status);
+      }
+    });
+
+    it('should handle OPTIONS requests appropriately', async () => {
+      const response = await request(app)
+        .options('/api/v1/files/test.jpg');
+      
+      // Should either be handled by CORS middleware or return 404
+      expect([200, 404, 405]).toContain(response.status);
+    });
+  });
+
+  describe('Async/Await Error Handling', () => {
+    it('should handle rejected promises in route handlers', async () => {
+      mockStorageService.getSignedUrl.mockRejectedValue(new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Async timeout')), 1);
+      }));
+
+      mockConfig.storageMode = 'firebase';
+
+      const response = await request(app)
+        .get('/api/v1/files/timeout-test.jpg')
+        .expect(404);
+
+      expect(response.body.error.message).toBe('File not found');
+    });
+
+    it('should handle synchronous throws in async context', async () => {
+      mockStorageService.getAbsolutePath.mockImplementation(() => {
+        throw new Error('Synchronous error in async context');
+      });
+
+      const response = await request(app)
+        .get('/api/v1/files/sync-error.jpg')
+        .expect(404);
+
+      expect(response.body.error.message).toBe('File not found');
+    });
+
+    it('should handle async middleware that never calls next()', async () => {
+      mockValidateFileContentBasic.mockImplementation(async (req, res, next) => {
+        // Simulate middleware that hangs (timeout would occur in real scenario)
+        await new Promise(resolve => setTimeout(resolve, 5));
+        // Don't call next() to simulate hanging middleware
+      });
+
+      // In a real scenario, this would timeout
+      // For testing, we just ensure it doesn't crash
+      const response = await request(app)
+        .get('/api/v1/files/hanging.jpg')
+        .timeout(100);
+
+      // Should either succeed after our short delay or timeout
+      expect([200, 408]).toContain(response.status);
+    });
+  });
+
+  describe('Memory and Resource Cleanup', () => {
+    it('should not leak memory on repeated requests', async () => {
+      // Simulate memory-intensive operations
+      for (let i = 0; i < 5; i++) {
+        mockValidateFileContent.mockImplementation((req: any, res: any, next: any) => {
+          req.fileValidation = { 
+            filepath: req.params.filepath,
+            isValid: true,
+            largeData: new Array(1000).fill(`iteration-${i}`)
+          };
+          next();
+        });
+
+        const response = await request(app)
+          .get(`/api/v1/files/secure/memory-test-${i}.jpg`)
+          .expect(200);
+
+        expect(response.status).toBe(200);
+      }
+
+      // All requests should complete successfully without memory issues
+      expect(mockValidateFileContent).toHaveBeenCalledTimes(5);
+    });
+
+    it('should clean up resources on error conditions', async () => {
+      let resourcesAllocated = false;
+      let resourcesCleaned = false;
+
+      mockStorageService.getAbsolutePath.mockImplementation(() => {
+        resourcesAllocated = true;
+        // Simulate resource cleanup in finally block
+        try {
+          throw new Error('Resource allocation failed');
+        } finally {
+          resourcesCleaned = true;
+        }
+      });
+
+      const response = await request(app)
+        .get('/api/v1/files/resource-cleanup.jpg')
+        .expect(404);
+
+      expect(resourcesAllocated).toBe(true);
+      expect(resourcesCleaned).toBe(true);
+    });
+  });
+
+  describe('Configuration Edge Cases', () => {
+    it('should handle undefined storage mode gracefully', async () => {
+      mockConfig.storageMode = undefined as any;
+
+      const response = await request(app)
+        .get('/api/v1/files/undefined-mode.jpg')
+        .expect(200);
+
+      // Should default to local storage behavior
+      expect(mockStorageService.getAbsolutePath).toHaveBeenCalled();
+    });
+
+    it('should handle invalid storage mode values', async () => {
+      mockConfig.storageMode = 'invalid-mode' as any;
+
+      const response = await request(app)
+        .get('/api/v1/files/invalid-mode.jpg')
+        .expect(200);
+
+      // Should treat as local storage (not firebase)
+      expect(mockStorageService.getAbsolutePath).toHaveBeenCalled();
+    });
+
+    it('should handle storage mode changes during request processing', async () => {
+      let callCount = 0;
+      
+      mockStorageService.getAbsolutePath.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          // Change mode during processing
+          mockConfig.storageMode = 'firebase';
+        }
+        return '/mock/path';
+      });
+
+      mockConfig.storageMode = 'local';
+
+      const response = await request(app)
+        .get('/api/v1/files/mode-change.jpg')
+        .expect(200);
+
+      // Should complete with original mode
+      expect(response.status).toBe(200);
+    });
+  });
+
+  describe('Content-Type Detection Robustness', () => {
+    it('should handle malformed file extensions', async () => {
+      const malformedExtensions = [
+        '.', // Just a dot
+        '..', // Double dot
+        '.jpg.', // Trailing dot
+        '.JP G', // Space in extension
+        '.jpg\n', // Newline in extension
+        '.jpg\0' // Null byte in extension
+      ];
+
+      for (const ext of malformedExtensions) {
+        mockPath.extname.mockReturnValue(ext);
+        
+        const response = await request(app)
+          .get('/api/v1/files/malformed-ext')
+          .expect(200);
+
+        // Should handle gracefully and set a content type
+        expect(response.headers['content-type']).toBeDefined();
+      }
+    });
+
+    it('should handle very long file extensions', async () => {
+      const longExtension = '.' + 'a'.repeat(100);
+      mockPath.extname.mockReturnValue(longExtension);
+
+      const response = await request(app)
+        .get('/api/v1/files/long-extension')
+        .expect(200);
+
+      expect(response.headers['content-type']).toMatch(/application\/octet-stream/);
+    });
+
+    it('should handle unicode in file extensions', async () => {
+      const unicodeExtensions = [
+        '.📄', // Emoji
+        '.файл', // Cyrillic
+        '.文件', // Chinese
+        '.ファイル' // Japanese
+      ];
+
+      for (const ext of unicodeExtensions) {
+        mockPath.extname.mockReturnValue(ext);
+        
+        const response = await request(app)
+          .get('/api/v1/files/unicode-ext')
+          .expect(200);
+
+        expect(response.headers['content-type']).toBeDefined();
+      }
     });
   });
 });

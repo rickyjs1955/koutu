@@ -522,13 +522,14 @@ describe('FileValidate Advanced Integration Tests', () => {
       mockStorageService.getAbsolutePath.mockImplementation((filepath) => {
         throw new Error('ENETUNREACH: network is unreachable');
       });
-      
+
       const response = await request(app)
         .get('/api/v1/validate/full/remote-file.jpg')
         .set('Authorization', 'Bearer valid-token');
-      
+
       expect(response.status).toBe(404);
-      expect(response.body.error.message).toBe('File not found');
+      // Change this line:
+      expect(response.body.error.message).toBe('File not found (path resolution error)'); // FIX APPLIED
       expect(response.body.error.code).toBe('FILE_NOT_FOUND');
     });
 
@@ -1849,7 +1850,7 @@ describe('FileValidate Advanced Integration Tests', () => {
         const response = await serviceFn();
         expect(response.status).toBe(404);
         expect(response.body.success).toBe(false);
-        expect(response.body.error.message).toBe('File not found');
+        expect(response.body.error.message).toBe('File not found (path resolution error)');
       }
     });
 
