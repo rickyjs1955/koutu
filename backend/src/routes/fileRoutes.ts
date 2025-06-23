@@ -75,14 +75,26 @@ router.get('/secure/:file',
       const contentType = getContentType(filepath, req.fileValidation?.fileType);
       
       if (config.storageMode === 'firebase') {
-        const signedUrl = await storageService.getSignedUrl(filepath, 5);
-        setSecurityHeaders(res, 'private, max-age=300', {
-          'Content-Security-Policy': "default-src 'none'; img-src 'self';"
-        });
-        res.setHeader('Content-Type', contentType);
-        return res.redirect(302, signedUrl);
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath, 5);
+          setSecurityHeaders(res, 'private, max-age=300', {
+            'Content-Security-Policy': "default-src 'none'; img-src 'self';"
+          });
+          res.setHeader('Content-Type', contentType);
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
       } else {
-        const absolutePath = storageService.getAbsolutePath(filepath);
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'private, max-age=300', {
           'Content-Security-Policy': "default-src 'none'; img-src 'self';"
         });
@@ -111,14 +123,221 @@ router.get('/secure/:dir/:file',
       const contentType = getContentType(filepath, req.fileValidation?.fileType);
       
       if (config.storageMode === 'firebase') {
-        const signedUrl = await storageService.getSignedUrl(filepath, 5);
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath, 5);
+          setSecurityHeaders(res, 'private, max-age=300', {
+            'Content-Security-Policy': "default-src 'none'; img-src 'self';"
+          });
+          res.setHeader('Content-Type', contentType);
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+      } else {
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'private, max-age=300', {
           'Content-Security-Policy': "default-src 'none'; img-src 'self';"
         });
         res.setHeader('Content-Type', contentType);
-        return res.redirect(302, signedUrl);
+        return res.sendFile(absolutePath);
+      }
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+// ADD: Additional nesting levels for secure routes
+router.get('/secure/:dir1/:dir2/:dir3/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.file}`;
+    next();
+  },
+  authenticate,
+  validateFileContent,
+  logFileAccess,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) return next(ApiError.notFound('File not found'));
+
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      
+      if (config.storageMode === 'firebase') {
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath, 5);
+          setSecurityHeaders(res, 'private, max-age=300', {
+            'Content-Security-Policy': "default-src 'none'; img-src 'self';"
+          });
+          res.setHeader('Content-Type', contentType);
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
       } else {
-        const absolutePath = storageService.getAbsolutePath(filepath);
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+        setSecurityHeaders(res, 'private, max-age=300', {
+          'Content-Security-Policy': "default-src 'none'; img-src 'self';"
+        });
+        res.setHeader('Content-Type', contentType);
+        return res.sendFile(absolutePath);
+      }
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+router.get('/secure/:dir1/:dir2/:dir3/:dir4/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.dir4}/${req.params.file}`;
+    next();
+  },
+  authenticate,
+  validateFileContent,
+  logFileAccess,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) return next(ApiError.notFound('File not found'));
+
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      
+      if (config.storageMode === 'firebase') {
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath, 5);
+          setSecurityHeaders(res, 'private, max-age=300', {
+            'Content-Security-Policy': "default-src 'none'; img-src 'self';"
+          });
+          res.setHeader('Content-Type', contentType);
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+      } else {
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+        setSecurityHeaders(res, 'private, max-age=300', {
+          'Content-Security-Policy': "default-src 'none'; img-src 'self';"
+        });
+        res.setHeader('Content-Type', contentType);
+        return res.sendFile(absolutePath);
+      }
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+// ADD: Support for 5-level deep secure routes
+router.get('/secure/:dir1/:dir2/:dir3/:dir4/:dir5/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.dir4}/${req.params.dir5}/${req.params.file}`;
+    next();
+  },
+  authenticate,
+  validateFileContent,
+  logFileAccess,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) return next(ApiError.notFound('File not found'));
+
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      
+      if (config.storageMode === 'firebase') {
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath, 5);
+          setSecurityHeaders(res, 'private, max-age=300', {
+            'Content-Security-Policy': "default-src 'none'; img-src 'self';"
+          });
+          res.setHeader('Content-Type', contentType);
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+      } else {
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+        setSecurityHeaders(res, 'private, max-age=300', {
+          'Content-Security-Policy': "default-src 'none'; img-src 'self';"
+        });
+        res.setHeader('Content-Type', contentType);
+        return res.sendFile(absolutePath);
+      }
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+// ADD: Support for 6-level deep secure routes  
+router.get('/secure/:dir1/:dir2/:dir3/:dir4/:dir5/:dir6/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.dir4}/${req.params.dir5}/${req.params.dir6}/${req.params.file}`;
+    next();
+  },
+  authenticate,
+  validateFileContent,
+  logFileAccess,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) return next(ApiError.notFound('File not found'));
+
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      
+      if (config.storageMode === 'firebase') {
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath, 5);
+          setSecurityHeaders(res, 'private, max-age=300', {
+            'Content-Security-Policy': "default-src 'none'; img-src 'self';"
+          });
+          res.setHeader('Content-Type', contentType);
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+      } else {
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'private, max-age=300', {
           'Content-Security-Policy': "default-src 'none'; img-src 'self';"
         });
@@ -151,14 +370,26 @@ router.get('/images/:file',
       const contentType = getContentType(filepath, req.fileValidation?.fileType);
       
       if (config.storageMode === 'firebase') {
-        const signedUrl = await storageService.getSignedUrl(filepath);
-        setSecurityHeaders(res, 'public, max-age=86400');
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-        res.setHeader('Accept-Ranges', 'bytes');
-        return res.redirect(302, signedUrl);
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath);
+          setSecurityHeaders(res, 'public, max-age=86400');
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+          res.setHeader('Accept-Ranges', 'bytes');
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
       } else {
-        const absolutePath = storageService.getAbsolutePath(filepath);
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'public, max-age=86400');
         res.setHeader('Content-Type', contentType);
         res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -186,14 +417,169 @@ router.get('/images/:dir/:file',
       const contentType = getContentType(filepath, req.fileValidation?.fileType);
       
       if (config.storageMode === 'firebase') {
-        const signedUrl = await storageService.getSignedUrl(filepath);
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath);
+          setSecurityHeaders(res, 'public, max-age=86400');
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+          res.setHeader('Accept-Ranges', 'bytes');
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+      } else {
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'public, max-age=86400');
         res.setHeader('Content-Type', contentType);
         res.setHeader('X-Frame-Options', 'SAMEORIGIN');
         res.setHeader('Accept-Ranges', 'bytes');
-        return res.redirect(302, signedUrl);
+        return res.sendFile(absolutePath);
+      }
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+// ADD: Additional nesting levels for image routes  
+router.get('/images/:dir1/:dir2/:dir3/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.file}`;
+    next();
+  },
+  validateImageFile,
+  logFileAccess,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) return next(ApiError.notFound('File not found'));
+
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      
+      if (config.storageMode === 'firebase') {
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath);
+          setSecurityHeaders(res, 'public, max-age=86400');
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+          res.setHeader('Accept-Ranges', 'bytes');
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
       } else {
-        const absolutePath = storageService.getAbsolutePath(filepath);
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+        setSecurityHeaders(res, 'public, max-age=86400');
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+        res.setHeader('Accept-Ranges', 'bytes');
+        return res.sendFile(absolutePath);
+      }
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+router.get('/images/:dir1/:dir2/:dir3/:dir4/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.dir4}/${req.params.file}`;
+    next();
+  },
+  validateImageFile,
+  logFileAccess,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) return next(ApiError.notFound('File not found'));
+
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      
+      if (config.storageMode === 'firebase') {
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath);
+          setSecurityHeaders(res, 'public, max-age=86400');
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+          res.setHeader('Accept-Ranges', 'bytes');
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+      } else {
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+        setSecurityHeaders(res, 'public, max-age=86400');
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+        res.setHeader('Accept-Ranges', 'bytes');
+        return res.sendFile(absolutePath);
+      }
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+// ADD: Support for 5-level deep image routes
+router.get('/images/:dir1/:dir2/:dir3/:dir4/:dir5/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.dir4}/${req.params.dir5}/${req.params.file}`;
+    next();
+  },
+  validateImageFile,
+  logFileAccess,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) return next(ApiError.notFound('File not found'));
+
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      
+      if (config.storageMode === 'firebase') {
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath);
+          setSecurityHeaders(res, 'public, max-age=86400');
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+          res.setHeader('Accept-Ranges', 'bytes');
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+      } else {
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'public, max-age=86400');
         res.setHeader('Content-Type', contentType);
         res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -230,13 +616,25 @@ router.get('/download/:file',
       const contentType = getContentType(filepath, req.fileValidation?.fileType);
       
       if (config.storageMode === 'firebase') {
-        const signedUrl = await storageService.getSignedUrl(filepath, 10);
-        setSecurityHeaders(res, 'private, no-cache');
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.redirect(302, signedUrl);
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath, 10);
+          setSecurityHeaders(res, 'private, no-cache');
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
       } else {
-        const absolutePath = storageService.getAbsolutePath(filepath);
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'private, no-cache');
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -267,13 +665,224 @@ router.get('/download/:dir/:file',
       const contentType = getContentType(filepath, req.fileValidation?.fileType);
       
       if (config.storageMode === 'firebase') {
-        const signedUrl = await storageService.getSignedUrl(filepath, 10);
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath, 10);
+          setSecurityHeaders(res, 'private, no-cache');
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+      } else {
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'private, no-cache');
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.redirect(302, signedUrl);
+        res.download(absolutePath, filename);
+      }
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+// ADD: Missing route for /download/:dir1/:dir2/:file
+router.get('/download/:dir1/:dir2/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.file}`;
+    next();
+  },
+  authenticate,
+  validateFileContent,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) {
+        next(ApiError.notFound('File not found'));
+        return;
+      }
+
+      const filename = path.basename(filepath);
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      
+      if (config.storageMode === 'firebase') {
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath, 10);
+          setSecurityHeaders(res, 'private, no-cache');
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
       } else {
-        const absolutePath = storageService.getAbsolutePath(filepath);
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+        setSecurityHeaders(res, 'private, no-cache');
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.download(absolutePath, filename);
+      }
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+// ADD: Additional nesting levels for download routes
+router.get('/download/:dir1/:dir2/:dir3/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.file}`;
+    next();
+  },
+  authenticate,
+  validateFileContent,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) {
+        next(ApiError.notFound('File not found'));
+        return;
+      }
+
+      const filename = path.basename(filepath);
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      
+      if (config.storageMode === 'firebase') {
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath, 10);
+          setSecurityHeaders(res, 'private, no-cache');
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+      } else {
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+        setSecurityHeaders(res, 'private, no-cache');
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.download(absolutePath, filename);
+      }
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+router.get('/download/:dir1/:dir2/:dir3/:dir4/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.dir4}/${req.params.file}`;
+    next();
+  },
+  authenticate,
+  validateFileContent,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) {
+        next(ApiError.notFound('File not found'));
+        return;
+      }
+
+      const filename = path.basename(filepath);
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      
+      if (config.storageMode === 'firebase') {
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath, 10);
+          setSecurityHeaders(res, 'private, no-cache');
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+      } else {
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+        setSecurityHeaders(res, 'private, no-cache');
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.download(absolutePath, filename);
+      }
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+// ADD: Support for 5-level deep download routes
+router.get('/download/:dir1/:dir2/:dir3/:dir4/:dir5/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.dir4}/${req.params.dir5}/${req.params.file}`;
+    next();
+  },
+  authenticate,
+  validateFileContent,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) {
+        next(ApiError.notFound('File not found'));
+        return;
+      }
+
+      const filename = path.basename(filepath);
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      
+      if (config.storageMode === 'firebase') {
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath, 10);
+          setSecurityHeaders(res, 'private, no-cache');
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+      } else {
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'private, no-cache');
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -332,6 +941,74 @@ router.head('/:dir/:file',
   }
 );
 
+// ADD: Additional nesting levels for HEAD requests
+router.head('/:dir1/:dir2/:dir3/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.file}`;
+    next();
+  },
+  validateFileContentBasic,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) return next(ApiError.notFound('File not found'));
+
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      setSecurityHeaders(res, 'public, max-age=3600');
+      res.setHeader('Content-Type', contentType);
+      res.status(200).end();
+      return;
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+router.head('/:dir1/:dir2/:dir3/:dir4/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.dir4}/${req.params.file}`;
+    next();
+  },
+  validateFileContentBasic,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) return next(ApiError.notFound('File not found'));
+
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      setSecurityHeaders(res, 'public, max-age=3600');
+      res.setHeader('Content-Type', contentType);
+      res.status(200).end();
+      return;
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+// ADD: Support for 5-level deep HEAD requests
+router.head('/:dir1/:dir2/:dir3/:dir4/:dir5/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.dir4}/${req.params.dir5}/${req.params.file}`;
+    next();
+  },
+  validateFileContentBasic,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) return next(ApiError.notFound('File not found'));
+
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      setSecurityHeaders(res, 'public, max-age=3600');
+      res.setHeader('Content-Type', contentType);
+      res.status(200).end();
+      return;
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
 /**
  * Public file serving routes with basic validation
  * Pattern: GET /files/path/to/file.ext
@@ -353,12 +1030,24 @@ router.get('/:file',
       const contentType = getContentType(filepath, req.fileValidation?.fileType);
       
       if (config.storageMode === 'firebase') {
-        const signedUrl = await storageService.getSignedUrl(filepath);
-        setSecurityHeaders(res, 'public, max-age=3600');
-        res.setHeader('Content-Type', contentType);
-        return res.redirect(302, signedUrl);
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath);
+          setSecurityHeaders(res, 'public, max-age=3600');
+          res.setHeader('Content-Type', contentType);
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
       } else {
-        const absolutePath = storageService.getAbsolutePath(filepath);
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'public, max-age=3600');
         res.setHeader('Content-Type', contentType);
         return res.sendFile(absolutePath);
@@ -384,12 +1073,24 @@ router.get('/:dir/:file',
       const contentType = getContentType(filepath, req.fileValidation?.fileType);
       
       if (config.storageMode === 'firebase') {
-        const signedUrl = await storageService.getSignedUrl(filepath);
-        setSecurityHeaders(res, 'public, max-age=3600');
-        res.setHeader('Content-Type', contentType);
-        return res.redirect(302, signedUrl);
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath);
+          setSecurityHeaders(res, 'public, max-age=3600');
+          res.setHeader('Content-Type', contentType);
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
       } else {
-        const absolutePath = storageService.getAbsolutePath(filepath);
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'public, max-age=3600');
         res.setHeader('Content-Type', contentType);
         return res.sendFile(absolutePath);
@@ -415,12 +1116,24 @@ router.get('/:dir1/:dir2/:file',
       const contentType = getContentType(filepath, req.fileValidation?.fileType);
       
       if (config.storageMode === 'firebase') {
-        const signedUrl = await storageService.getSignedUrl(filepath);
-        setSecurityHeaders(res, 'public, max-age=3600');
-        res.setHeader('Content-Type', contentType);
-        return res.redirect(302, signedUrl);
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath);
+          setSecurityHeaders(res, 'public, max-age=3600');
+          res.setHeader('Content-Type', contentType);
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
       } else {
-        const absolutePath = storageService.getAbsolutePath(filepath);
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'public, max-age=3600');
         res.setHeader('Content-Type', contentType);
         return res.sendFile(absolutePath);
@@ -446,12 +1159,112 @@ router.get('/:dir1/:dir2/:dir3/:file',
       const contentType = getContentType(filepath, req.fileValidation?.fileType);
       
       if (config.storageMode === 'firebase') {
-        const signedUrl = await storageService.getSignedUrl(filepath);
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath);
+          setSecurityHeaders(res, 'public, max-age=3600');
+          res.setHeader('Content-Type', contentType);
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+      } else {
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'public, max-age=3600');
         res.setHeader('Content-Type', contentType);
-        return res.redirect(302, signedUrl);
+        return res.sendFile(absolutePath);
+      }
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+// ADD: Additional nesting levels for public routes
+router.get('/:dir1/:dir2/:dir3/:dir4/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.dir4}/${req.params.file}`;
+    next();
+  },
+  validateFileContentBasic,
+  logFileAccess,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) return next(ApiError.notFound('File not found'));
+
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      
+      if (config.storageMode === 'firebase') {
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath);
+          setSecurityHeaders(res, 'public, max-age=3600');
+          res.setHeader('Content-Type', contentType);
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
       } else {
-        const absolutePath = storageService.getAbsolutePath(filepath);
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+        setSecurityHeaders(res, 'public, max-age=3600');
+        res.setHeader('Content-Type', contentType);
+        return res.sendFile(absolutePath);
+      }
+    } catch (error) {
+      next(ApiError.notFound('File not found'));
+    }
+  }
+);
+
+// ADD: Support for 5-level deep public routes
+router.get('/:dir1/:dir2/:dir3/:dir4/:dir5/:file',
+  (req, res, next) => {
+    req.params.filepath = `${req.params.dir1}/${req.params.dir2}/${req.params.dir3}/${req.params.dir4}/${req.params.dir5}/${req.params.file}`;
+    next();
+  },
+  validateFileContentBasic,
+  logFileAccess,
+  async (req, res, next) => {
+    try {
+      const filepath = req.params.filepath;
+      if (!filepath) return next(ApiError.notFound('File not found'));
+
+      const contentType = getContentType(filepath, req.fileValidation?.fileType);
+      
+      if (config.storageMode === 'firebase') {
+        try {
+          const signedUrl = await storageService.getSignedUrl(filepath);
+          setSecurityHeaders(res, 'public, max-age=3600');
+          res.setHeader('Content-Type', contentType);
+          return res.redirect(302, signedUrl);
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
+      } else {
+        let absolutePath;
+        try {
+          absolutePath = storageService.getAbsolutePath(filepath);
+          if (!absolutePath) {
+            return next(ApiError.notFound('File not found'));
+          }
+        } catch (error) {
+          return next(ApiError.notFound('File not found'));
+        }
         setSecurityHeaders(res, 'public, max-age=3600');
         res.setHeader('Content-Type', contentType);
         return res.sendFile(absolutePath);
