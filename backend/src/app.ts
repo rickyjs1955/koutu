@@ -79,13 +79,17 @@ app.get('/health', (req, res) => {
 // ==================== ERROR HANDLING (APPLIED LAST) ====================
 app.use(errorHandler);
 
-// ==================== SERVER STARTUP ====================
-const PORT = config.port;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📁 Storage mode: ${config.storageMode}`);
-  console.log(`🔒 Security: Enhanced middleware enabled`);
-  console.log(`🌍 Environment: ${config.nodeEnv}`);
-});
-
+// Export the app instance directly for testing
 export { app };
+
+// ==================== SERVER STARTUP (CONDITIONAL) ====================
+// Only start the server if this file is executed directly (not imported as a module)
+if (require.main === module) {
+  const PORT = config.port;
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📁 Storage mode: ${config.storageMode}`);
+    console.log(`🔒 Security: Enhanced middleware enabled`);
+    console.log(`🌍 Environment: ${config.nodeEnv}`);
+  });
+}

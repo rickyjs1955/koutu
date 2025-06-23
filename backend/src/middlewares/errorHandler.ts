@@ -5,6 +5,9 @@ export interface AppError extends Error {
   statusCode?: number;
   code?: string;
   cause?: Error;
+  // Add specific properties for express body-parser errors
+  type?: string; // For errors like 'entity.too.large'
+  body?: any; // For SyntaxError from JSON parsing
 }
 
 // Enhanced error categories for better error handling
@@ -35,7 +38,7 @@ export const errorHandler = (
   // Generate request context for logging
   const context: ErrorContext = {
     requestId: req.get('X-Request-ID') || generateRequestId(),
-    userId: req.user?.id,
+    userId: (req as any).user?.id, // Cast req to any to access req.user
     path: req.path,
     method: req.method,
     userAgent: req.get('User-Agent'),
@@ -54,22 +57,36 @@ export const errorHandler = (
   }
 
   const appErr = err as AppError;
-  
+
+  // --- START: Specific error handling for body parsing errors ---
+  if (appErr instanceof SyntaxError && 'body' in appErr && appErr.stack?.includes('body-parser')) {
+    // Malformed JSON error
+    appErr.statusCode = 400;
+    appErr.code = 'BAD_REQUEST_MALFORMED_JSON';
+    appErr.message = 'Malformed JSON request body.';
+  } else if (appErr.type === 'entity.too.large') {
+    // Payload too large error
+    appErr.statusCode = 413;
+    appErr.code = 'PAYLOAD_TOO_LARGE';
+    appErr.message = 'Request payload too large.';
+  }
+  // --- END: Specific error handling ---
+
   // Process and validate status code
   let statusCode = processStatusCode(appErr.statusCode);
-  
+
   // Process and sanitize error message
   let message = processErrorMessage(appErr.message);
-  
+
   // Process and sanitize error code
   let code = processErrorCode(appErr.code);
-  
+
   // Determine error severity and logging level
   const severity = getErrorSeverity(statusCode);
-  
+
   // Enhanced logging with context
   logError(appErr, code, message, severity, context);
-  
+
   // Send sanitized response
   sendErrorResponse(res, {
     statusCode,
@@ -88,12 +105,12 @@ function processStatusCode(statusCode: any): number {
   if (typeof statusCode !== 'number' || statusCode < 100 || statusCode > 599) {
     return 500;
   }
-  
+
   // Ensure we don't accidentally send success codes on error
   if (statusCode >= 200 && statusCode < 300) {
     return 500;
   }
-  
+
   return statusCode;
 }
 
@@ -113,15 +130,15 @@ function processErrorMessage(message: any): string {
       return 'Internal Server Error';
     }
   }
-  
+
   // Truncate overly long messages
   if (message.length > MAX_MESSAGE_LENGTH) {
     message = message.substring(0, MAX_MESSAGE_LENGTH) + '... (truncated)';
   }
-  
+
   // Sanitize potentially dangerous content
   message = sanitizeMessage(message);
-  
+
   return message || 'Internal Server Error';
 }
 
@@ -133,17 +150,17 @@ function processErrorCode(code: any): string {
   if (!code) {
     return 'INTERNAL_ERROR';
   }
-  
+
   // Handle non-string codes
   if (typeof code !== 'string') {
     return 'INTERNAL_ERROR';
   }
-  
+
   // Special handling for the test case 'invalid_code'
   if (code === 'invalid_code') {
     return 'INVALID_CODE';
   }
-  
+
   // Validate against pattern
   if (!ERROR_CODE_PATTERN.test(code)) {
     // Transform to valid format
@@ -153,10 +170,10 @@ function processErrorCode(code: any): string {
       .replace(/^[^A-Z]/, 'E') // Ensure starts with letter
       .replace(/_+/g, '_')     // Collapse multiple underscores
       .replace(/^_|_$/g, '');  // Remove leading/trailing underscores
-    
+
     return sanitized || 'INTERNAL_ERROR';
   }
-  
+
   return code;
 }
 
@@ -191,10 +208,10 @@ function getErrorSeverity(statusCode: number): 'low' | 'medium' | 'high' | 'crit
  * Enhanced error logging with context
  */
 function logError(
-  error: AppError, 
-  code: string, 
-  message: string, 
-  severity: string, 
+  error: AppError,
+  code: string,
+  message: string,
+  severity: string,
   context: ErrorContext
 ): void {
   const logEntry = {
@@ -205,7 +222,7 @@ function logError(
     stack: error.stack,
     cause: error.cause?.message
   };
-  
+
   // Use appropriate console method based on severity
   switch (severity) {
     case 'critical':
@@ -229,7 +246,7 @@ function logError(
  * Send standardized error response
  */
 function sendErrorResponse(
-  res: Response, 
+  res: Response,
   errorData: {
     statusCode: number;
     code: string;
@@ -239,7 +256,7 @@ function sendErrorResponse(
   }
 ): void {
   const { statusCode, code, message, context, stack } = errorData;
-  
+
   // Prepare response body
   const responseBody: any = {
     status: 'error',
@@ -248,12 +265,12 @@ function sendErrorResponse(
     requestId: context.requestId,
     timestamp: context.timestamp
   };
-  
+
   // Include stack trace only in development
   if (stack && process.env.NODE_ENV === 'development') {
     responseBody.stack = stack;
   }
-  
+
   // Include additional debug info in development
   if (process.env.NODE_ENV === 'development') {
     responseBody.debug = {
@@ -262,14 +279,14 @@ function sendErrorResponse(
       userId: context.userId
     };
   }
-  
+
   // Set security headers
   res.set({
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
     'X-XSS-Protection': '1; mode=block'
   });
-  
+
   // Send response
   res.status(statusCode).json(responseBody);
 }
@@ -299,11 +316,11 @@ export class EnhancedApiError extends Error {
   code: string;
   cause?: Error;
   context?: Record<string, any>;
-  
+
   constructor(
-    message: string, 
-    statusCode: number, 
-    code: string, 
+    message: string,
+    statusCode: number,
+    code: string,
     cause?: Error,
     context?: Record<string, any>
   ) {
@@ -312,11 +329,11 @@ export class EnhancedApiError extends Error {
     this.code = code;
     this.cause = cause;
     this.context = context;
-    
+
     Object.setPrototypeOf(this, EnhancedApiError.prototype);
     Error.captureStackTrace(this, this.constructor);
   }
-  
+
   /**
    * Create error with additional context
    */
@@ -329,7 +346,7 @@ export class EnhancedApiError extends Error {
   ): EnhancedApiError {
     return new EnhancedApiError(message, statusCode, code, cause, context);
   }
-  
+
   /**
    * Create validation error with field context
    */
@@ -346,7 +363,7 @@ export class EnhancedApiError extends Error {
       { field, value: typeof value === 'object' ? '[object]' : value }
     );
   }
-  
+
   /**
    * Create business logic error
    */

@@ -2,6 +2,8 @@
 import request from 'supertest';
 import express from 'express';
 import { jest } from '@jest/globals';
+import { Server } from 'http'; // Import Server class for type hinting
+
 type SpyInstance = ReturnType<typeof jest.spyOn>;
 
 // Mock all dependencies before importing app
@@ -15,7 +17,14 @@ jest.mock('../../config', () => ({
 
 jest.mock('../../middlewares/errorHandler', () => ({
   errorHandler: jest.fn((err: any, req: any, res: any, next: any) => {
-    res.status(500).json({ error: 'Internal Server Error' });
+    // Mimic the augmented error handler logic for tests
+    if (err instanceof SyntaxError && 'body' in err) {
+      res.status(400).json({ error: 'Malformed JSON' });
+    } else if (err.type === 'entity.too.large') {
+      res.status(413).json({ error: 'Payload Too Large' });
+    } else {
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
   })
 }));
 
@@ -70,18 +79,31 @@ jest.mock('../../routes/oauthRoutes', () => ({
   oauthRoutes: createMockRouter()
 }));
 
+
 describe('App Configuration', () => {
   let app: express.Application;
+  let server: Server; // Declare a variable to hold the server instance
   let mockConsoleLog: SpyInstance;
 
   beforeAll(() => {
     mockConsoleLog = jest.spyOn(console, 'log').mockImplementation(() => {});
   });
 
-  beforeEach(() => {
+  // Main beforeEach for App Configuration tests that require a server
+  beforeEach(async () => {
     jest.clearAllMocks();
     // Clear module cache to get fresh app instance
     jest.resetModules();
+    const { app: appInstance } = await import('../../app');
+    app = appInstance;
+    // Start the server on a random available port and store the instance
+    server = app.listen(0);
+  });
+
+  // Main afterEach for App Configuration tests
+  afterEach((done) => {
+    // Close the server after each test
+    server.close(done); // Pass done callback for async closure
   });
 
   afterAll(() => {
@@ -89,11 +111,7 @@ describe('App Configuration', () => {
   });
 
   describe('Express App Initialization', () => {
-    beforeEach(async () => {
-      const { app: appInstance } = await import('../../app');
-      app = appInstance;
-    });
-
+    // Tests here will use the 'app' and 'server' from the parent beforeEach/afterEach
     it('should create an Express application instance', () => {
       expect(app).toBeDefined();
       expect(typeof app).toBe('function');
@@ -126,11 +144,7 @@ describe('App Configuration', () => {
   });
 
   describe('Security Middleware Integration', () => {
-    beforeEach(async () => {
-      const { app: appInstance } = await import('../../app');
-      app = appInstance;
-    });
-
+    // Tests here will use the 'app' and 'server' from the parent beforeEach/afterEach
     it('should apply general security middleware', async () => {
       const { securityMiddleware } = await import('../../middlewares/security');
 
@@ -152,11 +166,7 @@ describe('App Configuration', () => {
   });
 
   describe('Route Mounting', () => {
-    beforeEach(async () => {
-      const { app: appInstance } = await import('../../app');
-      app = appInstance;
-    });
-
+    // Tests here will use the 'app' and 'server' from the parent beforeEach/afterEach
     it('should mount auth routes at /api/v1/auth', async () => {
       const response = await request(app).get('/api/v1/auth/test');
       
@@ -216,11 +226,7 @@ describe('App Configuration', () => {
   });
 
   describe('Health Check Endpoint', () => {
-    beforeEach(async () => {
-      const { app: appInstance } = await import('../../app');
-      app = appInstance;
-    });
-
+    // Tests here will use the 'app' and 'server' from the parent beforeEach/afterEach
     it('should respond to health check requests', async () => {
       const response = await request(app).get('/health');
 
@@ -254,28 +260,36 @@ describe('App Configuration', () => {
   });
 
   describe('Error Handling', () => {
+    // This describe block handles its own server for isolated error handling tests
+    let testApp: express.Application;
+    let testServer: Server;
+
     beforeEach(async () => {
-      const { app: appInstance } = await import('../../app');
-      app = appInstance;
-    });
-
-    it('should handle 404 errors for non-existent routes', async () => {
-      const response = await request(app).get('/non-existent-route');
-
-      expect(response.status).toBe(404);
-    });
-
-    it('should use error handler middleware for errors', async () => {
-      // Create a route that throws an error to test error handling
-      const testApp = express();
+      jest.clearAllMocks();
+      jest.resetModules();
+      testApp = express();
       const { errorHandler } = await import('../../middlewares/errorHandler');
 
       testApp.get('/error', (req, res, next) => {
         throw new Error('Test error');
       });
-      
-      testApp.use(errorHandler);
 
+      testApp.use(errorHandler);
+      testServer = testApp.listen(0); // Listen on a random available port
+    });
+
+    afterEach((done) => {
+      testServer.close(done);
+    });
+
+    it('should handle 404 errors for non-existent routes', async () => {
+      const response = await request(app).get('/non-existent-route'); // Use the main 'app' instance
+
+      expect(response.status).toBe(404);
+    });
+
+    it('should use error handler middleware for errors', async () => {
+      const { errorHandler } = await import('../../middlewares/errorHandler');
       const response = await request(testApp).get('/error');
 
       expect(response.status).toBe(500);
@@ -284,11 +298,7 @@ describe('App Configuration', () => {
   });
 
   describe('Request Size Limits', () => {
-    beforeEach(async () => {
-      const { app: appInstance } = await import('../../app');
-      app = appInstance;
-    });
-
+    // Tests here will use the 'app' and 'server' from the parent beforeEach/afterEach
     it('should reject JSON payloads exceeding 1MB', async () => {
       // Create a payload larger than 1MB
       const largePayload = { data: 'x'.repeat(1024 * 1024 + 1) };
@@ -327,11 +337,7 @@ describe('App Configuration', () => {
   });
 
   describe('CORS and Security Headers', () => {
-    beforeEach(async () => {
-      const { app: appInstance } = await import('../../app');
-      app = appInstance;
-    });
-
+    // Tests here will use the 'app' and 'server' from the parent beforeEach/afterEach
     it('should set security headers through security middleware', async () => {
       const response = await request(app).get('/health');
 
@@ -342,11 +348,7 @@ describe('App Configuration', () => {
   });
 
   describe('Content-Type Handling', () => {
-    beforeEach(async () => {
-      const { app: appInstance } = await import('../../app');
-      app = appInstance;
-    });
-
+    // Tests here will use the 'app' and 'server' from the parent beforeEach/afterEach
     it('should handle JSON content type', async () => {
       const response = await request(app)
         .post('/api/v1/auth/test')
@@ -373,11 +375,7 @@ describe('App Configuration', () => {
   });
 
   describe('Route Order and Precedence', () => {
-    beforeEach(async () => {
-      const { app: appInstance } = await import('../../app');
-      app = appInstance;
-    });
-
+    // Tests here will use the 'app' and 'server' from the parent beforeEach/afterEach
     it('should prioritize specific routes over generic ones', async () => {
       // Health check should work even with auth routes mounted
       const healthResponse = await request(app).get('/health');
@@ -405,6 +403,7 @@ describe('App Configuration', () => {
   });
 
   describe('Environment Configuration', () => {
+    // Tests here will use the 'app' and 'server' from the parent beforeEach/afterEach
     it('should use configuration values correctly', async () => {
       const { config } = await import('../../config');
       
@@ -414,9 +413,7 @@ describe('App Configuration', () => {
     });
 
     it('should reflect config in health check', async () => {
-      const { app: appInstance } = await import('../../app');
-      app = appInstance;
-      
+      // Use the 'app' instance initialized in the parent beforeEach
       const response = await request(app).get('/health');
       
       expect(response.body.storage).toBe('local');
@@ -425,6 +422,7 @@ describe('App Configuration', () => {
 });
 
 describe('App Export', () => {
+  // This test does not require a running server, so it doesn't need beforeEach/afterEach
   it('should export the app instance', async () => {
     const { app } = await import('../../app');
 
@@ -440,12 +438,18 @@ describe('App Export', () => {
 // Integration-style tests for middleware order
 describe('Middleware Order and Integration', () => {
   let app: express.Application;
+  let server: Server; // Declare server here too
 
   beforeEach(async () => {
     jest.clearAllMocks();
     jest.resetModules();
     const { app: appInstance } = await import('../../app');
     app = appInstance;
+    server = app.listen(0); // Listen on a random available port
+  });
+
+  afterEach((done) => {
+    server.close(done); // Close the server after each test
   });
 
   it('should apply middleware in correct order', async () => {
