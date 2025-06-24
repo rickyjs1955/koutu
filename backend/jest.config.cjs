@@ -35,6 +35,6 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1'
   },
   silent: true, // Suppress console output during tests
-
+  
   // Removed global setup/teardown to avoid ES module issues
 };
