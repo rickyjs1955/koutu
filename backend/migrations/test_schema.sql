@@ -6,11 +6,19 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 -- Drop existing tables if they exist (in reverse dependency order)
+DROP TABLE IF EXISTS wardrobe_items CASCADE;
 DROP TABLE IF EXISTS garment_items CASCADE;
 DROP TABLE IF EXISTS original_images CASCADE;
 DROP TABLE IF EXISTS wardrobes CASCADE;
 DROP TABLE IF EXISTS user_oauth_providers CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS polygons CASCADE; -- Added for completeness if it exists elsewhere
+DROP TABLE IF EXISTS test_items CASCADE;
+DROP TABLE IF EXISTS test_table CASCADE;
+DROP TABLE IF EXISTS parent_cleanup CASCADE;
+DROP TABLE IF EXISTS child_cleanup CASCADE;
+DROP TABLE IF EXISTS exclude_test_table CASCADE;
+
 
 -- Create users table
 CREATE TABLE users (
@@ -52,7 +60,7 @@ CREATE TABLE original_images (
 
 -- CRITICAL FIX: Create garment_items table that satisfies BOTH requirements:
 -- 1. garmentModel.ts interface (id, user_id, original_image_id, file_path, mask_path, metadata, data_version, etc.)
--- 2. Test expectations (name column for test queries)
+-- 2. Test expectations (name column for test queries AND tags column for garment item properties)
 CREATE TABLE garment_items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -74,6 +82,9 @@ CREATE TABLE garment_items (
   price DECIMAL(10,2),
   purchase_date DATE,
   image_url TEXT,
+  
+  -- NEW: Add tags column as TEXT array to match test expectations
+  tags TEXT[], 
   
   -- Standard timestamp fields
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -113,6 +124,8 @@ CREATE INDEX idx_garment_items_created_at ON garment_items(created_at DESC);
 CREATE INDEX idx_garment_items_data_version ON garment_items(data_version);
 CREATE INDEX idx_garment_items_category ON garment_items(category);
 CREATE INDEX idx_garment_items_name ON garment_items(name);
+-- NEW: Add index for tags column
+CREATE INDEX idx_garment_items_tags ON garment_items USING GIN (tags);
 CREATE INDEX idx_wardrobes_user_id ON wardrobes(user_id);
 CREATE INDEX idx_wardrobe_items_wardrobe_id ON wardrobe_items(wardrobe_id);
 CREATE INDEX idx_wardrobe_items_garment_id ON wardrobe_items(garment_item_id);

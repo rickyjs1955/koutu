@@ -114,7 +114,7 @@ Backend:
 62. /backend/src/utils/testUserModel.ts                     ✅Unit 🔔Integration ✅Security
 63. /backend/src/utils/testUserModel.v2.ts                  ❌Unit ❌Integration ❌Security
 64. /backend/src/validators/schemas.ts                      ✅Unit ✅Integration ✅Security
-65. /backend/src/app.ts                                     ✅Unit ❌Integration ❌Security
+65. /backend/src/app.ts                                     ✅Unit ✅Integration ✅Security
 
 Additional Test Suites:
 firebass.docker.int.test.ts✅

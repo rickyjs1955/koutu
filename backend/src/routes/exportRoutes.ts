@@ -3,7 +3,7 @@ import express from 'express';
 import { exportController } from '../controllers/exportController';
 import { authenticate } from '../middlewares/auth';
 import { validate } from '../middlewares/validate';
-import { mlExportRequestSchema } from '@koutu/shared/schemas/export';
+import { mlExportRequestSchema } from '../../../shared/src/schemas/export';
 
 const router = express.Router();
 
