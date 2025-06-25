@@ -97,7 +97,7 @@ Backend:
 42. /backend/src/services/oauthService.ts                   ✅Unit ✅Integration ✅Security
 43. /backend/src/services/InstagramApiService.ts            ✅Unit ✅Integration ✅Security
 44. /backend/src/utils/ApiError.ts                          ✅Unit ✅Integration ✅Security
-45. /backend/src/utils/dockerMigrationHelper.ts             🛠️Unit 🔔Integration 🔔Security
+45. /backend/src/utils/dockerMigrationHelper.ts             ✅Unit 🔔Integration 🔔Security
 46. /backend/src/utils/InstagramApiError.ts                 ✅Unit ✅Integration ✅Security
 47. /backend/src/utils/modelUtils.ts                        ✅Unit 🔔Integration 🔔Security
 48. /backend/src/utils/PolygonServiceUtils.ts               ✅Unit ✅Integration 🔔Security
@@ -106,16 +106,16 @@ Backend:
 51. /backend/src/utils/testDatabase.ts                      🔔Unit ✅Integration 🔔Security
 52. /backend/src/utils/testDatabase.v2.ts                   🛠️Unit 🔔Integration 🔔Security
 53. /backend/src/utils/testDatabaseConnection.ts            ✅Unit ✅Integration 🔔Security
-54. /backend/src/utils/testDatabaseConnection.v2.ts         🛠️Unit 🔔Integration 🔔Security
+54. /backend/src/utils/testDatabaseConnection.v2.ts         ✅Unit 🔔Integration 🔔Security
 55. /backend/src/utils/testGarmentModel.ts                  ✅Unit 🔔Integration 🔔Security
-56. /backend/src/utils/testGarmentModel.v2.ts               🛠️Unit 🔔Integration 🔔Security
+56. /backend/src/utils/testGarmentModel.v2.ts               ✅Unit 🔔Integration 🔔Security
 57. /backend/src/utils/testImageModel.ts                    ✅Unit ✅Integration 🔔Security
-58. /backend/src/utils/testImageModel.v2.ts                 🛠️Unit 🔔Integration 🔔Security
+58. /backend/src/utils/testImageModel.v2.ts                 ✅Unit 🔔Integration 🔔Security
 59. /backend/src/utils/testImageService.ts                  ✅Unit 🔔Integration 🔔Security
 60. /backend/src/utils/testImageService.v2.ts               ✅Unit 🔔Integration 🔔Security
 61. /backend/src/utils/testSetup.ts                         ✅Unit ✅Integration ✅Security
 62. /backend/src/utils/testUserModel.ts                     ✅Unit 🔔Integration ✅Security
-63. /backend/src/utils/testUserModel.v2.ts                  🛠️Unit 🔔Integration 🔔Security
+63. /backend/src/utils/testUserModel.v2.ts                  ✅Unit 🔔Integration 🔔Security
 64. /backend/src/validators/schemas.ts                      ✅Unit ✅Integration ✅Security
 65. /backend/src/app.ts                                     ✅Unit ✅Integration ✅Security
 
