@@ -117,7 +117,6 @@ describe('TestDatabase v2 - Docker Database Implementation', () => {
           .mockResolvedValueOnce({ rows: [] } as any) // pg_terminate_backend
           .mockResolvedValueOnce({ rows: [] } as any) // database doesn't exist
           .mockResolvedValueOnce({ rows: [] } as any) // CREATE DATABASE
-          .mockResolvedValueOnce({ rows: [] } as any) // CREATE EXTENSION
           .mockResolvedValue({ rows: [] } as any); // All other schema operations
 
         await TestDatabase.initialize();
@@ -133,6 +132,9 @@ describe('TestDatabase v2 - Docker Database Implementation', () => {
         
         (TestDatabase as any).testPool = oldPool;
         (TestDatabase as any).mainPool = oldPool;
+
+        // ADD MISSING MOCK SETUP - database doesn't exist scenario
+        mockPool.query.mockResolvedValue({ rows: [] } as any);
 
         await TestDatabase.initialize();
 
@@ -563,15 +565,27 @@ describe('TestDatabase v2 - Docker Database Implementation', () => {
 
       test('should skip database creation if exists', async () => {
         mockPool.query
+          .mockResolvedValueOnce({ rows: [] } as any) // SELECT 1 from waitForDockerPostgreSQL
           .mockResolvedValueOnce({ rows: [] } as any) // pg_terminate_backend
-          .mockResolvedValueOnce({ rows: [{ exists: true }] } as any) // database exists
-          .mockResolvedValue({ rows: [] } as any); // All other operations
+          .mockResolvedValueOnce({ rows: [{ exists: true }] } as any) // database exists check
+          .mockResolvedValue({ rows: [] } as any); // All other operations (should not include CREATE DATABASE)
 
         await TestDatabase.initialize();
 
         const createDbCalls = mockPool.query.mock.calls.filter((call: any) =>
           call[0] && typeof call[0] === 'string' && call[0].includes('CREATE DATABASE')
         );
+        
+        // Debug: log all calls to see what's happening
+        console.log('All query calls:');
+        interface QueryCall {
+          0: string;
+          [key: number]: any;
+        }
+        (mockPool.query.mock.calls as QueryCall[]).forEach((call: QueryCall, index: number) => {
+          console.log(`${index + 1}: ${call[0]}`);
+        });
+        
         expect(createDbCalls).toHaveLength(0);
       });
 
@@ -695,8 +709,17 @@ describe('TestDatabase v2 - Docker Database Implementation', () => {
 
         // Should complete schema creation quickly (mocked operations)
         expect(duration).toBeLessThan(100);
-        // Update expected call count to match actual implementation (3 terminate + check + create ext + 6 tables + 1 index batch)
-        expect(mockPool.query).toHaveBeenCalledTimes(12); // Adjust based on actual calls
+        
+        // Expected calls (when database doesn't exist):
+        // 1. SELECT 1 (waitForDockerPostgreSQL)
+        // 2. pg_terminate_backend 
+        // 3. EXISTS check (returns { rows: [] } = database doesn't exist)
+        // 4. CREATE DATABASE (because database doesn't exist)
+        // 5. CREATE EXTENSION
+        // 6-11. CREATE TABLE (6 tables: users, oauth_providers, original_images, garment_items, wardrobes, wardrobe_items)
+        // 12. CREATE INDEX (batch)
+        // Total: 12 calls
+        expect(mockPool.query).toHaveBeenCalledTimes(12);
       });
     });
   });

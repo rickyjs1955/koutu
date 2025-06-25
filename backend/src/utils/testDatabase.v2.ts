@@ -77,15 +77,58 @@ export class TestDatabase {
         'SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1) as exists',
         ['koutu_test']
       );
+
       console.log('DEBUG dbCheck:', dbCheck);
-      if (dbCheck && Array.isArray(dbCheck.rows)) {
-        console.log('DEBUG dbCheck.rows:', dbCheck.rows);
-        if (dbCheck.rows[0]) {
-          console.log('DEBUG dbCheck.rows[0].exists:', dbCheck.rows[0].exists);
+      
+      let databaseExists = false;
+      
+      // More robust handling of different response structures
+      try {
+        if (dbCheck && typeof dbCheck === 'object') {
+          console.log('DEBUG dbCheck type check passed');
+          
+          if ('rows' in dbCheck && Array.isArray(dbCheck.rows)) {
+            console.log('DEBUG dbCheck.rows:', dbCheck.rows);
+            
+            if (dbCheck.rows.length > 0) {
+              // Normal case: EXISTS query returns [{ exists: true/false }]
+              const firstRow = dbCheck.rows[0];
+              console.log('DEBUG firstRow:', firstRow);
+              
+              if (firstRow && typeof firstRow === 'object' && 'exists' in firstRow) {
+                console.log('DEBUG dbCheck.rows[0].exists:', firstRow.exists);
+                // Handle both boolean and string representations
+                databaseExists = Boolean(firstRow.exists);
+              } else {
+                // Row exists but no 'exists' property - assume database doesn't exist
+                console.log('DEBUG: Row missing exists property, assuming database does not exist');
+                databaseExists = false;
+              }
+            } else {
+              // Empty rows array - database doesn't exist
+              console.log('DEBUG: Empty rows array, database does not exist');
+              databaseExists = false;
+            }
+          } else {
+            // No rows property or not an array - assume database doesn't exist
+            console.log('DEBUG: No rows property or not an array, assuming database does not exist');
+            databaseExists = false;
+          }
+        } else {
+          // dbCheck is null/undefined/not an object - assume database doesn't exist
+          console.log('DEBUG: dbCheck is null/undefined/not object, assuming database does not exist');
+          databaseExists = false;
         }
+      } catch (parseError) {
+        // Any error in parsing the response - assume database doesn't exist for safety
+        console.log('DEBUG: Error parsing dbCheck response, assuming database does not exist:', parseError);
+        databaseExists = false;
       }
+      
+      console.log('DEBUG: Final databaseExists =', databaseExists);
+      
       // Only create the database if it does not exist
-      if (!dbCheck || !Array.isArray(dbCheck.rows) || dbCheck.rows.length === 0 || !dbCheck.rows[0].exists) {
+      if (!databaseExists) {
         console.log('DEBUG: Creating database koutu_test');
         await this.mainPool.query('CREATE DATABASE koutu_test');
         console.log('🐳 Test database created in Docker container');
