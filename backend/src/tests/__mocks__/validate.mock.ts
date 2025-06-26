@@ -14,6 +14,8 @@ export const createMockRequest = (overrides: Partial<Request> = {}): Partial<Req
     headers: {},
     method: 'POST',
     url: '/test',
+    path: '/test',
+    originalUrl: '/test',
     ...overrides
   };
 };

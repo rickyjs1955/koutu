@@ -1,4 +1,14 @@
 // /backend/src/controllers/__tests__/authController.integration.test.ts
+
+jest.doMock('../../models/db', () => {
+  const { getTestDatabaseConnection } = require('../../utils/dockerMigrationHelper');
+  const testDB = getTestDatabaseConnection();
+  return {
+    query: async (text: string, params?: any[]) => testDB.query(text, params),
+    getPool: () => testDB.getPool()
+  };
+});
+
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config';

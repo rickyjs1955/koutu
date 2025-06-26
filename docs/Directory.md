@@ -45,7 +45,7 @@ Shared:
 4. /shared/src/schemas/export.ts                            ❌Unit ❌Integration ❌Security
 5. /shared/src/schemas/image.ts                             ❌Unit ❌Integration ❌Security
 6. /shared/src/schemas/polygon.ts                           ❌Unit ❌Integration ❌Security
-7. /shared/src/schemas/oauth.ts NEED MODIFY FOR IG          ❌Unit ❌Integration ❌Security 
+7. /shared/src/schemas/oauth.ts                             ❌Unit ❌Integration ❌Security 
 8. /shared/src/schemas/index.ts                             ❌Unit ❌Integration ❌Security                          
 Backend:
 ✅ Tests Passed
@@ -104,7 +104,7 @@ Backend:
 49. /backend/src/utils/sanitize.ts                          ✅Unit ✅Integration ✅Security
 50. /backend/src/utils/testConfig.ts                        🔔Unit 🔔Integration ✅Security
 51. /backend/src/utils/testDatabase.ts                      🔔Unit ✅Integration 🔔Security
-52. /backend/src/utils/testDatabase.v2.ts                   🛠️Unit 🔔Integration 🔔Security
+52. /backend/src/utils/testDatabase.v2.ts                   ✅Unit 🔔Integration 🔔Security
 53. /backend/src/utils/testDatabaseConnection.ts            ✅Unit ✅Integration 🔔Security
 54. /backend/src/utils/testDatabaseConnection.v2.ts         ✅Unit 🔔Integration 🔔Security
 55. /backend/src/utils/testGarmentModel.ts                  ✅Unit 🔔Integration 🔔Security

@@ -1,19 +1,29 @@
 /**
- * ExportService Comprehensive Integration Test Suite
+ * ExportService Comprehensive Integration Test Suite - FIXED VERSION
  * 
- * @description Complete production-ready integration test suite similar to exportModel.int.test.ts
+ * @description Complete production-ready integration test suite
  * Tests complete service operations with real database and file system operations.
  * 
- * @prerequisites
- * - PostgreSQL instance running (Docker or Manual mode)
- * - Test database configured and accessible
- * - Required environment variables set
- * - Test data setup utilities available
+ * FIXES APPLIED:
+ * 1. Fixed database table setup for images/original_images compatibility
+ * 2. Improved mock implementation to prevent immediate failures
+ * 3. Fixed status assertions to handle async processing correctly
+ * 4. Added proper retry logic for eventual consistency
+ * 5. Enhanced error handling and test isolation
  * 
  * @author JLS
- * @version 1.0.0
- * @since June 14, 2025
+ * @version 1.1.0 (FIXED)
+ * @since June 26, 2025
  */
+
+jest.doMock('../../models/db', () => {
+  const { getTestDatabaseConnection } = require('../../utils/dockerMigrationHelper');
+  const testDB = getTestDatabaseConnection();
+  return {
+    query: async (text: string, params?: any[]) => testDB.query(text, params),
+    getPool: () => testDB.getPool()
+  };
+});
 
 import { jest } from '@jest/globals';
 import { v4 as uuidv4, validate as isUuid } from 'uuid';
@@ -76,16 +86,16 @@ const createTestExportOptions = (overrides: Partial<MLExportOptions> = {}): MLEx
 };
 
 /**
- * Creates sample garment data for testing
+ * Creates sample garment data for testing - FIXED VERSION
  */
 const createSampleGarmentData = async (TestDB: any, userId: string, count: number = 5) => {
   const garments = [];
   
   for (let i = 0; i < count; i++) {
-    // Create image first
+    // Create image first using the test helper
     const image = await createTestImageDirect(TestDB, userId, `garment-${i}`, i);
     
-    // Create garment
+    // Create garment with proper image_id reference
     const garmentId = uuidv4();
     await TestDB.query(`
       INSERT INTO garments (id, user_id, image_id, category, polygon_points, attributes, created_at, updated_at)
@@ -142,7 +152,7 @@ const validateExportJobStructure = (job: any, expectedUserId?: string) => {
   expect(typeof job.totalItems).toBe('number');
   expect(typeof job.processedItems).toBe('number');
   
-  // FIXED: Timestamps can be either strings or Date objects
+  // Timestamps can be either strings or Date objects
   expect(['string', 'object'].includes(typeof job.createdAt)).toBe(true);
   expect(['string', 'object'].includes(typeof job.updatedAt)).toBe(true);
   
@@ -167,6 +177,29 @@ const validateExportJobStructure = (job: any, expectedUserId?: string) => {
     expect(job.userId).toBe(expectedUserId);
   }
 };
+
+/**
+ * Wait for job to reach expected status with retry logic
+ */
+const waitForJobStatus = async (
+  jobId: string, 
+  expectedStatuses: string[], 
+  maxWaitMs: number = 5000,
+  checkIntervalMs: number = 100
+): Promise<any> => {
+  const startTime = Date.now();
+  
+  while (Date.now() - startTime < maxWaitMs) {
+    const job = await exportService.getBatchJob(jobId);
+    if (job && expectedStatuses.includes(job.status)) {
+      return job;
+    }
+    await sleep(checkIntervalMs);
+  }
+  
+  // Return the last known state
+  return await exportService.getBatchJob(jobId);
+};
 // #endregion
 
 describe('ExportService - Comprehensive Integration Test Suite', () => {
@@ -176,6 +209,7 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
   let testUser1: any;
   let testUser2: any;
   let testAdmin: any;
+  let originalProcessMLExport: any;
   // #endregion
 
   // #region Helper Functions
@@ -207,7 +241,7 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
   };
 
   /**
-   * Sets up required database tables if they don't exist
+   * Sets up required database tables if they don't exist - FIXED VERSION
    */
   const setupDatabaseTables = async () => {
     try {
@@ -231,7 +265,7 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
         )
       `);
 
-      // Create garments table if it doesn't exist
+      // FIXED: Create garments table if it doesn't exist
       const garmentTableCheck = await TestDB.query(`
         SELECT EXISTS (
           SELECT FROM information_schema.tables 
@@ -252,11 +286,74 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
           )
         `);
+      }
 
-        // Create images table alias for original_images
-        await TestDB.query(`
-          CREATE VIEW IF NOT EXISTS images AS SELECT * FROM original_images;
-        `);
+      // FIXED: Create images view/table compatibility
+      const imagesTableCheck = await TestDB.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_name = 'images'
+        );
+      `);
+
+      if (!imagesTableCheck.rows[0].exists) {
+        // Try to create a view first
+        try {
+          await TestDB.query(`CREATE VIEW images AS SELECT * FROM original_images;`);
+          console.log('✅ Created images view pointing to original_images');
+        } catch (viewError) {
+          // If view fails, create the actual table with same structure as original_images
+          console.warn('View creation failed, creating images table:', viewError);
+          
+          const originalImagesStructure = await TestDB.query(`
+            SELECT column_name, data_type, is_nullable, column_default
+            FROM information_schema.columns 
+            WHERE table_name = 'original_images'
+            ORDER BY ordinal_position;
+          `);
+
+          if (originalImagesStructure.rows.length > 0) {
+            // Build CREATE TABLE statement from original_images structure
+            interface ColumnInfo {
+              column_name: string;
+              data_type: string;
+              is_nullable: string;
+              column_default: string | null;
+            }
+
+            const columns = originalImagesStructure.rows.map((col: ColumnInfo) => {
+              let def = `${col.column_name} ${col.data_type}`;
+              if (col.is_nullable === 'NO') def += ' NOT NULL';
+              if (col.column_default) def += ` DEFAULT ${col.column_default}`;
+              return def;
+            }).join(',\n  ');
+
+            await TestDB.query(`
+              CREATE TABLE images (
+                ${columns},
+                PRIMARY KEY (id)
+              )
+            `);
+            console.log('✅ Created images table with original_images structure');
+          } else {
+            // Fallback: create basic images table
+            await TestDB.query(`
+              CREATE TABLE images (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                path VARCHAR(255) NOT NULL,
+                original_filename VARCHAR(255),
+                mimetype VARCHAR(100),
+                size INTEGER,
+                width INTEGER,
+                height INTEGER,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              )
+            `);
+            console.log('✅ Created basic images table structure');
+          }
+        }
       }
 
       // Create indexes for performance
@@ -271,38 +368,48 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       console.log('✅ Export service tables and indexes set up successfully');
     } catch (error) {
       console.warn('⚠️ Error setting up database tables:', error);
+      throw error; // Re-throw to make setup failures visible
     }
   };
   // #endregion
   
   // #region Test Setup and Teardown
   /**
-   * Global test setup - runs once before all tests
-   * Initializes database, creates test users, sets up mock for export processing
+   * Global test setup - runs once before all tests - FIXED VERSION
    */
   beforeAll(async () => {
     try {
       console.log('🧪 Initializing ExportService comprehensive test environment...');
       
-      // SINGLE smart mock that counts items but doesn't auto-complete
+      // Store original method before mocking
+      originalProcessMLExport = (exportService as any).processMLExport;
+      
+      // FIXED: Better mock that prevents immediate failures
       jest.spyOn(exportService as any, 'processMLExport').mockImplementation(async function(this: any, batchJob: any) {
         try {
-          // Count items like the real implementation would
+          console.log(`Mock processing export job ${batchJob.id}`);
+          
+          // Simulate the real flow but don't complete automatically
           const garments = await this.fetchFilteredGarments(
             batchJob.userId, 
             batchJob.options.garmentIds, 
             batchJob.options.categoryFilter
           );
           
-          // Update totalItems correctly
+          // Update totalItems based on actual data
           batchJob.totalItems = garments.length;
+          batchJob.processedItems = 0; // Start at 0
+          batchJob.progress = 0; // Start at 0
+          
+          // Update the job in database but keep it in pending status
           await this.updateBatchJob(batchJob);
           
-          // DON'T complete the job - let it stay in pending state
-          // Tests can control completion manually if needed
+          console.log(`Mock: Job ${batchJob.id} updated with ${garments.length} items, staying in pending state`);
+          
+          // Don't change status to completed - let tests control the lifecycle
           
         } catch (error) {
-          console.warn('Mock processMLExport error:', error);
+          console.error(`Mock processMLExport error for job ${batchJob.id}:`, error);
           const errorMessage = error instanceof Error ? error.message : String(error);
           await this.updateBatchJobStatus(batchJob.id, 'failed', errorMessage);
         }
@@ -310,52 +417,6 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       
       // Initialize dual-mode test environment
       const setup: any = await setupWardrobeTestEnvironmentWithAllModels();
-      TestDB = setup.TestDB;
-      testUserModel = setup.testUserModel;
-
-      // Ensure clean database state
-      await ensureCleanDatabase();
-      console.log('🧽 Database cleaned for fresh start');
-
-      // Setup database tables
-      await setupDatabaseTables();
-
-      // Create unique test users with timestamp and random suffix to avoid conflicts
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).substring(7);
-      
-      testUser1 = await testUserModel.create({
-        email: `export-comp-user1-${timestamp}-${random}@test.com`,
-        password: 'SecurePass123!'
-      });
-
-      testUser2 = await testUserModel.create({
-        email: `export-comp-user2-${timestamp}-${random}@test.com`,
-        password: 'SecurePass123!'
-      });
-
-      testAdmin = await testUserModel.create({
-        email: `export-comp-admin-${timestamp}-${random}@test.com`,
-        password: 'AdminPass123!'
-      });
-
-      console.log(`✅ ExportService comprehensive test environment ready`);
-    } catch (error) {
-      console.error('❌ Test setup failed:', error);
-      throw error;
-    }
-  }, 120000);
-  
-  /**
-   * Global test setup - runs once before all tests
-   * Initializes database, creates test users
-   */
-  beforeAll(async () => {
-    try {
-      console.log('🧪 Initializing ExportService comprehensive test environment...');
-      
-      // Initialize dual-mode test environment
-      const setup = await setupWardrobeTestEnvironmentWithAllModels();
       TestDB = setup.TestDB;
       testUserModel = setup.testUserModel;
 
@@ -421,7 +482,13 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       
       try {
         await TestDB.query('DELETE FROM garments');
+        // Clear both original_images and images if they exist
         await TestDB.query('DELETE FROM original_images');
+        try {
+          await TestDB.query('DELETE FROM images');
+        } catch (error) {
+          // images might be a view, ignore delete errors
+        }
       } catch (error) {
         // Tables might not exist yet, ignore
       }
@@ -431,7 +498,6 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       console.warn('Could not clear test data in beforeEach:', error);
     }
   });
-  // #endregion
 
   /**
    * Global test cleanup - runs once after all tests
@@ -440,6 +506,11 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
   afterAll(async () => {
     try {
       console.log('🧹 Starting comprehensive database cleanup...');
+      
+      // Restore original method
+      if (originalProcessMLExport) {
+        (exportService as any).processMLExport = originalProcessMLExport;
+      }
       
       // Close TestDB
       if (TestDB && typeof TestDB.cleanup === 'function') {
@@ -465,6 +536,7 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       console.error('❌ Cleanup error:', error instanceof Error ? error.message : String(error));
     }
   }, 30000);
+  // #endregion
 
   // #region Export Job Creation Tests
   describe('1. Export Job Creation Operations', () => {
@@ -484,6 +556,9 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       expect(typeof jobId).toBe('string');
       expect(isUuid(jobId)).toBe(true);
 
+      // Wait for mock to process and update totalItems
+      await sleep(200);
+
       // Verify job was created in database
       const dbResult = await TestDB.query(
         'SELECT * FROM export_batch_jobs WHERE id = $1',
@@ -493,6 +568,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       expect(dbResult.rows).toHaveLength(1);
       const job = dbResult.rows[0];
       expect(job.user_id).toBe(testUser1.id);
+      
+      // FIXED: Job should stay in pending state with our improved mock
       expect(job.status).toBe('pending');
       expect(job.progress).toBe(0);
       
@@ -511,6 +588,9 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       });
 
       const jobId = await exportService.exportMLData(testUser1.id, options);
+      
+      // Wait for processing
+      await sleep(100);
 
       const job = await exportService.getBatchJob(jobId);
       validateExportJobStructure(job!, testUser1.id);
@@ -526,6 +606,9 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       for (const format of formats) {
         const options = createTestExportOptions({ format });
         const jobId = await exportService.exportMLData(testUser1.id, options);
+        
+        // Wait for processing
+        await sleep(50);
         
         const job = await exportService.getBatchJob(jobId);
         expect(job).not.toBeNull();
@@ -549,11 +632,13 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       const options = createTestExportOptions();
       
       const jobId = await exportService.exportMLData(testUser1.id, options);
+      await sleep(100); // Wait for processing
+      
       const job = await exportService.getBatchJob(jobId);
 
       expect(job).not.toBeNull();
       
-      // FIXED: Just verify timestamps exist and are valid, don't check timing
+      // Just verify timestamps exist and are valid, don't check timing
       const createdAt = typeof job!.createdAt === 'string' 
         ? new Date(job!.createdAt) 
         : job!.createdAt;
@@ -583,6 +668,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       });
 
       const jobId = await exportService.exportMLData(testUser1.id, complexOptions);
+      await sleep(100);
+      
       const job = await exportService.getBatchJob(jobId);
 
       expect(job!.options).toEqual(complexOptions);
@@ -604,6 +691,9 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       const uniqueIds = new Set(jobIds);
       expect(uniqueIds.size).toBe(5);
 
+      // Wait for all jobs to be processed
+      await sleep(300);
+
       // Verify all jobs were created with correct user
       for (const jobId of jobIds) {
         const job = await exportService.getBatchJob(jobId);
@@ -614,6 +704,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
     test('should create export jobs for different users', async () => {
       const user1JobId = await exportService.exportMLData(testUser1.id, createTestExportOptions());
       const user2JobId = await exportService.exportMLData(testUser2.id, createTestExportOptions());
+
+      await sleep(200);
 
       const user1Job = await exportService.getBatchJob(user1JobId);
       const user2Job = await exportService.getBatchJob(user2JobId);
@@ -637,6 +729,9 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
         }))
       );
       testJobs = await Promise.all(promises);
+      
+      // Wait for all jobs to be processed
+      await sleep(300);
     });
 
     describe('2.1 getBatchJob Operations', () => {
@@ -665,9 +760,6 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       });
 
       test('should handle null and undefined input gracefully', async () => {
-        // FIXED: Since the service doesn't validate inputs before database calls,
-        // null/undefined will be passed to the database query which handles them appropriately
-        
         // Test null input - should return null (not throw)
         // @ts-ignore
         const nullResult = await exportService.getBatchJob(null);
@@ -697,6 +789,7 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
 
       test('should maintain user data isolation', async () => {
         await exportService.exportMLData(testUser2.id, createTestExportOptions());
+        await sleep(200);
 
         const user1Jobs = await exportService.getUserBatchJobs(testUser1.id);
         expect(user1Jobs).toHaveLength(3);
@@ -727,8 +820,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
     test('should cancel pending export job', async () => {
       const jobId = await exportService.exportMLData(testUser1.id, createTestExportOptions());
       
-      // Give time for mock to update totalItems
-      await sleep(100);
+      // Wait for job to be created and processed by mock
+      await sleep(200);
       
       // Verify job is initially pending
       const jobBefore = await exportService.getBatchJob(jobId);
@@ -737,8 +830,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       // Cancel the job
       await exportService.cancelExportJob(jobId);
       
-      // Give time for cancellation to process
-      await sleep(100);
+      // Wait for cancellation to process
+      await sleep(200);
       
       // Verify job status was updated
       const dbResult = await TestDB.query(
@@ -748,17 +841,12 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
 
       expect(dbResult.rows).toHaveLength(1);
       
-      // FIXED: The cancellation should work regardless of initial status
       const finalStatus = dbResult.rows[0].status;
       const finalError = dbResult.rows[0].error;
       
-      // Job should be cancelled (either failed or cancelled status)
-      expect(['failed', 'cancelled'].includes(finalStatus)).toBe(true);
-      
-      // If failed, should have cancellation error message
-      if (finalStatus === 'failed') {
-        expect(finalError).toBe('Job canceled by user');
-      }
+      // Job should be cancelled (failed status with cancellation message)
+      expect(finalStatus).toBe('failed');
+      expect(finalError).toBe('Job canceled by user');
     });
 
     test('should handle cancellation of non-existent job', async () => {
@@ -771,118 +859,40 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
 
     test('should handle concurrent cancellations gracefully', async () => {
       // Create jobs
-      const startTime = Date.now();
-      
       const jobIds = await Promise.all([
         exportService.exportMLData(testUser1.id, createTestExportOptions()),
         exportService.exportMLData(testUser1.id, createTestExportOptions()),
         exportService.exportMLData(testUser1.id, createTestExportOptions())
       ]);
       
-      const jobCreationTime = Date.now() - startTime;
+      // Wait for jobs to be created
+      await sleep(300);
 
-      // Verify initial states
-      for (let i = 0; i < jobIds.length; i++) {
-        const jobId = jobIds[i];
-        const initialJob = await exportService.getBatchJob(jobId);
-        
-        // Ensure job starts in pending state
-        if (initialJob?.status !== 'pending') {
-          // Job may have already started processing
-        }
+      // Verify all jobs start in pending state
+      for (const jobId of jobIds) {
+        const job = await exportService.getBatchJob(jobId);
+        expect(job?.status).toBe('pending');
       }
 
       // Cancel all jobs concurrently
-      const cancelStartTime = Date.now();
-      
-      const cancelPromises = jobIds.map((jobId) => {
-        return exportService.cancelExportJob(jobId);
-      });
-      
-      const cancelResults = await Promise.allSettled(cancelPromises);
-      const cancelTime = Date.now() - cancelStartTime;
+      const cancelPromises = jobIds.map(jobId => exportService.cancelExportJob(jobId));
+      await Promise.all(cancelPromises);
 
-      // Progressive delay to allow database updates
-      for (let delay of [100, 200, 300]) {
-        await sleep(delay);
+      // Wait for cancellations to complete
+      await sleep(300);
+
+      // Verify all jobs are cancelled
+      for (const jobId of jobIds) {
+        const dbResult = await TestDB.query(
+          'SELECT status, error FROM export_batch_jobs WHERE id = $1',
+          [jobId]
+        );
         
-        // Check intermediate states
-        for (let i = 0; i < jobIds.length; i++) {
-          const jobId = jobIds[i];
-          const dbResult = await TestDB.query(
-            'SELECT status, error, updated_at FROM export_batch_jobs WHERE id = $1',
-            [jobId]
-          );
-          
-          if (dbResult.rows.length === 0) {
-            // Job not found in database
-          }
-        }
+        expect(dbResult.rows).toHaveLength(1);
+        const job = dbResult.rows[0];
+        expect(job.status).toBe('failed');
+        expect(job.error).toBe('Job canceled by user');
       }
-
-      // Final verification with retry logic
-      const verificationResults = [];
-      
-      for (let i = 0; i < jobIds.length; i++) {
-        const jobId = jobIds[i];
-        let finalStatus = null;
-        let finalError = null;
-        let attempts = 0;
-        const maxAttempts = 5;
-        
-        // Retry logic for eventual consistency
-        while (attempts < maxAttempts) {
-          const dbResult = await TestDB.query(
-            'SELECT status, error, updated_at, created_at FROM export_batch_jobs WHERE id = $1',
-            [jobId]
-          );
-          
-          if (dbResult.rows.length === 0) {
-            attempts++;
-            await sleep(100);
-            continue;
-          }
-          
-          const job = dbResult.rows[0];
-          finalStatus = job.status;
-          finalError = job.error;
-          
-          // Check if we're in a terminal state
-          if (['failed', 'cancelled', 'completed'].includes(finalStatus)) {
-            break;
-          } else if (finalStatus === 'pending' || finalStatus === 'processing') {
-            attempts++;
-            await sleep(200 * attempts); // Exponential backoff
-          } else {
-            break;
-          }
-        }
-        
-        verificationResults.push({
-          jobId,
-          index: i + 1,
-          finalStatus,
-          finalError,
-          attempts
-        });
-      }
-
-      // Flexible assertions
-      verificationResults.forEach(result => {
-        // The job should not be stuck in an active state
-        if (result.finalStatus === 'pending' || result.finalStatus === 'processing') {
-          expect(result.finalStatus).not.toBe('pending');
-          expect(result.finalStatus).not.toBe('processing');
-        }
-        
-        // If it's failed, verify the error message
-        if (result.finalStatus === 'failed' && result.finalError) {
-          expect(result.finalError).toMatch(/(Job canceled by user|canceled|cancelled)/i);
-        }
-        
-        // Job should be in a recognized state
-        expect(['failed', 'cancelled', 'completed'].includes(result.finalStatus)).toBe(true);
-      });
     });
   });
   // #endregion
@@ -1068,6 +1078,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
 
     test('should maintain timestamp consistency and ordering', async () => {
       const jobId = await exportService.exportMLData(testUser1.id, createTestExportOptions());
+      await sleep(100);
+      
       const job = await exportService.getBatchJob(jobId);
 
       const createdTime = new Date(job!.createdAt).getTime();
@@ -1080,6 +1092,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
 
     test('should validate progress and item count constraints', async () => {
       const jobId = await exportService.exportMLData(testUser1.id, createTestExportOptions());
+      await sleep(100);
+      
       const job = await exportService.getBatchJob(jobId);
 
       expect(job!.progress).toBeGreaterThanOrEqual(0);
@@ -1101,6 +1115,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       });
 
       const jobId = await exportService.exportMLData(testUser1.id, complexOptions);
+      await sleep(100);
+      
       const job = await exportService.getBatchJob(jobId);
 
       expect(job!.options).toEqual(complexOptions);
@@ -1108,6 +1124,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
 
     test('should maintain data type consistency', async () => {
       const jobId = await exportService.exportMLData(testUser1.id, createTestExportOptions());
+      await sleep(100);
+      
       const job = await exportService.getBatchJob(jobId);
 
       expect(typeof job!.id).toBe('string');
@@ -1118,7 +1136,7 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       expect(typeof job!.totalItems).toBe('number');
       expect(typeof job!.processedItems).toBe('number');
       
-      // FIXED: Timestamps can be either strings or Date objects
+      // Timestamps can be either strings or Date objects
       expect(['string', 'object'].includes(typeof job!.createdAt)).toBe(true);
       expect(['string', 'object'].includes(typeof job!.updatedAt)).toBe(true);
     });
@@ -1139,6 +1157,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
 
       for (const options of edgeCases) {
         const jobId = await exportService.exportMLData(testUser1.id, options);
+        await sleep(50);
+        
         const job = await exportService.getBatchJob(jobId);
         
         expect(job).not.toBeNull();
@@ -1166,6 +1186,9 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       expect(jobIds).toHaveLength(50);
       expect(endTime - startTime).toBeLessThan(10000); // Should complete in under 10 seconds
 
+      // Wait for processing
+      await sleep(500);
+
       // Verify we can still query efficiently
       const queryStart = Date.now();
       const userJobs = await exportService.getUserBatchJobs(testUser1.id);
@@ -1186,6 +1209,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       const jobs = await Promise.all(Array.from({ length: 20 }, () =>
         exportService.exportMLData(testUser1.id, createTestExportOptions())
       ));
+      
+      await sleep(500);
       await exportService.getUserBatchJobs(testUser1.id);
 
       const finalMemory = process.memoryUsage().heapUsed;
@@ -1232,6 +1257,7 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       for (let i = 0; i < 10; i++) {
         rapidOperations.push(async () => {
           const jobId = await exportService.exportMLData(testUser1.id, createTestExportOptions());
+          await sleep(50); // Brief wait for job creation
           const job = await exportService.getBatchJob(jobId);
           await exportService.cancelExportJob(jobId);
           return job;
@@ -1245,8 +1271,7 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       expect(results).toHaveLength(10);
       expect(results.every((job: any) => job !== null)).toBe(true);
       
-      // FIXED: More lenient performance expectation
-      expect(endTime - startTime).toBeLessThan(10000); // Increased to 10 seconds for reliability
+      expect(endTime - startTime).toBeLessThan(10000); // 10 seconds for reliability
     });
   });
   // #endregion
@@ -1270,8 +1295,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       
       const jobId = await exportService.exportMLData(testUser1.id, exportOptions);
 
-      // 4. Verify job creation - wait a moment for counting to complete
-      await sleep(200); // Give time for the mock to update totalItems
+      // 4. Wait for job to be processed
+      await sleep(300);
       
       const createdJob = await exportService.getBatchJob(jobId);
       
@@ -1279,42 +1304,31 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
         throw new Error(`Export job ${jobId} not found after creation`);
       }
       
-      // FIXED: Job should be in pending state (not completed immediately)
       expect(createdJob.status).toBe('pending');
-      
-      // FIXED: Should have correct count now
-      expect(createdJob.totalItems).toBe(2);
+      expect(createdJob.totalItems).toBe(2); // 2 garments match the filter
 
       // 5. Verify job appears in user jobs list
       const userJobs = await exportService.getUserBatchJobs(testUser1.id);
       expect(userJobs).toHaveLength(1);
       expect(userJobs[0].id).toBe(jobId);
 
-      // 6. Try to cancel the job
+      // 6. Cancel the job
       await exportService.cancelExportJob(jobId);
       
-      // 7. Get final job state
-      await sleep(100);
+      // 7. Wait and verify cancellation
+      await sleep(200);
       
       const dbResult = await TestDB.query(
-        'SELECT status, error, updated_at FROM export_batch_jobs WHERE id = $1',
+        'SELECT status, error FROM export_batch_jobs WHERE id = $1',
         [jobId]
       );
       
-      if (dbResult.rows.length === 0) {
-        throw new Error(`Job ${jobId} not found in database`);
-      }
-      
+      expect(dbResult.rows).toHaveLength(1);
       const finalJobState = dbResult.rows[0];
       
-      // Job should be cancelled/failed after cancellation
-      expect(['failed', 'cancelled'].includes(finalJobState.status)).toBe(true);
-      
-      if (finalJobState.status === 'failed') {
-        expect(finalJobState.error).toMatch(/Job canceled by user/i);
-      }
+      expect(finalJobState.status).toBe('failed');
+      expect(finalJobState.error).toBe('Job canceled by user');
     });
-
 
     test('should handle multi-user export scenarios with isolation', async () => {
       // Create data for different users
@@ -1329,8 +1343,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
         format: 'yolo'
       }));
 
-      // Wait for item counting to complete
-      await sleep(200);
+      // Wait for processing
+      await sleep(300);
 
       // Verify user isolation
       const user1Stats = await exportService.getDatasetStats(testUser1.id);
@@ -1351,23 +1365,20 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       const user1Job = await exportService.getBatchJob(user1JobId);
       const user2Job = await exportService.getBatchJob(user2JobId);
       
-      expect(user1Job!.totalItems).toBe(3); // All 3 garments for user1
-      expect(user2Job!.totalItems).toBe(2); // All 2 garments for user2
-
-      // FIXED: Both jobs should be in pending state initially
+      expect(user1Job!.totalItems).toBe(3);
+      expect(user2Job!.totalItems).toBe(2);
       expect(user1Job!.status).toBe('pending');
       expect(user2Job!.status).toBe('pending');
 
-      // Cancel user1 jobs - should not affect user2
+      // Cancel user1 job - should not affect user2
       await exportService.cancelExportJob(user1JobId);
+      await sleep(200);
 
       const user2JobsAfterCancel = await exportService.getUserBatchJobs(testUser2.id);
       expect(user2JobsAfterCancel).toHaveLength(1);
-      expect(user2JobsAfterCancel[0].id).toBe(user2JobId);
       
-      // FIXED: user2 job should still be pending (not affected by user1 cancellation)
       const user2JobAfterCancel = await exportService.getBatchJob(user2JobId);
-      expect(user2JobAfterCancel!.status).toBe('pending');
+      expect(user2JobAfterCancel!.status).toBe('pending'); // Not affected
     });
 
     test('should handle export with various filter combinations', async () => {
@@ -1388,6 +1399,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       for (const filters of filterCombinations) {
         const options = createTestExportOptions(filters);
         const jobId = await exportService.exportMLData(testUser1.id, options);
+        
+        await sleep(100);
         
         const job = await exportService.getBatchJob(jobId);
         expect(job).not.toBeNull();
@@ -1420,6 +1433,9 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       const successfulOps = results.filter(r => r.status === 'fulfilled').length;
       expect(successfulOps).toBeGreaterThanOrEqual(6);
 
+      // Wait for processing
+      await sleep(300);
+
       // Verify final state consistency
       const finalJobs = await exportService.getUserBatchJobs(testUser1.id);
       
@@ -1431,7 +1447,7 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
   });
   // #endregion
 
-  // #region Edge Cases and Corner Cases
+  // #region Edge Cases and Corner Cases  
   describe('9. Edge Cases and Corner Cases', () => {
     test('should handle export with no matching garments', async () => {
       // Create garments but filter for non-existent category
@@ -1441,8 +1457,11 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
         categoryFilter: ['non-existent-category']
       }));
 
+      await sleep(100);
+
       const job = await exportService.getBatchJob(jobId);
       expect(job).not.toBeNull();
+      expect(job!.totalItems).toBe(0); // No matching garments
       validateExportJobStructure(job!, testUser1.id);
     });
 
@@ -1458,6 +1477,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       } as any);
 
       const jobId = await exportService.exportMLData(testUser1.id, largeOptions);
+      await sleep(100);
+      
       const job = await exportService.getBatchJob(jobId);
 
       expect(job!.options.categoryFilter).toHaveLength(1000);
@@ -1471,13 +1492,15 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
         metadata: {
           chinese: '你好世界',
           arabic: 'مرحبا بالعالم',
-          russian: 'Привет مир',
+          russian: 'Привет мир',
           emoji: '🚀💻🎉',
           mixed: '🌟 Hello 世界 مرحبا 🎯'
         }
       } as any);
 
       const jobId = await exportService.exportMLData(testUser1.id, internationalOptions);
+      await sleep(100);
+      
       const job = await exportService.getBatchJob(jobId);
 
       expect(job!.options.categoryFilter).toEqual(['👕shirt', '👖pants', '👗dress']);
@@ -1498,6 +1521,8 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       } as any);
 
       const jobId = await exportService.exportMLData(testUser1.id, specialNumberOptions);
+      await sleep(100);
+      
       const job = await exportService.getBatchJob(jobId);
 
       // JSON.stringify converts special numbers appropriately
@@ -1518,10 +1543,15 @@ describe('ExportService - Comprehensive Integration Test Suite', () => {
       } as any);
 
       const jobId = await exportService.exportMLData(testUser1.id, edgeOptions);
+      await sleep(100);
       const job = await exportService.getBatchJob(jobId);
-
-      expect(job).not.toBeNull();
-      validateExportJobStructure(job!, testUser1.id);
+      expect(job!.options.categoryFilter).toBeUndefined();
+      expect(job!.options.garmentIds).toBeNull();
+      expect(job!.options.imageFormat).toBeUndefined();
+      expect(job!.options.metadata.nullValue).toBeNull();
+      expect(job!.options.metadata.undefinedValue).toBeUndefined();
+      expect(job!.options.metadata.emptyString).toBe('');
+      expect(job!.options.metadata.whitespaceOnly).toBe('   \t\n   ');
     });
 
     test('should handle rapid job creation and cancellation', async () => {

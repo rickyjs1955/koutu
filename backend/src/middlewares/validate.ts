@@ -409,23 +409,20 @@ export const validateOAuthProvider = (req: Request, res: Response, next: NextFun
   const provider = req.params.provider;
   const validProviders = ['google', 'microsoft', 'github', 'instagram'];
   
-  if (!provider) {
-    return next(ApiError.badRequest('OAuth provider is required'));
+  // Check for missing or empty provider
+  if (!provider || provider === '') {
+    return next(ApiError.badRequest('Invalid OAuth provider'));
   }
   
-  // Type validation
-  if (Array.isArray(provider) || (typeof provider === 'object' && provider !== null)) {
-    return next(ApiError.badRequest('Invalid provider format'));
+  // Check for non-string types (prevents array pollution, object injection)
+  if (typeof provider !== 'string') {
+    return next(ApiError.badRequest('Invalid OAuth provider'));
   }
   
-  const providerStr = String(provider).toLowerCase().trim();
-  
-  if (!validProviders.includes(providerStr)) {
-    return next(ApiError.badRequest(`Unsupported OAuth provider: ${providerStr}`));
+  // Security: Strict case-sensitive validation (no normalization to prevent case manipulation attacks)
+  if (!validProviders.includes(provider)) {
+    return next(ApiError.badRequest('Invalid OAuth provider'));
   }
-  
-  // Normalize provider in params
-  req.params.provider = providerStr;
   
   next();
 };
@@ -434,30 +431,88 @@ export const validateOAuthProvider = (req: Request, res: Response, next: NextFun
  * Middleware to validate OAuth types in request query
  */
 export const validateOAuthTypes = (req: Request, res: Response, next: NextFunction) => {
-  // For OAuth callback, check query parameters
-  if (req.path.includes('/callback')) {
-    const { code, state, error } = req.query;
-    
-    // Check for type confusion attacks
-    if (code && (Array.isArray(code) || typeof code === 'object' && code !== null)) {
-      return next(ApiError.badRequest('Invalid authorization code format'));
-    }
-    
-    if (state && (Array.isArray(state) || typeof state === 'object' && state !== null)) {
-      return next(ApiError.badRequest('Invalid state parameter format'));
-    }
-    
-    if (error && (Array.isArray(error) || typeof error === 'object' && error !== null)) {
-      return next(ApiError.badRequest('Invalid error parameter format'));
-    }
-  }
+  // Fix: Robust path checking to handle undefined req.path in test environments
+  const requestPath = req.path || req.url || req.originalUrl || '';
   
-  // For OAuth authorize, check redirect parameter
-  if (req.path.includes('/authorize')) {
-    const { redirect } = req.query;
+  // Enhanced security: Check for OAuth-related query parameters and validate them
+  // regardless of path to prevent bypassing validation through path manipulation
+  const { code, state, error, redirect } = req.query;
+  
+  // If any OAuth-related parameters are present, validate them
+  const hasOAuthParams = code !== undefined || state !== undefined || error !== undefined || redirect !== undefined;
+  
+  if (hasOAuthParams || requestPath.includes('/callback') || requestPath.includes('/authorize')) {
     
-    if (redirect && (Array.isArray(redirect) || typeof redirect === 'object' && redirect !== null)) {
-      return next(ApiError.badRequest('Invalid redirect parameter format'));
+    // Check for array parameter pollution on all OAuth parameters
+    if (code !== undefined && Array.isArray(code)) {
+      return next(ApiError.badRequest('Invalid parameter format'));
+    }
+    
+    if (state !== undefined && Array.isArray(state)) {
+      return next(ApiError.badRequest('Invalid parameter format'));
+    }
+    
+    if (error !== undefined && Array.isArray(error)) {
+      return next(ApiError.badRequest('Invalid parameter format'));
+    }
+    
+    if (redirect !== undefined && Array.isArray(redirect)) {
+      return next(ApiError.badRequest('Invalid parameter format'));
+    }
+
+    // Check for object injection attempts on all OAuth parameters
+    if (code !== undefined && typeof code === 'object' && code !== null) {
+      return next(ApiError.badRequest('Invalid parameter format'));
+    }
+    
+    if (state !== undefined && typeof state === 'object' && state !== null) {
+      return next(ApiError.badRequest('Invalid parameter format'));
+    }
+    
+    if (error !== undefined && typeof error === 'object' && error !== null) {
+      return next(ApiError.badRequest('Invalid parameter format'));
+    }
+    
+    if (redirect !== undefined && typeof redirect === 'object' && redirect !== null) {
+      return next(ApiError.badRequest('Invalid parameter format'));
+    }
+    
+    // Additional security checks for OAuth parameters
+    
+    // Check for function injection
+    if (typeof code === 'function' || typeof state === 'function' || 
+        typeof error === 'function' || typeof redirect === 'function') {
+      return next(ApiError.badRequest('Invalid parameter format'));
+    }
+    
+    // Check for NoSQL injection patterns in objects
+    if (code && typeof code === 'object' && code !== null) {
+      const codeObj = code as any;
+      if (codeObj.$ne !== undefined || codeObj.$regex !== undefined || codeObj.$where !== undefined) {
+        return next(ApiError.badRequest('Invalid parameter format'));
+      }
+    }
+    
+    if (state && typeof state === 'object' && state !== null) {
+      const stateObj = state as any;
+      if (stateObj.$ne !== undefined || stateObj.$regex !== undefined || stateObj.$where !== undefined) {
+        return next(ApiError.badRequest('Invalid parameter format'));
+      }
+    }
+    
+    // Check for prototype pollution attempts
+    if (code && typeof code === 'object' && code !== null) {
+      if (Object.prototype.hasOwnProperty.call(code, '__proto__') || 
+          Object.prototype.hasOwnProperty.call(code, 'constructor')) {
+        return next(ApiError.badRequest('Invalid parameter format'));
+      }
+    }
+    
+    if (state && typeof state === 'object' && state !== null) {
+      if (Object.prototype.hasOwnProperty.call(state, '__proto__') || 
+          Object.prototype.hasOwnProperty.call(state, 'constructor')) {
+        return next(ApiError.badRequest('Invalid parameter format'));
+      }
     }
   }
   

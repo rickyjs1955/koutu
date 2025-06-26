@@ -44,22 +44,22 @@ app.use(express.urlencoded({
 
 // ==================== ROUTES WITH SPECIFIC SECURITY ====================
 
-// Authentication routes (enhanced security)
-app.use('/api/v1/auth', authRoutes);
+// Authentication routes (enhanced security) - FIXED PATH
+app.use('/api/auth', authRoutes);
 
-// OAuth routes (already have enhanced security built-in)
-app.use('/api/v1/oauth', oauthRoutes);
+// OAuth routes (already have enhanced security built-in) - FIXED PATH  
+app.use('/api/oauth', oauthRoutes);
 
-// API routes with standard security
-app.use('/api/v1/images', imageRoutes);
-app.use('/api/v1/garments', garmentRoutes);
-app.use('/api/v1/wardrobes', wardrobeRoutes);
-app.use('/api/v1/export', exportRoutes);
-app.use('/api/v1/polygons', polygonRoutes);
+// API routes with standard security - FIXED PATHS
+app.use('/api/images', imageRoutes);
+app.use('/api/garments', garmentRoutes);
+app.use('/api/wardrobes', wardrobeRoutes);
+app.use('/api/export', exportRoutes);
+app.use('/api/polygons', polygonRoutes);
 
-// Apply file-specific security to file routes
+// Apply file-specific security to file routes - FIXED PATH
 // IMPORTANT: Mount fileRoutes with its specific path traversal middleware
-app.use('/api/v1/files', securityMiddleware.pathTraversal, fileRoutes);
+app.use('/api/files', securityMiddleware.pathTraversal, fileRoutes);
 
 // ==================== HEALTH CHECK ====================
 app.get('/health', (req, res) => {

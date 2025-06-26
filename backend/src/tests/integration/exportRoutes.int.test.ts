@@ -9,6 +9,15 @@
  * @since June 15, 2025
  */
 
+jest.doMock('../../models/db', () => {
+  const { getTestDatabaseConnection } = require('../../utils/dockerMigrationHelper');
+  const testDB = getTestDatabaseConnection();
+  return {
+    query: async (text: string, params?: any[]) => testDB.query(text, params),
+    getPool: () => testDB.getPool()
+  };
+});
+
 import request from 'supertest';
 import express from 'express';
 import { jest } from '@jest/globals';

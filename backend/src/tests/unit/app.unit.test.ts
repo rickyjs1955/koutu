@@ -158,7 +158,7 @@ describe('App Configuration', () => {
     it('should apply path traversal middleware to file routes', async () => {
       const { securityMiddleware } = await import('../../middlewares/security');
 
-      await request(app).get('/api/v1/files/test');
+      await request(app).get('/api/files/test');
 
       // Path traversal middleware should be called for file routes
       expect(securityMiddleware.pathTraversal).toHaveBeenCalled();
@@ -167,58 +167,58 @@ describe('App Configuration', () => {
 
   describe('Route Mounting', () => {
     // Tests here will use the 'app' and 'server' from the parent beforeEach/afterEach
-    it('should mount auth routes at /api/v1/auth', async () => {
-      const response = await request(app).get('/api/v1/auth/test');
+    it('should mount auth routes at /api/auth', async () => {
+      const response = await request(app).get('/api/auth/test');
       
       // Should reach the mocked route and return 404 (route exists but endpoint doesn't)
       expect(response.status).toBe(404);
       expect(response.body.message).toBe('Test route');
     });
 
-    it('should mount oauth routes at /api/v1/oauth', async () => {
-      const response = await request(app).get('/api/v1/oauth/test');
+    it('should mount oauth routes at /api/oauth', async () => {
+      const response = await request(app).get('/api/oauth/test');
       
       expect(response.status).toBe(404);
       expect(response.body.message).toBe('Test route');
     });
 
-    it('should mount image routes at /api/v1/images', async () => {
-      const response = await request(app).get('/api/v1/images/test');
+    it('should mount image routes at /api/images', async () => {
+      const response = await request(app).get('/api/images/test');
       
       expect(response.status).toBe(404);
       expect(response.body.message).toBe('Test route');
     });
 
-    it('should mount garment routes at /api/v1/garments', async () => {
-      const response = await request(app).get('/api/v1/garments/test');
+    it('should mount garment routes at /api/garments', async () => {
+      const response = await request(app).get('/api/garments/test');
       
       expect(response.status).toBe(404);
       expect(response.body.message).toBe('Test route');
     });
 
-    it('should mount wardrobe routes at /api/v1/wardrobes', async () => {
-      const response = await request(app).get('/api/v1/wardrobes/test');
+    it('should mount wardrobe routes at /api/wardrobes', async () => {
+      const response = await request(app).get('/api/wardrobes/test');
       
       expect(response.status).toBe(404);
       expect(response.body.message).toBe('Test route');
     });
 
-    it('should mount export routes at /api/v1/export', async () => {
-      const response = await request(app).get('/api/v1/export/test');
+    it('should mount export routes at /api/export', async () => {
+      const response = await request(app).get('/api/export/test');
       
       expect(response.status).toBe(404);
       expect(response.body.message).toBe('Test route');
     });
 
-    it('should mount polygon routes at /api/v1/polygons', async () => {
-      const response = await request(app).get('/api/v1/polygons/test');
+    it('should mount polygon routes at /api/polygons', async () => {
+      const response = await request(app).get('/api/polygons/test');
       
       expect(response.status).toBe(404);
       expect(response.body.message).toBe('Test route');
     });
 
-    it('should mount file routes at /api/v1/files', async () => {
-      const response = await request(app).get('/api/v1/files/test');
+    it('should mount file routes at /api/files', async () => {
+      const response = await request(app).get('/api/files/test');
       
       expect(response.status).toBe(404);
       expect(response.body.message).toBe('Test route');
@@ -304,7 +304,7 @@ describe('App Configuration', () => {
       const largePayload = { data: 'x'.repeat(1024 * 1024 + 1) };
 
       const response = await request(app)
-        .post('/api/v1/auth/test')
+        .post('/api/auth/test')
         .send(largePayload)
         .set('Content-Type', 'application/json');
 
@@ -316,7 +316,7 @@ describe('App Configuration', () => {
       const normalPayload = { data: 'x'.repeat(1000) };
 
       const response = await request(app)
-        .post('/api/v1/auth/test')
+        .post('/api/auth/test')
         .send(normalPayload)
         .set('Content-Type', 'application/json');
 
@@ -328,7 +328,7 @@ describe('App Configuration', () => {
       const largeData = 'data=' + 'x'.repeat(1024 * 1024 + 1);
 
       const response = await request(app)
-        .post('/api/v1/auth/test')
+        .post('/api/auth/test')
         .send(largeData)
         .set('Content-Type', 'application/x-www-form-urlencoded');
 
@@ -351,7 +351,7 @@ describe('App Configuration', () => {
     // Tests here will use the 'app' and 'server' from the parent beforeEach/afterEach
     it('should handle JSON content type', async () => {
       const response = await request(app)
-        .post('/api/v1/auth/test')
+        .post('/api/auth/test')
         .send({ test: 'json' })
         .set('Content-Type', 'application/json');
 
@@ -360,7 +360,7 @@ describe('App Configuration', () => {
 
     it('should handle form-encoded content type', async () => {
       const response = await request(app)
-        .post('/api/v1/auth/test')
+        .post('/api/auth/test')
         .send('test=form')
         .set('Content-Type', 'application/x-www-form-urlencoded');
 
@@ -382,7 +382,7 @@ describe('App Configuration', () => {
       expect(healthResponse.status).toBe(200);
 
       // API routes should be accessible
-      const apiResponse = await request(app).get('/api/v1/auth/test');
+      const apiResponse = await request(app).get('/api/auth/test');
       expect(apiResponse.status).not.toBe(500);
     });
 
@@ -393,11 +393,11 @@ describe('App Configuration', () => {
       jest.clearAllMocks();
       
       // Test non-file route
-      await request(app).get('/api/v1/auth/test');
+      await request(app).get('/api/auth/test');
       expect(securityMiddleware.pathTraversal).not.toHaveBeenCalled();
       
       // Test file route
-      await request(app).get('/api/v1/files/test');
+      await request(app).get('/api/files/test');
       expect(securityMiddleware.pathTraversal).toHaveBeenCalled();
     });
   });
@@ -456,7 +456,7 @@ describe('Middleware Order and Integration', () => {
     const { securityMiddleware } = await import('../../middlewares/security');
     
     // Make a request to trigger middleware
-    await request(app).post('/api/v1/auth/test').send({ test: 'data' });
+    await request(app).post('/api/auth/test').send({ test: 'data' });
 
     // Security middleware should be called first
     expect(securityMiddleware.general[0]).toHaveBeenCalled();
@@ -465,7 +465,7 @@ describe('Middleware Order and Integration', () => {
 
   it('should handle requests that pass through all middleware layers', async () => {
     const response = await request(app)
-      .post('/api/v1/images/test')
+      .post('/api/images/test')
       .send({ image: 'data' })
       .set('Content-Type', 'application/json');
 

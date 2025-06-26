@@ -1,11 +1,19 @@
 // backend/src/__tests__/routes/authRoutes.int.test.ts
 
+jest.doMock('../../models/db', () => {
+  const { getTestDatabaseConnection } = require('../../utils/dockerMigrationHelper');
+  const testDB = getTestDatabaseConnection();
+  return {
+    query: async (text: string, params?: any[]) => testDB.query(text, params),
+    getPool: () => testDB.getPool()
+  };
+});
+
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config';
 import { setupTestDatabase, cleanupTestData, teardownTestDatabase } from '../../utils/testSetup';
 import { getTestDatabaseConnection } from '../../utils/dockerMigrationHelper';
-import { ApiError } from '../../utils/ApiError';
 
 /**
  * 🚀 AUTH ROUTES INTEGRATION TEST SUITE
@@ -1169,10 +1177,10 @@ describe('AuthRoutes Integration Tests', () => {
   describe('Edge Cases and Boundary Testing', () => {
     it('should handle extremely long email addresses', async () => {
       // Create an email that's exactly at the 254 character limit
-      const longEmail = 'a'.repeat(244) + '@test.com'; // 244 + 9 = 253 characters
-      const tooLongEmail = 'a'.repeat(245) + '@test.com'; // 245 + 9 = 254 characters
+      const longEmail = 'a'.repeat(244) + '@test.com'; // 244 + 9 = 253 characters (VALID)
+      const tooLongEmail = 'a'.repeat(246) + '@test.com'; // 246 + 9 = 255 characters (INVALID)
 
-      // Should accept email at limit or reject based on validation
+      // Should accept email at limit
       const validResponse = await request(app)
         .post('/api/auth/register')
         .send({
@@ -1180,23 +1188,20 @@ describe('AuthRoutes Integration Tests', () => {
           password: 'ValidPass123!'
         });
 
-      expect([201, 400, 409]).toContain(validResponse.status); // 409 if duplicate, 400 if validation fails
+      expect([201, 409]).toContain(validResponse.status); // 201 = success, 409 = duplicate
 
       // Should reject email over limit
       const invalidResponse = await request(app)
-        .post('/api/auth/register')
+        .post('/api/register')
         .send({
           email: tooLongEmail,
           password: 'ValidPass123!'
         });
 
-      // Should reject with 400 (validation) or 409 (if somehow treated as duplicate)
-      expect([400, 409]).toContain(invalidResponse.status);
+      // FIXED: Should reject with 400 (validation error)
+      expect(invalidResponse.status).toBe(400);
       expect(invalidResponse.body.status).toBe('error');
-      
-      if (invalidResponse.status === 400) {
-        expect(invalidResponse.body.message).toMatch(/email|too long|length/i);
-      }
+      expect(invalidResponse.body.message).toMatch(/email|too long|length/i);
     });
 
     it('should handle special characters in email addresses', async () => {

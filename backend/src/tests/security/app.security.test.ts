@@ -146,10 +146,10 @@ describe('App Security Tests', () => {
 
         it('should apply security headers to all routes', async () => {
             const routes = [
-                '/api/v1/auth/test',
-                '/api/v1/images/test',
-                '/api/v1/garments/test',
-                '/api/v1/wardrobes/test'
+                '/api/auth/test',
+                '/api/images/test',
+                '/api/garments/test',
+                '/api/wardrobes/test'
             ];
 
             for (const route of routes) {
@@ -181,7 +181,7 @@ describe('App Security Tests', () => {
 
         it('should apply rate limiting to API routes', async () => {
             const response = await request(app)
-                .get('/api/v1/auth/test')
+                .get('/api/auth/test')
                 .set('X-Test-Rate-Limit', 'exceeded');
 
             expect(response.status).toBe(429);
@@ -190,7 +190,7 @@ describe('App Security Tests', () => {
 
         it('should apply rate limiting to POST requests', async () => {
             const response = await request(app)
-                .post('/api/v1/images/test')
+                .post('/api/images/test')
                 .set('X-Test-Rate-Limit', 'exceeded')
                 .send({ test: 'data' });
 
@@ -200,21 +200,21 @@ describe('App Security Tests', () => {
 
     describe('Path Traversal Protection', () => {
         it('should allow normal file requests', async () => {
-            const response = await request(app).get('/api/v1/files/test');
+            const response = await request(app).get('/api/files/test');
 
             expect(response.status).toBe(200);
             expect(response.body.message).toBe('Test route success');
         });
 
         it('should block path traversal attempts with ".."', async () => {
-            const response = await request(app).get('/api/v1/files/../../../etc/passwd');
+            const response = await request(app).get('/api/files/../../../etc/passwd');
 
             expect(response.status).toBe(400);
             expect(response.body.error).toBe('Path traversal attempt detected');
         });
 
         it('should block URL-encoded path traversal attempts', async () => {
-            const response = await request(app).get('/api/v1/files/%2e%2e/sensitive-file');
+            const response = await request(app).get('/api/files/%2e%2e/sensitive-file');
 
             expect(response.status).toBe(400);
             expect(response.body.error).toBe('Path traversal attempt detected');
@@ -222,16 +222,16 @@ describe('App Security Tests', () => {
 
         it('should only apply path traversal protection to file routes', async () => {
             // Other routes should not be affected by path traversal in URL
-            const response = await request(app).get('/api/v1/auth/../test');
+            const response = await request(app).get('/api/auth/../test');
 
             expect(response.status).not.toBe(400);
         });
 
         it('should protect against nested path traversal attempts', async () => {
             const maliciousPaths = [
-                '/api/v1/files/../../config.json',
-                '/api/v1/files/../../../.env',
-                '/api/v1/files/subdir/../../../secret.txt'
+                '/api/files/../../config.json',
+                '/api/files/../../../.env',
+                '/api/files/subdir/../../../secret.txt'
             ];
 
             for (const path of maliciousPaths) {
@@ -247,7 +247,7 @@ describe('App Security Tests', () => {
             const largePayload = { data: 'x'.repeat(1024 * 1024 + 1) };
 
             const response = await request(app)
-                .post('/api/v1/auth/test')
+                .post('/api/auth/test')
                 .send(largePayload)
                 .set('Content-Type', 'application/json');
 
@@ -259,7 +259,7 @@ describe('App Security Tests', () => {
             const normalPayload = { data: 'x'.repeat(1000) };
 
             const response = await request(app)
-                .post('/api/v1/auth/test')
+                .post('/api/auth/test')
                 .send(normalPayload)
                 .set('Content-Type', 'application/json');
 
@@ -271,7 +271,7 @@ describe('App Security Tests', () => {
             const largeData = 'data=' + 'x'.repeat(1024 * 1024 + 1);
 
             const response = await request(app)
-                .post('/api/v1/images/test')
+                .post('/api/images/test')
                 .send(largeData)
                 .set('Content-Type', 'application/x-www-form-urlencoded');
 
@@ -284,7 +284,7 @@ describe('App Security Tests', () => {
             const normalParams = { param1: 'value1', param2: 'value2' };
 
             const response = await request(app)
-                .post('/api/v1/garments/test')
+                .post('/api/garments/test')
                 .send(normalParams)
                 .set('Content-Type', 'application/x-www-form-urlencoded');
 
@@ -295,7 +295,7 @@ describe('App Security Tests', () => {
     describe('JSON Parsing Security', () => {
         it('should reject malformed JSON', async () => {
             const response = await request(app)
-                .post('/api/v1/auth/test')
+                .post('/api/auth/test')
                 .send('{"malformed": json}')
                 .set('Content-Type', 'application/json');
 
@@ -305,7 +305,7 @@ describe('App Security Tests', () => {
 
         it('should reject empty request bodies when expected', async () => {
             const response = await request(app)
-                .post('/api/v1/auth/test')
+                .post('/api/auth/test')
                 .send('')
                 .set('Content-Type', 'application/json')
                 .set('Content-Length', '0');
@@ -318,7 +318,7 @@ describe('App Security Tests', () => {
             const validPayload = { username: 'test', password: 'secure123' };
 
             const response = await request(app)
-                .post('/api/v1/auth/test')
+                .post('/api/auth/test')
                 .send(validPayload)
                 .set('Content-Type', 'application/json');
 
@@ -341,7 +341,7 @@ describe('App Security Tests', () => {
             };
 
             const response = await request(app)
-                .post('/api/v1/wardrobes/test')
+                .post('/api/wardrobes/test')
                 .send(nestedPayload)
                 .set('Content-Type', 'application/json');
 
@@ -353,7 +353,7 @@ describe('App Security Tests', () => {
     describe('CORS Security', () => {
         it('should handle OPTIONS preflight requests', async () => {
             const response = await request(app)
-                .options('/api/v1/auth/test')
+                .options('/api/auth/test')
                 .set('Origin', 'http://localhost:3000')
                 .set('Access-Control-Request-Method', 'POST')
                 .set('Access-Control-Request-Headers', 'Content-Type');
@@ -368,13 +368,13 @@ describe('App Security Tests', () => {
             for (const method of methods) {
                 let response;
                 if (method === 'GET') {
-                    response = await request(app).get('/api/v1/images/test');
+                    response = await request(app).get('/api/images/test');
                 } else if (method === 'POST') {
-                    response = await request(app).post('/api/v1/images/test').send({ test: 'data' });
+                    response = await request(app).post('/api/images/test').send({ test: 'data' });
                 } else if (method === 'PUT') {
-                    response = await request(app).put('/api/v1/images/test').send({ test: 'data' });
+                    response = await request(app).put('/api/images/test').send({ test: 'data' });
                 } else if (method === 'DELETE') {
-                    response = await request(app).delete('/api/v1/images/test');
+                    response = await request(app).delete('/api/images/test');
                 } else {
                     continue; // Skip unknown methods
                 }
@@ -388,7 +388,7 @@ describe('App Security Tests', () => {
         it('should apply security middleware before route handlers', async () => {
             const { securityMiddleware } = await import('../../middlewares/security');
 
-            await request(app).get('/api/v1/auth/test');
+            await request(app).get('/api/auth/test');
 
             // All general security middleware should be called
             expect(securityMiddleware.general[0]).toHaveBeenCalled(); // CORS
@@ -402,18 +402,18 @@ describe('App Security Tests', () => {
             jest.clearAllMocks();
 
             // Non-file route
-            await request(app).get('/api/v1/auth/test');
+            await request(app).get('/api/auth/test');
             expect(securityMiddleware.pathTraversal).not.toHaveBeenCalled();
 
             // File route
-            await request(app).get('/api/v1/files/test');
+            await request(app).get('/api/files/test');
             expect(securityMiddleware.pathTraversal).toHaveBeenCalled();
         });
 
         it('should handle security middleware errors gracefully', async () => {
             // Test rate limiting rejection
             const response = await request(app)
-                .get('/api/v1/auth/test')
+                .get('/api/auth/test')
                 .set('X-Test-Rate-Limit', 'exceeded');
 
             expect(response.status).toBe(429);
@@ -432,7 +432,7 @@ describe('App Security Tests', () => {
 
             for (const contentType of contentTypes.slice(0, 2)) { // Test first two
                 const response = await request(app)
-                .post('/api/v1/auth/test')
+                .post('/api/auth/test')
                 .send(contentType === 'application/json' ? { test: 'data' } : 'test=data')
                 .set('Content-Type', contentType);
 
@@ -443,7 +443,7 @@ describe('App Security Tests', () => {
         it('should reject suspicious content types', async () => {
             // This would typically be handled by additional middleware
             const response = await request(app)
-                .post('/api/v1/auth/test')
+                .post('/api/auth/test')
                 .send('test data')
                 .set('Content-Type', 'application/x-executable');
 
@@ -456,9 +456,9 @@ describe('App Security Tests', () => {
         it('should apply consistent security headers across all endpoints', async () => {
             const endpoints = [
                 '/health',
-                '/api/v1/auth/test',
-                '/api/v1/images/test',
-                '/api/v1/files/test'
+                '/api/auth/test',
+                '/api/images/test',
+                '/api/files/test'
             ];
 
             for (const endpoint of endpoints) {
@@ -472,7 +472,7 @@ describe('App Security Tests', () => {
 
         it('should maintain security headers in error responses', async () => {
             const response = await request(app)
-                .get('/api/v1/files/../../../etc/passwd');
+                .get('/api/files/../../../etc/passwd');
 
             expect(response.status).toBe(400);
             expect(response.headers['x-content-type-options']).toBe('nosniff');
@@ -512,7 +512,7 @@ describe('App Security Tests', () => {
     describe('Error Handling Security', () => {
         it('should not expose sensitive information in error messages', async () => {
             const response = await request(app)
-                .post('/api/v1/auth/test')
+                .post('/api/auth/test')
                 .send('{"malformed": json}')
                 .set('Content-Type', 'application/json');
 
@@ -524,7 +524,7 @@ describe('App Security Tests', () => {
 
         it('should maintain security headers in error responses', async () => {
             const response = await request(app)
-                .post('/api/v1/auth/test')
+                .post('/api/auth/test')
                 .send('invalid')
                 .set('Content-Type', 'application/json');
 

@@ -1677,7 +1677,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         
         const createWardrobeResponse = await RequestHelper.makeRequest(() =>
             request(app)
-            .post('/api/v1/wardrobes')
+            .post('/api/wardrobes')
             .set('Authorization', `Bearer ${authToken}`)
             .send(wardrobeData)
         );
@@ -1695,7 +1695,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         // Step 2: List wardrobes
         const listWardrobesResponse = await RequestHelper.makeRequest(() =>
             request(app)
-            .get('/api/v1/wardrobes')
+            .get('/api/wardrobes')
             .set('Authorization', `Bearer ${authToken}`)
         );
 
@@ -1720,7 +1720,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         const updateData = { name: 'Updated Test Wardrobe', description: 'Updated description' };
         const updateWardrobeResponse = await RequestHelper.makeRequest(() =>
             request(app)
-            .put(`/api/v1/wardrobes/${wardrobeId}`)
+            .put(`/api/wardrobes/${wardrobeId}`)
             .set('Authorization', `Bearer ${authToken}`)
             .send(updateData)
         );
@@ -1742,7 +1742,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         
         const uploadResponse = await RequestHelper.makeRequest(() =>
             request(app)
-            .post('/api/v1/images')
+            .post('/api/images')
             .set('Authorization', `Bearer ${authToken}`)
             .field('category', 'garment')
             .attach('file', imageBuffer, 'test-image.jpg')
@@ -1761,7 +1761,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             // Step 2: Get image metadata
             const getImageResponse = await RequestHelper.makeRequest(() =>
             request(app)
-                .get(`/api/v1/images/${imageId}`)
+                .get(`/api/images/${imageId}`)
                 .set('Authorization', `Bearer ${authToken}`)
             );
             
@@ -1771,7 +1771,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             // Step 3: List user images
             const listImagesResponse = await RequestHelper.makeRequest(() =>
             request(app)
-                .get('/api/v1/images')
+                .get('/api/images')
                 .set('Authorization', `Bearer ${authToken}`)
             );
             
@@ -1809,7 +1809,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         
         const createGarmentResponse = await RequestHelper.makeRequest(() =>
             request(app)
-            .post('/api/v1/garments')
+            .post('/api/garments')
             .set('Authorization', `Bearer ${authToken}`)
             .send(garmentData)
         );
@@ -1832,7 +1832,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             
             const createPolygonResponse = await RequestHelper.makeRequest(() =>
             request(app)
-                .post('/api/v1/polygons')
+                .post('/api/polygons')
                 .set('Authorization', `Bearer ${authToken}`)
                 .send(polygonData)
             );
@@ -1873,7 +1873,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         
         const createExportResponse = await RequestHelper.makeRequest(() =>
             request(app)
-            .post('/api/v1/export')
+            .post('/api/export')
             .set('Authorization', `Bearer ${authToken}`)
             .send(exportData)
         );
@@ -1889,7 +1889,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             // Step 2: Check export status
             const statusResponse = await RequestHelper.makeRequest(() =>
             request(app)
-                .get(`/api/v1/export/${jobId}`)
+                .get(`/api/export/${jobId}`)
                 .set('Authorization', `Bearer ${authToken}`)
             );
             
@@ -1899,7 +1899,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             // Step 3: List user exports
             const listExportsResponse = await RequestHelper.makeRequest(() =>
             request(app)
-                .get('/api/v1/export')
+                .get('/api/export')
                 .set('Authorization', `Bearer ${authToken}`)
             );
             
@@ -1919,14 +1919,14 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
     describe('🛡️ Security Middleware Integration', () => {
         it('should enforce authentication across all protected routes', async () => {
         const protectedRoutes = [
-            { method: 'GET', path: '/api/v1/wardrobes' },
-            { method: 'POST', path: '/api/v1/wardrobes' },
-            { method: 'GET', path: '/api/v1/images' },
-            { method: 'POST', path: '/api/v1/images' },
-            { method: 'GET', path: '/api/v1/garments' },
-            { method: 'POST', path: '/api/v1/garments' },
-            { method: 'GET', path: '/api/v1/export' },
-            { method: 'POST', path: '/api/v1/export' }
+            { method: 'GET', path: '/api/wardrobes' },
+            { method: 'POST', path: '/api/wardrobes' },
+            { method: 'GET', path: '/api/images' },
+            { method: 'POST', path: '/api/images' },
+            { method: 'GET', path: '/api/garments' },
+            { method: 'POST', path: '/api/garments' },
+            { method: 'GET', path: '/api/export' },
+            { method: 'POST', path: '/api/export' }
         ];
         
         for (const route of protectedRoutes) {
@@ -2038,7 +2038,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             
             const response = await RequestHelper.makeRequest(() =>
             request(app)
-                .get('/api/v1/wardrobes')
+                .get('/api/wardrobes')
                 .set('Authorization', `Bearer ${test.token}`)
             );
             
@@ -2068,7 +2068,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
                 concurrentOperations.push(
                 RequestHelper.makeRequest(() =>
                     request(app)
-                    .post('/api/v1/wardrobes')
+                    .post('/api/wardrobes')
                     .set('Authorization', `Bearer ${authToken}`)
                     .send(wardrobeData)
                 )
@@ -2115,7 +2115,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         const wardrobeData = TestDataFactory.generateTestWardrobe(testUser.id);
         const createResponse = await RequestHelper.makeRequest(() =>
             request(app)
-            .post('/api/v1/wardrobes')
+            .post('/api/wardrobes')
             .set('Authorization', `Bearer ${authToken}`)
             .send(wardrobeData)
         );
@@ -2126,7 +2126,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             // Attempt operation that should fail (e.g., update with invalid data)
             const invalidUpdateResponse = await RequestHelper.makeRequest(() =>
             request(app)
-                .put(`/api/v1/wardrobes/${wardrobeId}`)
+                .put(`/api/wardrobes/${wardrobeId}`)
                 .set('Authorization', `Bearer ${authToken}`)
                 .send({ name: null }) // Invalid data
             );
@@ -2137,7 +2137,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             // Verify original data is intact
             const verifyResponse = await RequestHelper.makeRequest(() =>
             request(app)
-                .get(`/api/v1/wardrobes/${wardrobeId}`)
+                .get(`/api/wardrobes/${wardrobeId}`)
                 .set('Authorization', `Bearer ${authToken}`)
             );
             
@@ -2209,7 +2209,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             connectionTests.push(
             RequestHelper.makeRequest(() =>
                 request(app)
-                .get('/api/v1/wardrobes')
+                .get('/api/wardrobes')
                 .set('Authorization', `Bearer ${authToken}`)
             )
             );
@@ -2242,7 +2242,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             
             const response = await RequestHelper.makeRequest(() =>
             request(app)
-                .post('/api/v1/files/upload')
+                .post('/api/files/upload')
                 .set('Authorization', `Bearer ${authToken}`)
                 .attach('file', imageBuffer, maliciousPath)
             );
@@ -2261,7 +2261,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         
         const response = await RequestHelper.makeRequest(() =>
             request(app)
-            .post('/api/v1/images')
+            .post('/api/images')
             .set('Authorization', `Bearer ${authToken}`)
             .attach('file', oversizedContent, 'oversized.jpg')
         );
@@ -2287,7 +2287,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         for (const file of invalidFileTypes) {
             const response = await RequestHelper.makeRequest(() =>
             request(app)
-                .post('/api/v1/images')
+                .post('/api/images')
                 .set('Authorization', `Bearer ${authToken}`)
                 .attach('file', file.content, file.filename)
             );
@@ -2315,7 +2315,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             fileOperations.push(
             RequestHelper.makeRequest(() =>
                 request(app)
-                .post('/api/v1/images')
+                .post('/api/images')
                 .set('Authorization', `Bearer ${authToken}`)
                 .attach('file', imageBuffer, `concurrent-${i}.jpg`)
             )
@@ -2342,8 +2342,8 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         it('should maintain response times under normal load', async () => {
         const performanceTests = [
             { endpoint: '/health', method: 'GET', expectedMaxTime: 1000 },
-            { endpoint: '/api/v1/wardrobes', method: 'GET', auth: true, expectedMaxTime: 2000 },
-            { endpoint: '/api/v1/images', method: 'GET', auth: true, expectedMaxTime: 3000 }
+            { endpoint: '/api/wardrobes', method: 'GET', auth: true, expectedMaxTime: 2000 },
+            { endpoint: '/api/images', method: 'GET', auth: true, expectedMaxTime: 3000 }
         ];
         
         for (const test of performanceTests) {
@@ -2408,7 +2408,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             
             const response = await RequestHelper.makeRequest(() =>
             request(app)
-                .post('/api/v1/wardrobes')
+                .post('/api/wardrobes')
                 .set('Authorization', `Bearer ${authToken}`)
                 .send(wardrobeData)
             );
@@ -2442,7 +2442,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         // Test behavior when optional services might be down
         const response = await RequestHelper.makeRequest(() =>
             request(app)
-            .get('/api/v1/wardrobes')
+            .get('/api/wardrobes')
             .set('Authorization', `Bearer ${authToken}`)
             .set('X-Simulate-Service-Down', 'true')
         );
@@ -2483,7 +2483,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             
             try {
             const requestBuilder = request(app)
-                .post('/api/v1/wardrobes')
+                .post('/api/wardrobes')
                 .set('Authorization', `Bearer ${authToken}`)
                 .set('Content-Type', test.contentType);
             
@@ -2519,20 +2519,20 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         const errorScenarios = [
             {
             description: 'unauthorized access',
-            request: () => request(app).get('/api/v1/wardrobes'),
+            request: () => request(app).get('/api/wardrobes'),
             expectedStatus: 401
             },
             {
             description: 'non-existent resource',
             request: () => request(app)
-                .get('/api/v1/wardrobes/00000000-0000-0000-0000-000000000000')
+                .get('/api/wardrobes/00000000-0000-0000-0000-000000000000')
                 .set('Authorization', `Bearer ${authToken}`),
             expectedStatus: 404
             },
             {
             description: 'invalid data',
             request: () => request(app)
-                .post('/api/v1/wardrobes')
+                .post('/api/wardrobes')
                 .set('Authorization', `Bearer ${authToken}`)
                 .send({ name: '' }), // Empty name should be invalid
             expectedStatus: [400, 422]
@@ -2594,7 +2594,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         const wardrobe1Data = TestDataFactory.generateTestWardrobe(testUser.id);
         const createWardrobe1Response = await RequestHelper.makeRequest(() =>
             request(app)
-            .post('/api/v1/wardrobes')
+            .post('/api/wardrobes')
             .set('Authorization', `Bearer ${authToken}`)
             .send(wardrobe1Data)
         );
@@ -2603,7 +2603,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         const wardrobe2Data = TestDataFactory.generateTestWardrobe(testUser2.id);
         const createWardrobe2Response = await RequestHelper.makeRequest(() =>
             request(app)
-            .post('/api/v1/wardrobes')
+            .post('/api/wardrobes')
             .set('Authorization', `Bearer ${authToken2}`)
             .send(wardrobe2Data)
         );
@@ -2612,13 +2612,13 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             // User 1 should not see User 2's wardrobes
             const user1WardrobesResponse = await RequestHelper.makeRequest(() =>
             request(app)
-                .get('/api/v1/wardrobes')
+                .get('/api/wardrobes')
                 .set('Authorization', `Bearer ${authToken}`)
             );
             
             const user2WardrobesResponse = await RequestHelper.makeRequest(() =>
             request(app)
-                .get('/api/v1/wardrobes')
+                .get('/api/wardrobes')
                 .set('Authorization', `Bearer ${authToken2}`)
             );
             
@@ -2654,7 +2654,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             
             const wardrobeResponse = await RequestHelper.makeRequest(() =>
                 request(app)
-                .post('/api/v1/wardrobes')
+                .post('/api/wardrobes')
                 .set('Authorization', `Bearer ${authToken}`)
                 .send(wardrobeData)
             );
@@ -2682,7 +2682,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             
             const imageUploadResponse = await RequestHelper.makeRequest(() =>
                 request(app)
-                .post('/api/v1/images')
+                .post('/api/images')
                 .set('Authorization', `Bearer ${authToken}`)
                 .attach('file', imageBuffer, 'summer-shirt.jpg')
             );
@@ -2730,7 +2730,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             let garmentId: string;
             const garmentResponse = await RequestHelper.makeRequest(() =>
                 request(app)
-                .post('/api/v1/garments')
+                .post('/api/garments')
                 .set('Authorization', `Bearer ${authToken}`)
                 .send(garmentData)
             );
@@ -2760,7 +2760,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             
             const polygonResponse = await RequestHelper.makeRequest(() =>
                 request(app)
-                .post('/api/v1/polygons')
+                .post('/api/polygons')
                 .set('Authorization', `Bearer ${authToken}`)
                 .send(polygonData)
             );
@@ -2782,7 +2782,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             
             const exportResponse = await RequestHelper.makeRequest(() =>
                 request(app)
-                .post('/api/v1/export')
+                .post('/api/export')
                 .set('Authorization', `Bearer ${authToken}`)
                 .send(exportData)
             );
@@ -2861,7 +2861,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             {
             name: 'Authentication Check',
             operation: () => request(app)
-                .get('/api/v1/wardrobes')
+                .get('/api/wardrobes')
                 .set('Authorization', `Bearer ${authToken}`)
             },
             {
@@ -2928,7 +2928,7 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         // Generate some test metrics
         const testRequests = [
             () => request(app).get('/health'),
-            () => request(app).get('/api/v1/wardrobes').set('Authorization', `Bearer ${authToken}`),
+            () => request(app).get('/api/wardrobes').set('Authorization', `Bearer ${authToken}`),
             () => request(app).get('/health')
         ];
         
