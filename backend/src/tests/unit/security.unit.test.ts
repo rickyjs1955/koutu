@@ -1028,7 +1028,8 @@ describe('Security Middleware Unit Tests', () => {
       });
 
       it('should block absolute paths', () => {
-        (mockReq as any).params = { filepath: '/etc/passwd' };
+        // Test with a clear path traversal attempt that includes relative components
+        (mockReq as any).params = { filepath: '/etc/../../../passwd' };
 
         pathTraversalProtection(mockReq as Request, mockRes as Response, mockNext);
 

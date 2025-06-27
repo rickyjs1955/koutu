@@ -2149,56 +2149,76 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         });
 
         it('should maintain referential integrity across related tables', async () => {
-            // Create wardrobe
-            const wardrobeData = TestDataFactory.generateTestWardrobe(testUser.id);
-            const wardrobe = await testDB.query(
-                `INSERT INTO wardrobes (id, user_id, name, description, created_at, updated_at) 
-                VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING *`,
-                [uuidv4(), testUser.id, wardrobeData.name, wardrobeData.description]
-            );
-            const wardrobeId = wardrobe.rows[0].id;
-            
-            // Create image with proper user_id
-            const imageId = uuidv4();
-            const testImage = await testDB.query(
-                `INSERT INTO original_images (id, user_id, file_path, original_filename, file_size, mime_type, status, created_at, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) RETURNING *`,
-                [
-                imageId,
-                testUser.id,
-                `/test/images/integrity_test_${Date.now()}.jpg`,
-                'integrity_test_image.jpg',
-                1024,
-                'image/jpeg',
-                'processed'
-                ]
-            );
-            
-            // Create garment with all required fields including user_id
-            const garment = await testDB.query(
-                `INSERT INTO garment_items (id, wardrobe_id, original_image_id, user_id, name, category, created_at, updated_at) 
-                VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING *`,
-                [uuidv4(), wardrobeId, imageId, testUser.id, 'Test Garment', 'shirt']
-            );
-            const garmentId = garment.rows[0].id;
-            
-            console.log('ℹ️ Testing referential integrity with manual cleanup order');
-            
-            // Delete in correct order to respect foreign key constraints
-            // First delete garments (children)
-            await testDB.query('DELETE FROM garment_items WHERE wardrobe_id = $1', [wardrobeId]);
-            
-            // Then delete wardrobe (parent)
-            await testDB.query('DELETE FROM wardrobes WHERE id = $1', [wardrobeId]);
-            
-            // Verify that related records were properly deleted
-            const remainingGarments = await testDB.query('SELECT id FROM garment_items WHERE wardrobe_id = $1', [wardrobeId]);
-            const remainingWardrobes = await testDB.query('SELECT id FROM wardrobes WHERE id = $1', [wardrobeId]);
-            
-            expect(remainingGarments.rows.length).toBe(0);
-            expect(remainingWardrobes.rows.length).toBe(0);
-            
-            console.log('✅ Referential integrity validated - manual deletion order works properly');
+          // Create wardrobe
+          const wardrobeData = TestDataFactory.generateTestWardrobe(testUser.id);
+          const wardrobe = await testDB.query(
+            `INSERT INTO wardrobes (id, user_id, name, description, created_at, updated_at) 
+            VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING *`,
+            [uuidv4(), testUser.id, wardrobeData.name, wardrobeData.description]
+          );
+          const wardrobeId = wardrobe.rows[0].id;
+          
+          // Create image with proper user_id
+          const imageId = uuidv4();
+          const testImage = await testDB.query(
+            `INSERT INTO original_images (id, user_id, file_path, original_filename, file_size, mime_type, status, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) RETURNING *`,
+            [
+              imageId,
+              testUser.id,
+              `/test/images/integrity_test_${Date.now()}.jpg`,
+              'integrity_test_image.jpg',
+              1024,
+              'image/jpeg',
+              'processed'
+            ]
+          );
+          
+          // Create garment with schema-compatible fields (no wardrobe_id column)
+          const garment = await testDB.query(
+            `INSERT INTO garment_items (id, original_image_id, user_id, file_path, mask_path, name, category, created_at, updated_at) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) RETURNING *`,
+            [
+              uuidv4(), 
+              imageId, 
+              testUser.id, 
+              `/test/garments/integrity_test_${Date.now()}.jpg`,
+              `/test/masks/integrity_test_${Date.now()}.jpg`,
+              'Test Garment', 
+              'shirt'
+            ]
+          );
+          const garmentId = garment.rows[0].id;
+          
+          // Create the wardrobe-garment relationship via junction table
+          await testDB.query(
+            `INSERT INTO wardrobe_items (wardrobe_id, garment_item_id, position, created_at, updated_at) 
+            VALUES ($1, $2, $3, NOW(), NOW())`,
+            [wardrobeId, garmentId, 0]
+          );
+          
+          console.log('ℹ️ Testing referential integrity with manual cleanup order');
+          
+          // Delete in correct order to respect foreign key constraints
+          // First delete wardrobe_items relationships (junction table)
+          await testDB.query('DELETE FROM wardrobe_items WHERE wardrobe_id = $1', [wardrobeId]);
+          
+          // Then delete garments
+          await testDB.query('DELETE FROM garment_items WHERE id = $1', [garmentId]);
+          
+          // Finally delete wardrobe
+          await testDB.query('DELETE FROM wardrobes WHERE id = $1', [wardrobeId]);
+          
+          // Verify that related records were properly deleted
+          const remainingWardrobeItems = await testDB.query('SELECT id FROM wardrobe_items WHERE wardrobe_id = $1', [wardrobeId]);
+          const remainingGarments = await testDB.query('SELECT id FROM garment_items WHERE id = $1', [garmentId]);
+          const remainingWardrobes = await testDB.query('SELECT id FROM wardrobes WHERE id = $1', [wardrobeId]);
+          
+          expect(remainingWardrobeItems.rows.length).toBe(0);
+          expect(remainingGarments.rows.length).toBe(0);
+          expect(remainingWardrobes.rows.length).toBe(0);
+          
+          console.log('✅ Referential integrity validated - manual deletion order works properly');
         });
 
         it('should handle database connection pool under load', async () => {
@@ -2741,9 +2761,17 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             } else {
                 // Create garment directly in database as fallback
                 const garmentResult = await testDB.query(
-                `INSERT INTO garment_items (id, wardrobe_id, original_image_id, user_id, name, category, created_at, updated_at) 
-                VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING *`,
-                [uuidv4(), wardrobeId, imageId, testUser.id, garmentData.name, garmentData.category]
+                  `INSERT INTO garment_items (id, original_image_id, user_id, file_path, mask_path, name, category, created_at, updated_at) 
+                  VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) RETURNING *`,
+                  [
+                    uuidv4(), 
+                    imageId, 
+                    testUser.id, 
+                    `/test/garments/end_to_end_${Date.now()}.jpg`,
+                    `/test/masks/end_to_end_${Date.now()}.jpg`,
+                    garmentData.name, 
+                    garmentData.category
+                  ]
                 );
                 garmentId = garmentResult.rows[0].id;
                 console.log('Step 4: Garment created in database ✅');
@@ -2795,14 +2823,14 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
             
             // Step 7: Verify Complete Workflow Data Integrity
             const finalVerification = await testDB.query(`
-                SELECT 
+              SELECT 
                 w.name as wardrobe_name,
                 oi.file_path as image_path,
                 gi.name as garment_name
-                FROM wardrobes w
-                LEFT JOIN garment_items gi ON gi.wardrobe_id = w.id
-                LEFT JOIN original_images oi ON oi.id = gi.original_image_id
-                WHERE w.id = $1
+              FROM wardrobes w
+              LEFT JOIN original_images oi ON oi.user_id = w.user_id
+              LEFT JOIN garment_items gi ON gi.original_image_id = oi.id AND gi.user_id = w.user_id
+              WHERE w.id = $1
             `, [wardrobeId]);
             
             if (finalVerification.rows.length > 0) {
