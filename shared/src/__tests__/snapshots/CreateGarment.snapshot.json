@@ -1,0 +1,76 @@
+{
+  "name": "CreateGarment",
+  "version": "1.0.0",
+  "timestamp": "2025-06-28T08:34:11.154Z",
+  "required": [
+    "original_image_id",
+    "metadata",
+    "mask_data"
+  ],
+  "optional": [
+    "file_path",
+    "mask_path"
+  ],
+  "types": {
+    "original_image_id": "string",
+    "file_path": "string",
+    "mask_path": "string",
+    "metadata": "object",
+    "mask_data": "object"
+  },
+  "nested": {
+    "metadata": {
+      "name": "CreateGarment.metadata",
+      "version": "1.0.0",
+      "timestamp": "2025-06-28T08:34:11.154Z",
+      "required": [
+        "type",
+        "color"
+      ],
+      "optional": [
+        "pattern",
+        "season",
+        "brand",
+        "tags"
+      ],
+      "types": {
+        "type": "enum",
+        "color": "string",
+        "pattern": "enum",
+        "season": "enum",
+        "brand": "string",
+        "tags": "array"
+      },
+      "nested": {},
+      "enums": {
+        "type": [
+          "shirt",
+          "pants",
+          "dress",
+          "jacket",
+          "skirt",
+          "other"
+        ]
+      }
+    },
+    "mask_data": {
+      "name": "CreateGarment.mask_data",
+      "version": "1.0.0",
+      "timestamp": "2025-06-28T08:34:11.154Z",
+      "required": [
+        "width",
+        "height",
+        "data"
+      ],
+      "optional": [],
+      "types": {
+        "width": "number",
+        "height": "number",
+        "data": "array"
+      },
+      "nested": {},
+      "enums": {}
+    }
+  },
+  "enums": {}
+}

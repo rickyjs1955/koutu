@@ -1,0 +1,29 @@
+{
+  "name": "User",
+  "version": "1.0.0",
+  "timestamp": "2025-06-28T08:34:11.146Z",
+  "required": [
+    "email"
+  ],
+  "optional": [
+    "id",
+    "name",
+    "password_hash",
+    "created_at",
+    "updated_at",
+    "linkedProviders",
+    "oauth_provider"
+  ],
+  "types": {
+    "id": "string",
+    "email": "string",
+    "name": "string",
+    "password_hash": "string",
+    "created_at": "date",
+    "updated_at": "date",
+    "linkedProviders": "array",
+    "oauth_provider": "string"
+  },
+  "nested": {},
+  "enums": {}
+}

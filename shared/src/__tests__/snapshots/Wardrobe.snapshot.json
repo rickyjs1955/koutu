@@ -1,0 +1,23 @@
+{
+  "name": "Wardrobe",
+  "version": "1.0.0",
+  "timestamp": "2025-06-28T08:34:11.153Z",
+  "required": [
+    "name"
+  ],
+  "optional": [
+    "id",
+    "description",
+    "created_at",
+    "updated_at"
+  ],
+  "types": {
+    "id": "string",
+    "name": "string",
+    "description": "string",
+    "created_at": "date",
+    "updated_at": "date"
+  },
+  "nested": {},
+  "enums": {}
+}

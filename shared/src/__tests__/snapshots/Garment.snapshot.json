@@ -1,0 +1,66 @@
+{
+  "name": "Garment",
+  "version": "1.0.0",
+  "timestamp": "2025-06-28T08:34:11.148Z",
+  "required": [
+    "user_id",
+    "original_image_id",
+    "file_path",
+    "mask_path",
+    "metadata"
+  ],
+  "optional": [
+    "id",
+    "created_at",
+    "updated_at",
+    "data_version"
+  ],
+  "types": {
+    "id": "string",
+    "user_id": "string",
+    "original_image_id": "string",
+    "file_path": "string",
+    "mask_path": "string",
+    "metadata": "object",
+    "created_at": "date",
+    "updated_at": "date",
+    "data_version": "number"
+  },
+  "nested": {
+    "metadata": {
+      "name": "Garment.metadata",
+      "version": "1.0.0",
+      "timestamp": "2025-06-28T08:34:11.148Z",
+      "required": [
+        "type",
+        "color"
+      ],
+      "optional": [
+        "pattern",
+        "season",
+        "brand",
+        "tags"
+      ],
+      "types": {
+        "type": "enum",
+        "color": "string",
+        "pattern": "enum",
+        "season": "enum",
+        "brand": "string",
+        "tags": "array"
+      },
+      "nested": {},
+      "enums": {
+        "type": [
+          "shirt",
+          "pants",
+          "dress",
+          "jacket",
+          "skirt",
+          "other"
+        ]
+      }
+    }
+  },
+  "enums": {}
+}

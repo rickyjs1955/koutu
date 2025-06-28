@@ -1,0 +1,27 @@
+{
+  "name": "Polygon",
+  "version": "1.0.0",
+  "timestamp": "2025-06-28T08:34:11.151Z",
+  "required": [
+    "original_image_id",
+    "points"
+  ],
+  "optional": [
+    "id",
+    "label",
+    "metadata",
+    "created_at",
+    "updated_at"
+  ],
+  "types": {
+    "id": "string",
+    "original_image_id": "string",
+    "points": "array",
+    "label": "string",
+    "metadata": "unknown",
+    "created_at": "date",
+    "updated_at": "date"
+  },
+  "nested": {},
+  "enums": {}
+}

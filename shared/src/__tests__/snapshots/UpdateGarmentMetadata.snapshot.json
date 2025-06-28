@@ -1,0 +1,49 @@
+{
+  "name": "UpdateGarmentMetadata",
+  "version": "1.0.0",
+  "timestamp": "2025-06-28T08:34:11.155Z",
+  "required": [
+    "metadata"
+  ],
+  "optional": [],
+  "types": {
+    "metadata": "object"
+  },
+  "nested": {
+    "metadata": {
+      "name": "UpdateGarmentMetadata.metadata",
+      "version": "1.0.0",
+      "timestamp": "2025-06-28T08:34:11.155Z",
+      "required": [
+        "type",
+        "color"
+      ],
+      "optional": [
+        "pattern",
+        "season",
+        "brand",
+        "tags"
+      ],
+      "types": {
+        "type": "enum",
+        "color": "string",
+        "pattern": "enum",
+        "season": "enum",
+        "brand": "string",
+        "tags": "array"
+      },
+      "nested": {},
+      "enums": {
+        "type": [
+          "shirt",
+          "pants",
+          "dress",
+          "jacket",
+          "skirt",
+          "other"
+        ]
+      }
+    }
+  },
+  "enums": {}
+}

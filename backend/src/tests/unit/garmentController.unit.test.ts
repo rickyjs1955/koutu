@@ -2083,81 +2083,89 @@ describe('Garment Controller - Production Unit Tests', () => {
     // ==========================================
     describe('Test Suite Validation', () => {
         test('should validate all controller methods are tested', () => {
-        const controllerMethods = Object.keys(garmentController);
-        const testedMethods = [
-            'createGarment',
-            'getGarments', 
-            'getGarment',
-            'updateGarmentMetadata',
-            'deleteGarment'
-        ];
+            const controllerMethods = Object.keys(garmentController);
+            const testedMethods = [
+                'createGarment',
+                'getGarments', 
+                'getGarment',
+                'updateGarmentMetadata',
+                'deleteGarment'
+            ];
 
-        expect(controllerMethods.sort()).toEqual(testedMethods.sort());
+            expect(controllerMethods.sort()).toEqual(testedMethods.sort());
         });
 
         test('should validate mock setup completeness', () => {
-        const requiredMocks = [
-            'createGarment',
-            'getGarments',
-            'getGarment', 
-            'updateGarmentMetadata',
-            'deleteGarment'
-        ];
+            const requiredMocks = [
+                'createGarment',
+                'getGarments',
+                'getGarment', 
+                'updateGarmentMetadata',
+                'deleteGarment'
+            ];
 
-        for (const mockMethod of requiredMocks) {
-            expect(jest.isMockFunction(mockGarmentService[mockMethod as keyof typeof mockGarmentService])).toBe(true);
-        }
+            for (const mockMethod of requiredMocks) {
+                expect(jest.isMockFunction(mockGarmentService[mockMethod as keyof typeof mockGarmentService])).toBe(true);
+            }
         });
 
         test('should validate test data integrity', () => {
-        // Validate mock data has basic required properties (without strict validation)
-        expect(MOCK_GARMENTS.BASIC_SHIRT).toHaveProperty('id');
-        expect(MOCK_GARMENTS.BASIC_SHIRT).toHaveProperty('user_id');
-        expect(MOCK_GARMENTS.BASIC_SHIRT).toHaveProperty('metadata');
-        
-        expect(MOCK_GARMENTS.DETAILED_DRESS).toHaveProperty('id');
-        expect(MOCK_GARMENTS.DETAILED_DRESS).toHaveProperty('user_id');
-        expect(MOCK_GARMENTS.DETAILED_DRESS).toHaveProperty('metadata');
+            // Validate mock data has basic required properties (without strict validation)
+            expect(MOCK_GARMENTS.BASIC_SHIRT).toHaveProperty('id');
+            expect(MOCK_GARMENTS.BASIC_SHIRT).toHaveProperty('user_id');
+            expect(MOCK_GARMENTS.BASIC_SHIRT).toHaveProperty('metadata');
+            
+            expect(MOCK_GARMENTS.DETAILED_DRESS).toHaveProperty('id');
+            expect(MOCK_GARMENTS.DETAILED_DRESS).toHaveProperty('user_id');
+            expect(MOCK_GARMENTS.DETAILED_DRESS).toHaveProperty('metadata');
 
-        // Validate mock helper functions work
-        const testGarment = createMockGarment();
-        expect(testGarment).toHaveProperty('id');
-        expect(testGarment).toHaveProperty('user_id');
-        expect(testGarment).toHaveProperty('metadata');
+            // Validate mock helper functions work
+            const testGarment = createMockGarment();
+            expect(testGarment).toHaveProperty('id');
+            expect(testGarment).toHaveProperty('user_id');
+            expect(testGarment).toHaveProperty('metadata');
 
-        const testInput = createMockCreateInput();
-        expect(testInput).toHaveProperty('user_id');
-        expect(testInput).toHaveProperty('original_image_id');
-        expect(testInput).toHaveProperty('file_path');
-        expect(testInput).toHaveProperty('mask_path');
+            const testInput = createMockCreateInput();
+            expect(testInput).toHaveProperty('user_id');
+            expect(testInput).toHaveProperty('original_image_id');
+            expect(testInput).toHaveProperty('file_path');
+            expect(testInput).toHaveProperty('mask_path');
         });
 
         test('should validate performance helper accuracy', () => {
-        const testOperation = async () => {
-            await new Promise(resolve => setTimeout(resolve, 50));
-            return 'test result';
-        };
+            const testOperation = async () => {
+                await new Promise(resolve => setTimeout(resolve, 50));
+                return 'test result';
+            };
 
-        return PerformanceHelper.measureExecutionTime(testOperation).then(({ result, duration }) => {
-            expect(result).toBe('test result');
-            expect(duration).toBeGreaterThanOrEqual(40); // Allow some variance
-            expect(duration).toBeLessThan(200); // Increased tolerance for CI/test environments
-        });
+            return PerformanceHelper.measureExecutionTime(testOperation).then(({ result, duration }) => {
+                expect(result).toBe('test result');
+                expect(duration).toBeGreaterThanOrEqual(40); // Allow some variance
+                
+                // Be more lenient in CI/test environments - performance can vary significantly
+                // due to system load, container overhead, or virtualization
+                const maxExpectedDuration = process.env.CI ? 500 : 300; // Higher threshold for CI
+                
+                expect(duration).toBeLessThan(maxExpectedDuration);
+                
+                // Log the actual duration for monitoring
+                console.log(`Performance test duration: ${duration}ms (threshold: ${maxExpectedDuration}ms)`);
+            });
         });
 
         test('should validate error helper functionality', () => {
-        const dbErrors = ErrorTestHelper.createDatabaseErrorScenarios();
-        expect(Object.keys(dbErrors)).toEqual(['connectionError', 'constraintViolation', 'timeoutError']);
+            const dbErrors = ErrorTestHelper.createDatabaseErrorScenarios();
+            expect(Object.keys(dbErrors)).toEqual(['connectionError', 'constraintViolation', 'timeoutError']);
 
-        const validationErrors = ErrorTestHelper.createValidationErrorScenarios();
-        expect(Object.keys(validationErrors)).toEqual(['invalidUuid', 'emptyRequiredField', 'invalidMetadataType', 'oversizedMetadata']);
-        });
+            const validationErrors = ErrorTestHelper.createValidationErrorScenarios();
+            expect(Object.keys(validationErrors)).toEqual(['invalidUuid', 'emptyRequiredField', 'invalidMetadataType', 'oversizedMetadata']);
+            });
 
-        test('should validate cleanup functionality', () => {
-        // Test cleanup helper
-        const cleanupValidation = CleanupHelper.validateTestEnvironmentClean();
-        expect(cleanupValidation.isClean).toBe(true);
-        expect(cleanupValidation.issues).toEqual([]);
+            test('should validate cleanup functionality', () => {
+            // Test cleanup helper
+            const cleanupValidation = CleanupHelper.validateTestEnvironmentClean();
+            expect(cleanupValidation.isClean).toBe(true);
+            expect(cleanupValidation.issues).toEqual([]);
         });
     });
 

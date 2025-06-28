@@ -16,7 +16,7 @@
     "test": "npm run test:core",
     "test:core": "npm run test:export && npm run test:validation-safe && npm run test:property-safe",
     "test:comprehensive": "jest --config jest.config.cjs --testPathIgnorePatterns=setup --testPathIgnorePatterns=generators",
-    "test:all": "npm run test:type-check && npm run test:core",
+    "test:all": "npm run test:type-check && npm run test:core && npm run test:evolution",
     
     "test:export": "jest --config jest.config.cjs src/schemas/export.test.ts",
     "test:garment": "jest --config jest.config.cjs src/schemas/garment.test.ts",
@@ -27,23 +27,34 @@
     "test:property": "jest --config jest.config.cjs src/__tests__/property-based.test.ts",
     "test:property-safe": "jest --config jest.config.cjs src/__tests__/property-based.test.ts --testNamePattern=\"should always validate|should always reject|should maintain|should handle arrays|should detect|should have tests\"",
     
+    "test:evolution": "jest --config jest.config.cjs src/__tests__/schema-evolution.test.ts",
+    "test:evolution:allow-breaking": "ALLOW_BREAKING_CHANGES=true npm run test:evolution",
+    "test:evolution:update-snapshots": "npm run test:evolution -- --updateSnapshot",
+    
     "test:type-check": "tsc --noEmit",
-    "test:lint": "eslint src/schemas --ext .ts --max-warnings 25",
+    "test:lint": "SUPPRESS_NO_CONFIG_WARNING=true eslint src/schemas --ext .ts --max-warnings 3",
     "test:lint:strict": "eslint src/schemas --ext .ts --max-warnings 0",
+    "test:lint:quiet": "eslint src/schemas --ext .ts --quiet",
     
     "test:watch": "jest --config jest.config.cjs --watch src/schemas/export.test.ts",
     "test:coverage": "npm run test:core -- --coverage",
     "test:debug": "jest --config jest.config.cjs --runInBand --no-cache --verbose",
     
-    "test:stats": "echo 'Test Suite Statistics:' && echo 'Export: 12 tests (validation core)' && echo 'Schema Validation: 13 working tests (edge cases, performance)' && echo 'Property-Based: 16 tests (generative testing)' && echo 'Total: 41+ comprehensive tests'",
+    "test:stats": "echo 'Test Suite Statistics:' && echo 'Export: 12 tests (validation core)' && echo 'Schema Validation: 13 working tests (edge cases, performance)' && echo 'Property-Based: 16 tests (generative testing)' && echo 'Schema Evolution: 19 tests (breaking change detection)' && echo 'Total: 60+ comprehensive tests'",
     "test:quick": "npm run test:export",
-    "test:full": "npm run test && npm run test:cross-platform-safe",
+    "test:full": "npm run test && npm run test:cross-platform-safe && npm run test:evolution",
+    "test:ci": "npm run test:type-check && npm run test:lint:quiet && npm run test:core && npm run test:evolution",
     
-    "lint": "eslint src/schemas --ext .ts --max-warnings 25",
+    "lint": "eslint src/schemas --ext .ts --max-warnings 5",
     "lint:fix": "eslint src/schemas --ext .ts --fix",
+    "lint:quiet": "eslint src/schemas --ext .ts --quiet",
     "type-check": "tsc --noEmit",
     "clean": "rimraf dist coverage test-results",
-    "prepublishOnly": "npm run clean && npm run build"
+    "prepublishOnly": "npm run clean && npm run build",
+    
+    "schema:check": "npm run test:evolution",
+    "schema:update": "npm run test:evolution:update-snapshots",
+    "schema:allow-breaking": "npm run test:evolution:allow-breaking"
   },
   "keywords": [
     "validation",
