@@ -7,8 +7,15 @@ import { authService } from '../services/authService';
 import { authenticate, requireAuth, rateLimitByUser } from '../middlewares/auth';
 import { validateAuthTypes, validateBody, validateRequestTypes } from '../middlewares/validate';
 import { securityMiddleware } from '../middlewares/security';
-
 import { ApiError } from '../utils/ApiError';
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: any;
+    }
+  }
+}
 
 const router = express.Router();
 

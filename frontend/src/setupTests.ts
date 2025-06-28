@@ -1,84 +1,101 @@
-// frontend/src/setupTests.ts
-import '@testing-library/jest-dom';
+// src/setupTests.ts (for Vitest)
+import { expect, afterEach, beforeAll, afterAll, vi } from 'vitest'
+import { cleanup } from '@testing-library/react'
+import * as matchers from '@testing-library/jest-dom/matchers'
 
-// Add custom type declarations to fix TypeScript errors
-declare global {
-  interface Window {
-    // Properly extend without redefining the matchMedia property
-    matchMedia: (query: string) => MediaQueryList;
-  }
-}
+// Extend Vitest's expect with jest-dom matchers
+expect.extend(matchers)
 
-// Create a proper MediaQueryList mock implementation
-const createMatchMediaMock = (): (query: string) => MediaQueryList => {
-  return (query: string): MediaQueryList => {
-    return {
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: jest.fn(), // deprecated
-      removeListener: jest.fn(), // deprecated
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-      dispatchEvent: jest.fn(() => true),
-    } as unknown as MediaQueryList;
-  };
-};
-
-// Apply the mock
-window.matchMedia = window.matchMedia || createMatchMediaMock();
+// Cleanup after each test case (e.g. clearing jsdom)
+afterEach(() => {
+  cleanup()
+})
 
 // Mock localStorage
-const localStorageMock = (() => {
-  let store: Record<string, string> = {};
-  return {
-    getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => {
-      store[key] = value.toString();
-    },
-    removeItem: (key: string) => {
-      delete store[key];
-    },
-    clear: () => {
-      store = {};
-    },
-  };
-})();
-
+const localStorageMock = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+  length: 0,
+  key: vi.fn()
+}
 Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock,
-});
+  value: localStorageMock
+})
 
-// Mock intersectionObserver
-class IntersectionObserverMock implements IntersectionObserver {
-  readonly root: Element | null = null;
-  readonly rootMargin: string = '';
-  readonly thresholds: ReadonlyArray<number> = [];
-  
-  constructor() {
-    this.observe = jest.fn();
-    this.unobserve = jest.fn();
-    this.disconnect = jest.fn();
-    this.takeRecords = jest.fn(() => []);
-  }
-  
-  observe = jest.fn();
-  unobserve = jest.fn();
-  disconnect = jest.fn();
-  takeRecords = jest.fn(() => []);
+// Mock sessionStorage
+const sessionStorageMock = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+  length: 0,
+  key: vi.fn()
+}
+Object.defineProperty(window, 'sessionStorage', {
+  value: sessionStorageMock
+})
+
+// Mock fetch globally
+global.fetch = vi.fn()
+
+// Mock window.matchMedia
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), // deprecated
+    removeListener: vi.fn(), // deprecated
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+})
+
+// Mock IntersectionObserver
+global.IntersectionObserver = class IntersectionObserver {
+  root: Element | null = null
+  rootMargin: string = ''
+  thresholds: ReadonlyArray<number> = []
+  constructor(_callback: IntersectionObserverCallback, _options?: IntersectionObserverInit) {}
+  observe() { return null }
+  disconnect() { return null }
+  unobserve() { return null }
+  takeRecords() { return [] }
 }
 
-Object.defineProperty(window, 'IntersectionObserver', {
-  writable: true,
-  configurable: true,
-  value: IntersectionObserverMock,
-});
+// Mock ResizeObserver
+global.ResizeObserver = class ResizeObserver {
+  constructor() {}
+  observe() { return null }
+  disconnect() { return null }
+  unobserve() { return null }
+}
 
-// Silence React 18 console errors during testing
-const originalError = console.error;
-console.error = (...args) => {
-  if (/Warning.*not wrapped in act/.test(args[0])) {
-    return;
+// Mock URL.createObjectURL
+global.URL.createObjectURL = vi.fn(() => 'mock-url')
+global.URL.revokeObjectURL = vi.fn()
+
+// Mock HTMLCanvasElement.getContext
+HTMLCanvasElement.prototype.getContext = vi.fn()
+
+// Suppress console errors during tests (optional)
+const originalError = console.error
+beforeAll(() => {
+  console.error = (...args: any[]) => {
+    if (
+      /Warning.*not wrapped in act/.test(args[0]) ||
+      /Warning.*useLayoutEffect/.test(args[0])
+    ) {
+      return
+    }
+    originalError.call(console, ...args)
   }
-  originalError(...args);
-};
+})
+
+afterAll(() => {
+  console.error = originalError
+})

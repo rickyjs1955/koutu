@@ -4,7 +4,7 @@ import { oauthController } from '../controllers/oauthController';
 import { securityMiddleware } from '../middlewares/security';
 import { authenticate, requireAuth, rateLimitByUser } from '../middlewares/auth';
 import { validateOAuthTypes, validateOAuthProvider } from '../middlewares/validate';
-import { ApiError } from '@/utils/ApiError';
+import { ApiError } from '../utils/ApiError';
 import { config } from '../config'; // Import your config to check NODE_ENV
 
 const router = express.Router();

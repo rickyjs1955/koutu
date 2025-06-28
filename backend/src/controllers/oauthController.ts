@@ -5,7 +5,7 @@ import { authService } from '../services/authService';
 import { getAuthorizationUrl, OAuthProvider } from '../config/oauth';
 import { v4 as uuidv4 } from 'uuid';
 import { ApiError } from '../utils/ApiError';
-import { sanitization } from '@/utils/sanitize';
+import { sanitization } from '../utils/sanitize';
 import * as db from '../models/db';
 
 // Track OAuth state parameters to prevent CSRF attacks

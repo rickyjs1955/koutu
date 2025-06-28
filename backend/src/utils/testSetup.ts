@@ -1,6 +1,6 @@
 // /backend/src/utils/testSetup.ts - HYBRID DOCKER/LOCAL SETUP
 
-import { cleanupTestFirebase, initializeTestFirebase, resetFirebaseEmulator } from '@/tests/__helpers__/firebase.helper';
+import { initializeTestFirebase, resetFirebaseEmulator, cleanupTestFirebase } from '../tests/__helpers__/firebase.helper';
 import { TestDatabaseConnection } from './testDatabaseConnection';
 
 // Global initialization state

@@ -1,33 +1,53 @@
-// frontend/jest.config.cjs
-/** @type {import('jest').Config} */
+// jest.config.cjs
 module.exports = {
-    testEnvironment: 'jsdom',
-    roots: ['<rootDir>/src'],
-    testMatch: ['**/__tests__/**/*.ts?(x)', '**/?(*.)+(spec|test).ts?(x)'],
-    transform: {
-      '^.+\\.(ts|tsx)$': ['ts-jest']
-    },
-    moduleNameMapper: {
-      '^(\\.{1,2}/.*)\\.js$': '$1',
-      '^@/(.*)$': '<rootDir>/src/$1',
-      '^@koutu/shared/(.*)$': '<rootDir>/../shared/src/$1',
-      // Handle CSS and static file imports
-      '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
-      '\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/src/__mocks__/fileMock.js'
-    },
-    moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-    setupFilesAfterEnv: [
-      '<rootDir>/src/setupTests.ts',
-    ],
-    testTimeout: 10000,
-    collectCoverageFrom: [
-      '<rootDir>/src/**/*.{ts,tsx}',
-      '!<rootDir>/src/**/*.d.ts',
-      '!<rootDir>/src/**/*.test.{ts,tsx}',
-      '!<rootDir>/src/**/__tests__/**',
-      '!<rootDir>/src/**/__mocks__/**',
-    ],
-    moduleDirectories: ['node_modules', 'src'],
-    // Add verbose option for more detailed test output
-    verbose: true,
-  };
+  preset: 'ts-jest/presets/default-esm',
+  testEnvironment: 'jsdom',
+  extensionsToTreatAsEsm: ['.ts', '.tsx'],
+  setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
+  moduleNameMapper: {
+    // Handle CSS imports
+    '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+    // Handle image imports
+    '\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$': 'jest-transform-stub',
+    // Handle module path mapping
+    '^@/(.*)$': '<rootDir>/src/$1',
+    // Handle Vite's ?url imports
+    '\\?url$': 'jest-transform-stub',
+    // Handle other Vite-specific imports
+    '\\?(raw|worker|inline)$': 'jest-transform-stub'
+  },
+  transform: {
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
+      useESM: true,
+      tsconfig: {
+        jsx: 'react-jsx',
+        module: 'esnext',
+        target: 'es2020',
+        moduleResolution: 'node'
+      }
+    }]
+  },
+  transformIgnorePatterns: [
+    'node_modules/(?!(.*\\.mjs$|@testing-library))'
+  ],
+  testMatch: [
+    '<rootDir>/src/**/__tests__/**/*.(ts|tsx|js)',
+    '<rootDir>/src/**/?(*.)(test|spec).(ts|tsx|js)'
+  ],
+  collectCoverageFrom: [
+    'src/**/*.(ts|tsx)',
+    '!src/**/*.d.ts',
+    '!src/main.tsx',
+    '!src/vite-env.d.ts'
+  ],
+  // Mock import.meta and other Vite globals
+  globals: {
+    'ts-jest': {
+      useESM: true
+    }
+  },
+  // Setup for import.meta support
+  testEnvironmentOptions: {
+    customExportConditions: ['node', 'node-addons']
+  }
+};

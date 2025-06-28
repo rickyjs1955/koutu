@@ -3,7 +3,13 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config';
-import { bucket } from '../config/firebase';
+let bucket: any;
+try {
+  const firebaseConfig = require('../config/firebase');
+  bucket = firebaseConfig.bucket;
+} catch (e) {
+  console.log('Firebase bucket not available, using local storage only');
+}
 
 // Ensure uploads directory exists for local storage mode
 const uploadsDir = config.uploadsDir;
@@ -42,7 +48,7 @@ export const storageService = {
       });
       
       return new Promise((resolve, reject) => {
-        writeStream.on('error', (error) => {
+        writeStream.on('error', (error: Error) => {
           reject(error);
         });
         

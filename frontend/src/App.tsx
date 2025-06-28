@@ -1,138 +1,262 @@
-// /frontend/src/app.tsx
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, useAuth } from './hooks/useAuth';
-import { MLExportDashboard } from './pages/MLExportDashboard';
-import OAuthCallbackPage from './pages/OAuthCallbackPage';
+// src/App.tsx
+import React, { useState } from 'react'
 
-// Create a QueryClient for React Query
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
-
-// Import pages
-// These would be your actual page components
-const Login = () => <div>Login Page</div>;
-const Register = () => <div>Register Page</div>;
-const ImageUpload = () => <div>Image Upload Page</div>;
-const ImageList = () => <div>Image List Page</div>;
-const GarmentDetail = () => <div>Garment Detail Page</div>;
-const GarmentList = () => <div>Garment List Page</div>;
-const WardrobeList = () => <div>Wardrobe List Page</div>;
-const WardrobeDetail = () => <div>Wardrobe Detail Page</div>;
-const NotFound = () => <div>404 Not Found</div>;
-
-// Layout component with navigation
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { logout, isAuthenticated } = useAuth();
-  
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Basic navigation bar */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <a href="/" className="text-xl font-bold text-gray-900">Koutu</a>
-            </div>
-            
-            {isAuthenticated ? (
-              <div className="flex items-center space-x-4">
-                <a href="/images" className="text-gray-600 hover:text-gray-900">Images</a>
-                <a href="/garments" className="text-gray-600 hover:text-gray-900">Garments</a>
-                <a href="/wardrobes" className="text-gray-600 hover:text-gray-900">Wardrobes</a>
-                <button 
-                  onClick={logout}
-                  className="ml-4 px-4 py-2 rounded bg-red-100 text-red-600 hover:bg-red-200"
-                >
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-4">
-                <a href="/login" className="text-gray-600 hover:text-gray-900">Login</a>
-                <a href="/register" className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">Register</a>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
-      
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {children}
-      </main>
-    </div>
-  );
-};
-
-// Protected route component
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return <div className="flex justify-center items-center h-64">Loading...</div>;
-  }
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return <>{children}</>;
-};
-
-// Public route component (redirects if already authenticated)
-const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return <div className="flex justify-center items-center h-64">Loading...</div>;
-  }
-  
-  if (isAuthenticated) {
-    return <Navigate to="/images" replace />;
-  }
-  
-  return <>{children}</>;
-};
-
-// Main App component
 const App: React.FC = () => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
-          <Layout>
-            <Routes>
-              {/* Public routes */}
-              <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-              <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-              
-              {/* Protected routes */}
-              <Route path="/" element={<Navigate to="/images" replace />} />
-              <Route path="/images" element={<ProtectedRoute><ImageList /></ProtectedRoute>} />
-              <Route path="/images/upload" element={<ProtectedRoute><ImageUpload /></ProtectedRoute>} />
-              <Route path="/garments" element={<ProtectedRoute><GarmentList /></ProtectedRoute>} />
-              <Route path="/garments/:id" element={<ProtectedRoute><GarmentDetail /></ProtectedRoute>} />
-              <Route path="/wardrobes" element={<ProtectedRoute><WardrobeList /></ProtectedRoute>} />
-              <Route path="/wardrobes/:id" element={<ProtectedRoute><WardrobeDetail /></ProtectedRoute>} />
-              <Route path="/export/ml" element={<MLExportDashboard />} />
-              <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
-              
-              {/* 404 route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Layout>
-        </Router>
-      </AuthProvider>
-    </QueryClientProvider>
-  );
-};
+  const [currentPage, setCurrentPage] = useState('home')
 
-export default App;
+  return (
+    <div style={{ 
+      minHeight: '100vh', 
+      fontFamily: 'Arial, sans-serif',
+      backgroundColor: '#f5f5f5'
+    }}>
+      {/* Header */}
+      <header style={{
+        backgroundColor: '#2563eb',
+        color: 'white',
+        padding: '1rem 2rem',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <div style={{ 
+          maxWidth: '1200px', 
+          margin: '0 auto',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <h1 style={{ margin: 0, fontSize: '1.8rem' }}>
+            👗 Koutu
+          </h1>
+          <nav>
+            <button 
+              onClick={() => setCurrentPage('home')}
+              style={{
+                backgroundColor: currentPage === 'home' ? '#1d4ed8' : 'transparent',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                margin: '0 0.25rem',
+                borderRadius: '0.25rem',
+                cursor: 'pointer'
+              }}
+            >
+              Home
+            </button>
+            <button 
+              onClick={() => setCurrentPage('images')}
+              style={{
+                backgroundColor: currentPage === 'images' ? '#1d4ed8' : 'transparent',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                margin: '0 0.25rem',
+                borderRadius: '0.25rem',
+                cursor: 'pointer'
+              }}
+            >
+              Images
+            </button>
+            <button 
+              onClick={() => setCurrentPage('garments')}
+              style={{
+                backgroundColor: currentPage === 'garments' ? '#1d4ed8' : 'transparent',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                margin: '0 0.25rem',
+                borderRadius: '0.25rem',
+                cursor: 'pointer'
+              }}
+            >
+              Garments
+            </button>
+            <button 
+              onClick={() => setCurrentPage('login')}
+              style={{
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                margin: '0 0.25rem',
+                borderRadius: '0.25rem',
+                cursor: 'pointer'
+              }}
+            >
+              Login
+            </button>
+          </nav>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main style={{
+        maxWidth: '1200px',
+        margin: '0 auto',
+        padding: '2rem'
+      }}>
+        {currentPage === 'home' && (
+          <div style={{ textAlign: 'center', padding: '3rem' }}>
+            <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: '#1f2937' }}>
+              Welcome to Koutu! 👋
+            </h2>
+            <p style={{ fontSize: '1.2rem', color: '#6b7280', marginBottom: '2rem' }}>
+              Your AI-powered fashion management platform
+            </p>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '1rem',
+              marginTop: '2rem'
+            }}>
+              <div style={{
+                backgroundColor: 'white',
+                padding: '1.5rem',
+                borderRadius: '0.5rem',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}>
+                <h3 style={{ color: '#2563eb' }}>📸 Upload Images</h3>
+                <p>Upload your fashion photos and let AI analyze them</p>
+              </div>
+              <div style={{
+                backgroundColor: 'white',
+                padding: '1.5rem',
+                borderRadius: '0.5rem',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}>
+                <h3 style={{ color: '#2563eb' }}>👕 Create Garments</h3>
+                <p>Extract and categorize garments from your images</p>
+              </div>
+              <div style={{
+                backgroundColor: 'white',
+                padding: '1.5rem',
+                borderRadius: '0.5rem',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}>
+                <h3 style={{ color: '#2563eb' }}>🎯 ML Export</h3>
+                <p>Export your data for machine learning training</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {currentPage === 'images' && (
+          <div>
+            <h2>📸 Images</h2>
+            <div style={{
+              backgroundColor: 'white',
+              padding: '2rem',
+              borderRadius: '0.5rem',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              textAlign: 'center'
+            }}>
+              <p>Image upload and management will go here</p>
+              <button style={{
+                backgroundColor: '#2563eb',
+                color: 'white',
+                border: 'none',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.25rem',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}>
+                Upload Image
+              </button>
+            </div>
+          </div>
+        )}
+
+        {currentPage === 'garments' && (
+          <div>
+            <h2>👕 Garments</h2>
+            <div style={{
+              backgroundColor: 'white',
+              padding: '2rem',
+              borderRadius: '0.5rem',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              textAlign: 'center'
+            }}>
+              <p>Garment management will go here</p>
+              <button style={{
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.25rem',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}>
+                Create Garment
+              </button>
+            </div>
+          </div>
+        )}
+
+        {currentPage === 'login' && (
+          <div style={{ maxWidth: '400px', margin: '0 auto' }}>
+            <h2>🔐 Login</h2>
+            <div style={{
+              backgroundColor: 'white',
+              padding: '2rem',
+              borderRadius: '0.5rem',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Email:</label>
+                <input 
+                  type="email" 
+                  placeholder="your@email.com"
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.25rem',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Password:</label>
+                <input 
+                  type="password" 
+                  placeholder="••••••••"
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.25rem',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+              <button style={{
+                width: '100%',
+                backgroundColor: '#2563eb',
+                color: 'white',
+                border: 'none',
+                padding: '0.75rem',
+                borderRadius: '0.25rem',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}>
+                Login
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer style={{
+        backgroundColor: '#1f2937',
+        color: 'white',
+        padding: '1rem',
+        textAlign: 'center',
+        marginTop: '2rem'
+      }}>
+        <p>Koutu - AI Fashion Platform © 2024</p>
+      </footer>
+    </div>
+  )
+}
+
+export default App

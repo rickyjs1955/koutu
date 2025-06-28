@@ -9,7 +9,7 @@ import { imageModel } from '../models/imageModel';
 import { garmentModel } from '../models/garmentModel';
 import { polygonModel } from '../models/polygonModel';
 import { wardrobeModel } from '../models/wardrobeModel';
-import { TestDatabaseConnection } from '@/utils/testDatabaseConnection';
+import { TestDatabaseConnection } from '../utils/testDatabaseConnection';
 
 // Rate limiting cache
 export const rateLimitCache = new Map<string, { count: number; resetTime: number }>();
@@ -160,7 +160,7 @@ export const authorizeResource = (
       }
 
       // Add resource context to request for potential use in handlers
-      req.resourceContext = {
+      (req as any).resourceContext = {
         resourceType,
         resourceId,
         ownerId
