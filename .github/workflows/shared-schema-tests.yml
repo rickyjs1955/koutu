@@ -1,0 +1,142 @@
+// ==================== CONTINUOUS INTEGRATION CONFIGURATION ====================
+
+export const ciConfig = `
+# .github/workflows/shared-schema-tests.yml
+
+name: Shared Schema Tests
+
+on:
+  push:
+    paths:
+      - 'shared/**'
+      - '.github/workflows/shared-schema-tests.yml'
+  pull_request:
+    paths:
+      - 'shared/**'
+
+jobs:
+  test-schemas:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18, 20]
+        test-suite:
+          - unit
+          - integration
+          - cross-platform
+          - performance
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js \${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: \${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          cd shared
+          npm ci
+      
+      - name: Run type checking
+        run: |
+          cd shared
+          npm run test:type-check
+      
+      - name: Run linting
+        run: |
+          cd shared
+          npm run test:lint
+      
+      - name: Run \${{ matrix.test-suite }} tests
+        run: |
+          cd shared
+          npm run test:\${{ matrix.test-suite }}
+      
+      - name: Upload coverage reports
+        if: matrix.test-suite == 'unit'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./shared/coverage/lcov.info
+          flags: shared-schemas
+          name: shared-schemas-\${{ matrix.node-version }}
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-\${{ matrix.node-version }}-\${{ matrix.test-suite }}
+          path: |
+            shared/test-results/
+            shared/coverage/
+
+  validate-compatibility:
+    runs-on: ubuntu-latest
+    needs: test-schemas
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Test backend compatibility
+        run: |
+          cd backend
+          npm test -- --testPathPattern=shared
+      
+      - name: Test frontend compatibility (if applicable)
+        run: |
+          cd frontend
+          npm test -- --testPathPattern=shared
+      
+      - name: Validate schema exports
+        run: |
+          cd shared
+          npm run build
+          node -e "console.log('Testing imports...'); require('./dist/index.js');"
+
+  performance-benchmarks:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          cd shared
+          npm ci
+      
+      - name: Run performance benchmarks
+        run: |
+          cd shared
+          npm run test:benchmark
+      
+      - name: Store benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'customSmallerIsBetter'
+          output-file-path: shared/benchmark-results.json
+          github-token: \${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+`;
+
+export { globalSetup, schemaMatchers, testGenerator, ciConfig };
