@@ -1,7 +1,7 @@
 {
   "name": "CreateGarment",
   "version": "1.0.0",
-  "timestamp": "2025-06-28T08:34:11.154Z",
+  "timestamp": "2025-06-28T08:45:32.100Z",
   "required": [
     "original_image_id",
     "metadata",
@@ -22,7 +22,7 @@
     "metadata": {
       "name": "CreateGarment.metadata",
       "version": "1.0.0",
-      "timestamp": "2025-06-28T08:34:11.154Z",
+      "timestamp": "2025-06-28T08:45:32.101Z",
       "required": [
         "type",
         "color"
@@ -56,7 +56,7 @@
     "mask_data": {
       "name": "CreateGarment.mask_data",
       "version": "1.0.0",
-      "timestamp": "2025-06-28T08:34:11.154Z",
+      "timestamp": "2025-06-28T08:45:32.101Z",
       "required": [
         "width",
         "height",

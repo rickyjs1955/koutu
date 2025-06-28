@@ -1,7 +1,7 @@
 {
   "name": "Polygon",
   "version": "1.0.0",
-  "timestamp": "2025-06-28T08:34:11.151Z",
+  "timestamp": "2025-06-28T08:45:32.078Z",
   "required": [
     "original_image_id",
     "points"

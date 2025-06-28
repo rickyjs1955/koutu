@@ -1,7 +1,7 @@
 {
   "name": "Garment",
   "version": "1.0.0",
-  "timestamp": "2025-06-28T08:34:11.148Z",
+  "timestamp": "2025-06-28T08:45:32.056Z",
   "required": [
     "user_id",
     "original_image_id",
@@ -30,7 +30,7 @@
     "metadata": {
       "name": "Garment.metadata",
       "version": "1.0.0",
-      "timestamp": "2025-06-28T08:34:11.148Z",
+      "timestamp": "2025-06-28T08:45:32.056Z",
       "required": [
         "type",
         "color"

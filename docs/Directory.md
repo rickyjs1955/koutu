@@ -39,14 +39,14 @@ Shared:
 ❌ Tests Not Available
 🔔 Tests Not Applicable
 ⏸️ Tests Deferred Until Later    
-1. /shared/src/schemas/wardrobe.ts                          ❌Unit ❌Integration ❌Security
-2. /shared/src/schemas/garment.ts                           ❌Unit ❌Integration ❌Security
-3. /shared/src/schemas/user.ts                              ❌Unit ❌Integration ❌Security
-4. /shared/src/schemas/export.ts                            ❌Unit ❌Integration ❌Security
-5. /shared/src/schemas/image.ts                             ❌Unit ❌Integration ❌Security
-6. /shared/src/schemas/polygon.ts                           ❌Unit ❌Integration ❌Security
-7. /shared/src/schemas/oauth.ts                             ❌Unit ❌Integration ❌Security 
-8. /shared/src/schemas/index.ts                             ❌Unit ❌Integration ❌Security                          
+1. /shared/src/schemas/wardrobe.ts                          ✅Unit ✅Integration ✅Security
+2. /shared/src/schemas/garment.ts                           ✅Unit ✅Integration ✅Security
+3. /shared/src/schemas/user.ts                              ✅Unit ✅Integration ✅Security
+4. /shared/src/schemas/export.ts                            ✅Unit ✅Integration ✅Security
+5. /shared/src/schemas/image.ts                             ✅Unit ✅Integration ✅Security
+6. /shared/src/schemas/polygon.ts                           ✅Unit ✅Integration ✅Security
+7. /shared/src/schemas/oauth.ts                             ✅Unit ✅Integration ✅Security
+8. /shared/src/schemas/index.ts                             ✅Unit ✅Integration ✅Security                          
 Backend:
 ✅ Tests Passed
 🛠️ Tests ongoing
