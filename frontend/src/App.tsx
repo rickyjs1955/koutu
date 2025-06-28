@@ -1,8 +1,128 @@
-// src/App.tsx
 import React, { useState } from 'react'
+
+const API_BASE_URL = 'http://localhost:3000/api'
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('home')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  // API call functions
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setMessage('Please enter both email and password')
+      return
+    }
+
+    setLoading(true)
+    setMessage('')
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password })
+      })
+
+      const data = await response.json()
+      
+      if (response.ok) {
+        setMessage(`✅ Login successful! Welcome ${email}`)
+        // Store token if provided
+        if (data.data?.token) {
+          localStorage.setItem('authToken', data.data.token)
+        }
+      } else {
+        setMessage(`❌ Login failed: ${data.message || 'Unknown error'}`)
+      }
+    } catch (error) {
+      setMessage(`❌ Network error: ${error instanceof Error ? error.message : String(error)}`)
+      console.error('Login error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUploadImage = async () => {
+    setLoading(true)
+    setMessage('')
+
+    try {
+      // Test API connection first
+      const response = await fetch(`${API_BASE_URL}/images`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || 'dummy-token'}`,
+          'Content-Type': 'application/json',
+        }
+      })
+
+      if (response.ok) {
+        setMessage('✅ Image API connected successfully!')
+      } else {
+        const data = await response.json()
+        setMessage(`❌ Image API error: ${data.message || response.statusText}`)
+      }
+    } catch (error) {
+      setMessage(`❌ Network error: ${error instanceof Error ? error.message : String(error)}`)
+      console.error('Upload error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCreateGarment = async () => {
+    setLoading(true)
+    setMessage('')
+
+    try {
+      // Test API connection
+      const response = await fetch(`${API_BASE_URL}/garments`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || 'dummy-token'}`,
+          'Content-Type': 'application/json',
+        }
+      })
+
+      if (response.ok) {
+        setMessage('✅ Garment API connected successfully!')
+      } else {
+        const data = await response.json()
+        setMessage(`❌ Garment API error: ${data.message || response.statusText}`)
+      }
+    } catch (error) {
+      setMessage(`❌ Network error: ${error instanceof Error ? error.message : String(error)}`)
+      console.error('Garment error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const testBackendConnection = async () => {
+    setLoading(true)
+    setMessage('')
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/../health`)
+      const data = await response.json()
+      
+      if (response.ok) {
+        setMessage(`✅ Backend connected! Status: ${data.status}, Storage: ${data.storage}`)
+      } else {
+        setMessage(`❌ Backend error: ${response.statusText}`)
+      }
+    } catch (error) {
+      setMessage(`❌ Cannot connect to backend: ${error instanceof Error ? error.message : String(error)}`)
+      console.error('Connection error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div style={{ 
@@ -88,6 +208,21 @@ const App: React.FC = () => {
         </div>
       </header>
 
+      {/* Status Message */}
+      {message && (
+        <div style={{
+          maxWidth: '1200px',
+          margin: '1rem auto',
+          padding: '1rem',
+          backgroundColor: message.includes('✅') ? '#d1fae5' : '#fee2e2',
+          color: message.includes('✅') ? '#065f46' : '#991b1b',
+          borderRadius: '0.25rem',
+          border: `1px solid ${message.includes('✅') ? '#a7f3d0' : '#fecaca'}`
+        }}>
+          {message}
+        </div>
+      )}
+
       {/* Main Content */}
       <main style={{
         maxWidth: '1200px',
@@ -102,6 +237,27 @@ const App: React.FC = () => {
             <p style={{ fontSize: '1.2rem', color: '#6b7280', marginBottom: '2rem' }}>
               Your AI-powered fashion management platform
             </p>
+            
+            {/* Backend Connection Test */}
+            <div style={{ marginBottom: '2rem' }}>
+              <button 
+                onClick={testBackendConnection}
+                disabled={loading}
+                style={{
+                  backgroundColor: '#8b5cf6',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.25rem',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '1rem',
+                  opacity: loading ? 0.6 : 1
+                }}
+              >
+                {loading ? '🔄 Testing...' : '🔗 Test Backend Connection'}
+              </button>
+            </div>
+
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -150,16 +306,21 @@ const App: React.FC = () => {
               textAlign: 'center'
             }}>
               <p>Image upload and management will go here</p>
-              <button style={{
-                backgroundColor: '#2563eb',
-                color: 'white',
-                border: 'none',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '0.25rem',
-                cursor: 'pointer',
-                fontSize: '1rem'
-              }}>
-                Upload Image
+              <button 
+                onClick={handleUploadImage}
+                disabled={loading}
+                style={{
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.25rem',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '1rem',
+                  opacity: loading ? 0.6 : 1
+                }}
+              >
+                {loading ? '🔄 Testing...' : 'Test Image API'}
               </button>
             </div>
           </div>
@@ -176,16 +337,21 @@ const App: React.FC = () => {
               textAlign: 'center'
             }}>
               <p>Garment management will go here</p>
-              <button style={{
-                backgroundColor: '#10b981',
-                color: 'white',
-                border: 'none',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '0.25rem',
-                cursor: 'pointer',
-                fontSize: '1rem'
-              }}>
-                Create Garment
+              <button 
+                onClick={handleCreateGarment}
+                disabled={loading}
+                style={{
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.25rem',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '1rem',
+                  opacity: loading ? 0.6 : 1
+                }}
+              >
+                {loading ? '🔄 Testing...' : 'Test Garment API'}
               </button>
             </div>
           </div>
@@ -205,6 +371,8 @@ const App: React.FC = () => {
                 <input 
                   type="email" 
                   placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '0.5rem',
@@ -219,6 +387,8 @@ const App: React.FC = () => {
                 <input 
                   type="password" 
                   placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '0.5rem',
@@ -228,17 +398,22 @@ const App: React.FC = () => {
                   }}
                 />
               </div>
-              <button style={{
-                width: '100%',
-                backgroundColor: '#2563eb',
-                color: 'white',
-                border: 'none',
-                padding: '0.75rem',
-                borderRadius: '0.25rem',
-                cursor: 'pointer',
-                fontSize: '1rem'
-              }}>
-                Login
+              <button 
+                onClick={handleLogin}
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem',
+                  borderRadius: '0.25rem',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '1rem',
+                  opacity: loading ? 0.6 : 1
+                }}
+              >
+                {loading ? '🔄 Logging in...' : 'Login'}
               </button>
             </div>
           </div>
@@ -254,6 +429,9 @@ const App: React.FC = () => {
         marginTop: '2rem'
       }}>
         <p>Koutu - AI Fashion Platform © 2024</p>
+        <p style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>
+          API Base: {API_BASE_URL}
+        </p>
       </footer>
     </div>
   )
