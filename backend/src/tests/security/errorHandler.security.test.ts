@@ -61,17 +61,17 @@ describe('Error Handler Security Tests', () => {
           const error = createMockError(payload, 400, 'DANGEROUS_INPUT');
           
           expect(() => {
-            errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+            errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
           }).not.toThrow();
 
           const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
           const responseBody = jsonCall[0];
           
-          // Should return a response without throwing errors
+          // Should return a Flutter-compatible response without throwing errors
           expect(responseBody).toBeDefined();
-          expect(responseBody.status).toBe('error');
-          expect(responseBody.code).toBe('DANGEROUS_INPUT');
-          expect(typeof responseBody.message).toBe('string');
+          expect(responseBody.success).toBe(false);
+          expect(responseBody.error.code).toBe('DANGEROUS_INPUT');
+          expect(typeof responseBody.error.message).toBe('string');
         });
       });
 
@@ -79,28 +79,28 @@ describe('Error Handler Security Tests', () => {
         const htmlError = '<img src="x" onerror="alert(1)">';
         const error = createMockError(htmlError, 400, 'HTML_TEST');
         
-        errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+        errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
 
         const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
         const responseBody = jsonCall[0];
         
         // At minimum, should not execute scripts or cause errors
-        expect(responseBody.message).toBeDefined();
-        expect(typeof responseBody.message).toBe('string');
+        expect(responseBody.error.message).toBeDefined();
+        expect(typeof responseBody.error.message).toBe('string');
       });
 
       it('should handle SQL-like patterns in error messages', () => {
         const sqlError = "'; DROP TABLE users; --";
         const error = createMockError(sqlError, 400, 'SQL_TEST');
         
-        errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+        errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
 
         const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
         const responseBody = jsonCall[0];
         
         // Should process without throwing errors
-        expect(responseBody.message).toBeDefined();
-        expect(responseBody.code).toBe('SQL_TEST');
+        expect(responseBody.error.message).toBeDefined();
+        expect(responseBody.error.code).toBe('SQL_TEST');
       });
     });
 
@@ -109,13 +109,13 @@ describe('Error Handler Security Tests', () => {
         const unicodeError = 'Error with unicode: 🚀 ñáéíóú ©®™';
         const error = createMockError(unicodeError, 400, 'UNICODE_TEST');
         
-        errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+        errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
 
         const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
         const responseBody = jsonCall[0];
         
-        expect(responseBody.message).toContain('🚀');
-        expect(responseBody.message).toContain('ñáéíóú');
+        expect(responseBody.error.message).toContain('🚀');
+        expect(responseBody.error.message).toContain('ñáéíóú');
       });
 
       it('should handle null bytes safely', () => {
@@ -123,7 +123,7 @@ describe('Error Handler Security Tests', () => {
         const error = createMockError(nullByteError, 400, 'NULL_BYTE_TEST');
         
         expect(() => {
-          errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+          errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
         }).not.toThrow();
       });
 
@@ -132,7 +132,7 @@ describe('Error Handler Security Tests', () => {
         const error = createMockError(controlCharError, 400, 'CONTROL_CHAR_TEST');
         
         expect(() => {
-          errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+          errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
         }).not.toThrow();
       });
     });
@@ -146,7 +146,7 @@ describe('Error Handler Security Tests', () => {
         const error = createMockError(largeMessage, 400, 'LARGE_MESSAGE_DOS');
         
         const start = Date.now();
-        errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+        errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
         const processingTime = Date.now() - start;
         
         // Should complete within reasonable time
@@ -156,7 +156,7 @@ describe('Error Handler Security Tests', () => {
         const responseBody = jsonCall[0];
         
         expect(responseBody).toBeDefined();
-        expect(responseBody.status).toBe('error');
+        expect(responseBody.success).toBe(false);
       });
 
       it('should handle repeated patterns efficiently', () => {
@@ -165,7 +165,7 @@ describe('Error Handler Security Tests', () => {
         const error = createMockError(repeatedPattern, 400, 'PATTERN_DOS');
         
         const start = Date.now();
-        errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+        errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
         const processingTime = Date.now() - start;
         
         expect(processingTime).toBeLessThan(1000);
@@ -220,7 +220,7 @@ describe('Error Handler Security Tests', () => {
           const res = createMockResponse();
           const next = createMockNext();
           
-          errorHandler(error, req as Request, res as Response, next);
+          errorHandler(error as Error, req as Request, res as Response, next);
         }
         
         // Force garbage collection if available
@@ -246,12 +246,11 @@ describe('Error Handler Security Tests', () => {
           const error = createMockError('Production error', 500, 'PROD_ERROR');
           (error as any).stack = 'Error: Production error\n    at sensitive-file.js:42:10';
           
-          errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+          errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
 
           const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
           const responseBody = jsonCall[0];
           
-          expect(responseBody.stack).toBeUndefined();
           expect(responseBody.debug).toBeUndefined();
         } finally {
           envMock.restore();
@@ -268,7 +267,7 @@ describe('Error Handler Security Tests', () => {
           
           const error = createMockError('Debug test error', 400, 'DEBUG_ERROR');
           
-          errorHandler(error, req as Request, mockRes as Response, mockNext);
+          errorHandler(error as Error, req as Request, mockRes as Response, mockNext);
 
           const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
           const responseBody = jsonCall[0];
@@ -285,26 +284,26 @@ describe('Error Handler Security Tests', () => {
         const sensitiveError = 'Database connection failed: password=secret123';
         const error = createMockError(sensitiveError, 500, 'DB_ERROR');
         
-        errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+        errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
 
         const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
         const responseBody = jsonCall[0];
         
         // Should still return an error message
-        expect(responseBody.message).toBeDefined();
-        expect(typeof responseBody.message).toBe('string');
+        expect(responseBody.error.message).toBeDefined();
+        expect(typeof responseBody.error.message).toBe('string');
       });
 
       it('should handle file system paths in error messages', () => {
         const pathError = 'File not found: /home/user/.ssh/id_rsa';
         const error = createMockError(pathError, 400, 'FILE_ERROR');
         
-        errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+        errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
 
         const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
         const responseBody = jsonCall[0];
         
-        expect(responseBody.message).toBeDefined();
+        expect(responseBody.error.message).toBeDefined();
       });
     });
   });
@@ -314,16 +313,16 @@ describe('Error Handler Security Tests', () => {
       const operations = [
         () => {
           const error = createMockError('Quick error', 400, 'QUICK_ERROR');
-          errorHandler(error, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
+          errorHandler(error as Error, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
         },
         () => {
           const error = createMockError('A'.repeat(1000), 400, 'MEDIUM_ERROR');
-          errorHandler(error, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
+          errorHandler(error as Error, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
         },
         () => {
           const complexError = createMockError('Complex error', 500, 'COMPLEX_ERROR');
           (complexError as any).cause = new Error('Nested cause');
-          errorHandler(complexError, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
+          errorHandler(complexError as any, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
         }
       ];
 
@@ -334,15 +333,15 @@ describe('Error Handler Security Tests', () => {
       const operations = [
         () => {
           const error = createMockError('Normal message', 400, 'NORMAL');
-          errorHandler(error, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
+          errorHandler(error as Error, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
         },
         () => {
           const error = createMockError('<script>alert("xss")</script>'.repeat(10), 400, 'XSS_TEST');
-          errorHandler(error, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
+          errorHandler(error as Error, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
         },
         () => {
           const error = createMockError('SELECT * FROM users;'.repeat(10), 400, 'SQL_TEST');
-          errorHandler(error, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
+          errorHandler(error as Error, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
         }
       ];
 
@@ -355,37 +354,37 @@ describe('Error Handler Security Tests', () => {
       const maliciousCode = '<script>alert("code")</script>';
       const error = createMockError('Code injection test', 400, maliciousCode);
       
-      errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+      errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
 
       const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
       const responseBody = jsonCall[0];
       
-      expect(responseBody.code).toBeDefined();
-      expect(typeof responseBody.code).toBe('string');
+      expect(responseBody.error.code).toBeDefined();
+      expect(typeof responseBody.error.code).toBe('string');
     });
 
     it('should handle null bytes in error codes', () => {
       const nullByteCode = 'VALID_CODE\x00INJECTED';
       const error = createMockError('Null byte test', 400, nullByteCode);
       
-      errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+      errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
 
       const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
       const responseBody = jsonCall[0];
       
-      expect(responseBody.code).toBeDefined();
+      expect(responseBody.error.code).toBeDefined();
     });
 
     it('should handle very long error codes', () => {
       const longCode = 'A'.repeat(1000);
       const error = createMockError('Long code test', 400, longCode);
       
-      errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+      errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
 
       const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
       const responseBody = jsonCall[0];
       
-      expect(responseBody.code).toBeDefined();
+      expect(responseBody.error.code).toBeDefined();
     });
   });
 
@@ -393,7 +392,7 @@ describe('Error Handler Security Tests', () => {
     it('should set required security headers', () => {
       const error = createMockError('Security header test', 400, 'HEADER_TEST');
       
-      errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+      errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockRes.set).toHaveBeenCalledWith(expectedSecurityHeaders);
     });
@@ -401,7 +400,7 @@ describe('Error Handler Security Tests', () => {
     it('should prevent MIME type sniffing attacks', () => {
       const error = createMockError('MIME test', 400, 'MIME_TEST');
       
-      errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+      errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockRes.set).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -413,7 +412,7 @@ describe('Error Handler Security Tests', () => {
     it('should prevent clickjacking attacks', () => {
       const error = createMockError('Clickjacking test', 400, 'CLICKJACK_TEST');
       
-      errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+      errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockRes.set).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -425,7 +424,7 @@ describe('Error Handler Security Tests', () => {
     it('should enable XSS protection', () => {
       const error = createMockError('XSS protection test', 400, 'XSS_PROTECTION_TEST');
       
-      errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+      errorHandler(error as Error, mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockRes.set).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -450,7 +449,7 @@ describe('Error Handler Security Tests', () => {
       const error = createMockError('UA test', 400, 'UA_TEST');
       
       expect(() => {
-        errorHandler(error, req as Request, mockRes as Response, mockNext);
+        errorHandler(error as Error, req as Request, mockRes as Response, mockNext);
       }).not.toThrow();
     });
 
@@ -468,13 +467,13 @@ describe('Error Handler Security Tests', () => {
       const error = createMockError('Long request ID test', 400, 'LONG_ID_TEST');
       
       expect(() => {
-        errorHandler(error, req as Request, mockRes as Response, mockNext);
+        errorHandler(error as Error, req as Request, mockRes as Response, mockNext);
       }).not.toThrow();
       
       const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
       const responseBody = jsonCall[0];
       
-      expect(responseBody.requestId).toBeDefined();
+      expect(responseBody.error.requestId).toBeDefined();
     });
 
     it('should handle request ID injection attempts', () => {
@@ -491,7 +490,7 @@ describe('Error Handler Security Tests', () => {
       const error = createMockError('ID injection test', 400, 'ID_INJECTION_TEST');
       
       expect(() => {
-        errorHandler(error, req as Request, mockRes as Response, mockNext);
+        errorHandler(error as Error, req as Request, mockRes as Response, mockNext);
       }).not.toThrow();
     });
   });
@@ -507,7 +506,7 @@ describe('Error Handler Security Tests', () => {
         const res = createMockResponse();
         const next = createMockNext();
         
-        errorHandler(error, req as Request, res as Response, next);
+        errorHandler(error as Error, req as Request, res as Response, next);
       }
       
       const duration = Date.now() - start;
@@ -533,7 +532,7 @@ describe('Error Handler Security Tests', () => {
         
         for (let i = 0; i < 50; i++) { // Reduced iterations for more stable timing
           const error = createError();
-          errorHandler(error, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
+          errorHandler(error as Error, createMockRequest() as Request, createMockResponse() as Response, createMockNext());
         }
         
         times.push(Date.now() - start);
@@ -565,7 +564,7 @@ describe('Error Handler Security Tests', () => {
           const res = createMockResponse();
           const next = createMockNext();
           
-          errorHandler(error, req as Request, res as Response, next);
+          errorHandler(error as Error, req as Request, res as Response, next);
           resolve(i);
         })
       );
@@ -658,7 +657,7 @@ describe('Error Handler Security Tests', () => {
 
       scenarios.forEach(error => {
         const res = createMockResponse();
-        errorHandler(error, mockReq as Request, res as Response, mockNext);
+        errorHandler(error as Error, mockReq as Request, res as Response, mockNext);
         
         expect(res.set).toHaveBeenCalledWith(expectedSecurityHeaders);
       });
@@ -680,7 +679,6 @@ describe('Error Handler Security Tests', () => {
         const responseBody = jsonCall[0];
         
         // Should not expose stack trace in production
-        expect(responseBody.stack).toBeUndefined();
         expect(responseBody.debug).toBeUndefined();
       } finally {
         envMock.restore();
@@ -691,13 +689,13 @@ describe('Error Handler Security Tests', () => {
       const i18nError = createMockError('Erreur avec caractères spéciaux: àáâãäåæçèéêë', 400, 'I18N_TEST');
       
       expect(() => {
-        errorHandler(i18nError, mockReq as Request, mockRes as Response, mockNext);
+        errorHandler(i18nError as any, mockReq as Request, mockRes as Response, mockNext);
       }).not.toThrow();
       
       const jsonCall = (mockRes.json as jest.MockedFunction<any>).mock.calls[0];
       const responseBody = jsonCall[0];
       
-      expect(responseBody.message).toContain('àáâãäåæçèéêë');
+      expect(responseBody.error.message).toContain('àáâãäåæçèéêë');
     });
   });
 

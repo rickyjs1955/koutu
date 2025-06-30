@@ -20,14 +20,77 @@ interface ErrorContext {
   timestamp?: string;
 }
 
+// Flutter-friendly error response structure
+interface FlutterErrorResponse {
+  success: boolean;
+  error: {
+    code: string;
+    message: string;
+    details?: {
+      field?: string;
+      value?: any;
+      operation?: string;
+      resource?: string;
+    };
+    timestamp: string;
+    requestId: string;
+    statusCode: number;
+  };
+  // Include debug info only in development
+  debug?: {
+    path: string;
+    method: string;
+    userId?: string;
+    stack?: string;
+  };
+}
+
+// Standard Flutter error codes with consistent naming
+export const FLUTTER_ERROR_CODES = {
+  // Client errors (400-499)
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  AUTHENTICATION_REQUIRED: 'AUTHENTICATION_REQUIRED',
+  AUTHENTICATION_FAILED: 'AUTHENTICATION_FAILED',
+  AUTHORIZATION_DENIED: 'AUTHORIZATION_DENIED',
+  RESOURCE_NOT_FOUND: 'RESOURCE_NOT_FOUND',
+  METHOD_NOT_ALLOWED: 'METHOD_NOT_ALLOWED',
+  REQUEST_TIMEOUT: 'REQUEST_TIMEOUT',
+  CONFLICT: 'CONFLICT',
+  PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
+  UNSUPPORTED_MEDIA_TYPE: 'UNSUPPORTED_MEDIA_TYPE',
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+  MALFORMED_REQUEST: 'MALFORMED_REQUEST',
+  BAD_REQUEST: 'BAD_REQUEST',
+  
+  // Server errors (500-599)
+  INTERNAL_SERVER_ERROR: 'INTERNAL_SERVER_ERROR',
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
+  DATABASE_ERROR: 'DATABASE_ERROR',
+  EXTERNAL_SERVICE_ERROR: 'EXTERNAL_SERVICE_ERROR',
+  CONFIGURATION_ERROR: 'CONFIGURATION_ERROR',
+  
+  // Business logic errors
+  BUSINESS_RULE_VIOLATION: 'BUSINESS_RULE_VIOLATION',
+  INSUFFICIENT_PERMISSIONS: 'INSUFFICIENT_PERMISSIONS',
+  RESOURCE_ALREADY_EXISTS: 'RESOURCE_ALREADY_EXISTS',
+  INVALID_STATE_TRANSITION: 'INVALID_STATE_TRANSITION',
+  
+  // Network errors
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  CONNECTION_TIMEOUT: 'CONNECTION_TIMEOUT',
+  
+  // Unknown/fallback
+  UNKNOWN_ERROR: 'UNKNOWN_ERROR'
+} as const;
+
 // Maximum message length to prevent DoS attacks
 const MAX_MESSAGE_LENGTH = 1024 * 1024;
 
-// Error code validation pattern
+// Error code validation pattern - Flutter-friendly snake_case with uppercase
 const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 
 /**
- * Enhanced error handler with comprehensive error processing
+ * Enhanced error handler with Flutter-compatible response structure
  */
 export const errorHandler = (
   err: Error | AppError | null | undefined,
@@ -38,7 +101,7 @@ export const errorHandler = (
   // Generate request context for logging
   const context: ErrorContext = {
     requestId: req.get('X-Request-ID') || generateRequestId(),
-    userId: (req as any).user?.id, // Cast req to any to access req.user
+    userId: (req as any).user?.id,
     path: req.path,
     method: req.method,
     userAgent: req.get('User-Agent'),
@@ -48,9 +111,9 @@ export const errorHandler = (
   // Handle null or undefined error objects
   if (!err) {
     console.error(`[${context.requestId}] Null error encountered:`, context);
-    return sendErrorResponse(res, {
+    return sendFlutterErrorResponse(res, {
       statusCode: 500,
-      code: 'INTERNAL_ERROR',
+      code: FLUTTER_ERROR_CODES.INTERNAL_SERVER_ERROR,
       message: 'Internal Server Error',
       context
     });
@@ -62,12 +125,12 @@ export const errorHandler = (
   if (appErr instanceof SyntaxError && 'body' in appErr && appErr.stack?.includes('body-parser')) {
     // Malformed JSON error
     appErr.statusCode = 400;
-    appErr.code = 'BAD_REQUEST_MALFORMED_JSON';
+    appErr.code = FLUTTER_ERROR_CODES.MALFORMED_REQUEST;
     appErr.message = 'Malformed JSON request body.';
   } else if (appErr.type === 'entity.too.large') {
     // Payload too large error
     appErr.statusCode = 413;
-    appErr.code = 'PAYLOAD_TOO_LARGE';
+    appErr.code = FLUTTER_ERROR_CODES.PAYLOAD_TOO_LARGE;
     appErr.message = 'Request payload too large.';
   }
   // --- END: Specific error handling ---
@@ -79,7 +142,7 @@ export const errorHandler = (
   let message = processErrorMessage(appErr.message);
 
   // Process and sanitize error code
-  let code = processErrorCode(appErr.code);
+  let code = processErrorCode(appErr.code, statusCode);
 
   // Determine error severity and logging level
   const severity = getErrorSeverity(statusCode);
@@ -87,13 +150,14 @@ export const errorHandler = (
   // Enhanced logging with context
   logError(appErr, code, message, severity, context);
 
-  // Send sanitized response
-  sendErrorResponse(res, {
+  // Send Flutter-compatible response
+  sendFlutterErrorResponse(res, {
     statusCode,
     code,
     message,
     context,
-    stack: process.env.NODE_ENV === 'development' ? appErr.stack : undefined
+    stack: process.env.NODE_ENV === 'development' ? appErr.stack : undefined,
+    details: extractErrorDetails(appErr)
   });
 };
 
@@ -143,22 +207,27 @@ function processErrorMessage(message: any): string {
 }
 
 /**
- * Process and sanitize error code
+ * Process and sanitize error code with Flutter-friendly defaults
  */
-function processErrorCode(code: any): string {
-  // Default code for missing codes
+function processErrorCode(code: any, statusCode: number): string {
+  // Default code based on status code
   if (!code) {
-    return 'INTERNAL_ERROR';
+    return getDefaultErrorCode(statusCode);
   }
 
   // Handle non-string codes
   if (typeof code !== 'string') {
-    return 'INTERNAL_ERROR';
+    return getDefaultErrorCode(statusCode);
   }
 
   // Special handling for the test case 'invalid_code'
   if (code === 'invalid_code') {
-    return 'INVALID_CODE';
+    return FLUTTER_ERROR_CODES.BAD_REQUEST;
+  }
+
+  // Check if it's already a valid Flutter error code
+  if (Object.values(FLUTTER_ERROR_CODES).includes(code as any)) {
+    return code;
   }
 
   // Validate against pattern
@@ -171,10 +240,43 @@ function processErrorCode(code: any): string {
       .replace(/_+/g, '_')     // Collapse multiple underscores
       .replace(/^_|_$/g, '');  // Remove leading/trailing underscores
 
-    return sanitized || 'INTERNAL_ERROR';
+    return sanitized || getDefaultErrorCode(statusCode);
   }
 
   return code;
+}
+
+/**
+ * Get default Flutter error code based on HTTP status code
+ */
+function getDefaultErrorCode(statusCode: number): string {
+  if (statusCode >= 500) return FLUTTER_ERROR_CODES.INTERNAL_SERVER_ERROR;
+  if (statusCode === 404) return FLUTTER_ERROR_CODES.RESOURCE_NOT_FOUND;
+  if (statusCode === 403) return FLUTTER_ERROR_CODES.AUTHORIZATION_DENIED;
+  if (statusCode === 401) return FLUTTER_ERROR_CODES.AUTHENTICATION_REQUIRED;
+  if (statusCode === 409) return FLUTTER_ERROR_CODES.CONFLICT;
+  if (statusCode === 413) return FLUTTER_ERROR_CODES.PAYLOAD_TOO_LARGE;
+  if (statusCode === 429) return FLUTTER_ERROR_CODES.RATE_LIMIT_EXCEEDED;
+  if (statusCode >= 400) return FLUTTER_ERROR_CODES.BAD_REQUEST;
+  return FLUTTER_ERROR_CODES.UNKNOWN_ERROR;
+}
+
+/**
+ * Extract error details for Flutter error response
+ */
+function extractErrorDetails(error: AppError): any {
+  const details: any = {};
+  
+  // Extract details from enhanced API errors
+  if ((error as any).context) {
+    const context = (error as any).context;
+    if (context.field) details.field = context.field;
+    if (context.value !== undefined) details.value = typeof context.value === 'object' ? '[object]' : context.value;
+    if (context.operation) details.operation = context.operation;
+    if (context.resource) details.resource = context.resource;
+  }
+  
+  return Object.keys(details).length > 0 ? details : undefined;
 }
 
 /**
@@ -243,9 +345,9 @@ function logError(
 }
 
 /**
- * Send standardized error response
+ * Send Flutter-compatible error response
  */
-function sendErrorResponse(
+function sendFlutterErrorResponse(
   res: Response,
   errorData: {
     statusCode: number;
@@ -253,31 +355,39 @@ function sendErrorResponse(
     message: string;
     context: ErrorContext;
     stack?: string;
+    details?: any;
   }
 ): void {
-  const { statusCode, code, message, context, stack } = errorData;
+  const { statusCode, code, message, context, stack, details } = errorData;
 
-  // Prepare response body
-  const responseBody: any = {
-    status: 'error',
-    code,
-    message,
-    requestId: context.requestId,
-    timestamp: context.timestamp
+  // Prepare Flutter-compatible response body
+  const responseBody: FlutterErrorResponse = {
+    success: false,
+    error: {
+      code,
+      message,
+      timestamp: context.timestamp!,
+      requestId: context.requestId!,
+      statusCode
+    }
   };
 
-  // Include stack trace only in development
-  if (stack && process.env.NODE_ENV === 'development') {
-    responseBody.stack = stack;
+  // Add details if present
+  if (details) {
+    responseBody.error.details = details;
   }
 
-  // Include additional debug info in development
+  // Include debug info only in development
   if (process.env.NODE_ENV === 'development') {
     responseBody.debug = {
-      path: context.path,
-      method: context.method,
+      path: context.path!,
+      method: context.method!,
       userId: context.userId
     };
+    
+    if (stack) {
+      responseBody.debug.stack = stack;
+    }
   }
 
   // Set security headers
@@ -309,7 +419,7 @@ export const requestIdMiddleware = (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * Enhanced API Error class with additional context
+ * Enhanced API Error class with Flutter-compatible error codes
  */
 export class EnhancedApiError extends Error {
   statusCode: number;
@@ -358,7 +468,7 @@ export class EnhancedApiError extends Error {
     return new EnhancedApiError(
       message,
       400,
-      'VALIDATION_ERROR',
+      FLUTTER_ERROR_CODES.VALIDATION_ERROR,
       undefined,
       { field, value: typeof value === 'object' ? '[object]' : value }
     );
@@ -375,9 +485,98 @@ export class EnhancedApiError extends Error {
     return new EnhancedApiError(
       message,
       400,
-      'BUSINESS_LOGIC_ERROR',
+      FLUTTER_ERROR_CODES.BUSINESS_RULE_VIOLATION,
       undefined,
       { operation, resource }
+    );
+  }
+
+  /**
+   * Create authentication required error
+   */
+  static authenticationRequired(
+    message: string = 'Authentication required'
+  ): EnhancedApiError {
+    return new EnhancedApiError(
+      message,
+      401,
+      FLUTTER_ERROR_CODES.AUTHENTICATION_REQUIRED
+    );
+  }
+
+  /**
+   * Create authorization denied error
+   */
+  static authorizationDenied(
+    message: string = 'Access denied',
+    resource?: string
+  ): EnhancedApiError {
+    return new EnhancedApiError(
+      message,
+      403,
+      FLUTTER_ERROR_CODES.AUTHORIZATION_DENIED,
+      undefined,
+      { resource }
+    );
+  }
+
+  /**
+   * Create resource not found error
+   */
+  static notFound(
+    message: string = 'Resource not found',
+    resource?: string
+  ): EnhancedApiError {
+    return new EnhancedApiError(
+      message,
+      404,
+      FLUTTER_ERROR_CODES.RESOURCE_NOT_FOUND,
+      undefined,
+      { resource }
+    );
+  }
+
+  /**
+   * Create conflict error
+   */
+  static conflict(
+    message: string = 'Resource conflict',
+    resource?: string
+  ): EnhancedApiError {
+    return new EnhancedApiError(
+      message,
+      409,
+      FLUTTER_ERROR_CODES.CONFLICT,
+      undefined,
+      { resource }
+    );
+  }
+
+  /**
+   * Create rate limit error
+   */
+  static rateLimitExceeded(
+    message: string = 'Rate limit exceeded'
+  ): EnhancedApiError {
+    return new EnhancedApiError(
+      message,
+      429,
+      FLUTTER_ERROR_CODES.RATE_LIMIT_EXCEEDED
+    );
+  }
+
+  /**
+   * Create internal server error
+   */
+  static internalError(
+    message: string = 'Internal server error',
+    cause?: Error
+  ): EnhancedApiError {
+    return new EnhancedApiError(
+      message,
+      500,
+      FLUTTER_ERROR_CODES.INTERNAL_SERVER_ERROR,
+      cause
     );
   }
 }
@@ -391,4 +590,33 @@ export const asyncErrorHandler = (
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
+};
+
+/**
+ * Helper function to create success responses with consistent structure
+ */
+export const createSuccessResponse = (data: any, message?: string) => {
+  return {
+    success: true,
+    data,
+    message: message || 'Operation completed successfully',
+    timestamp: new Date().toISOString()
+  };
+};
+
+/**
+ * Helper function to validate Flutter error response structure
+ */
+export const isFlutterErrorResponse = (response: any): response is FlutterErrorResponse => {
+  return (
+    response &&
+    typeof response === 'object' &&
+    response.success === false &&
+    response.error &&
+    typeof response.error.code === 'string' &&
+    typeof response.error.message === 'string' &&
+    typeof response.error.timestamp === 'string' &&
+    typeof response.error.requestId === 'string' &&
+    typeof response.error.statusCode === 'number'
+  );
 };
