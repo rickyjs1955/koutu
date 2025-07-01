@@ -6,18 +6,20 @@ import {
 
 // Test utilities
 const createMockRequest = (overrides: Partial<Request> = {}): Partial<Request> => ({
-    get: jest.fn().mockImplementation((header: string) => {
-        if (header === 'X-Request-ID') return 'test-request-id';
+    get: ((name: string) => {
+        if (name === 'X-Request-ID') return 'test-request-id';
+        if (name === 'set-cookie') return undefined as string[] | undefined;
         return undefined;
-    }),
+    }) as Request['get'],
     ...overrides
 });
 
-const createMockResponse = (): Partial<Response> => ({
+const createMockResponse = (): Response => ({
     status: jest.fn().mockReturnThis(),
     json: jest.fn().mockReturnThis(),
-    send: jest.fn().mockReturnThis()
-});
+    send: jest.fn().mockReturnThis(),
+    // Add any other Response methods as needed for your tests
+} as unknown as Response);
 
 describe('Response Wrapper Security Tests', () => {
     let mockReq: Partial<Request>;
@@ -205,10 +207,11 @@ describe('Response Wrapper Security Tests', () => {
         describe('Request Context Security', () => {
             it('should handle malicious request IDs safely', () => {
                 const maliciousReq = createMockRequest({
-                get: jest.fn().mockImplementation((header: string) => {
+                get: ((header: string) => {
                     if (header === 'X-Request-ID') return '<script>alert("id")</script>';
+                    if (header === 'set-cookie') return undefined as string[] | undefined;
                     return undefined;
-                })
+                }) as Request['get']
                 });
 
                 const maliciousWrapper = new ResponseWrapper(maliciousReq as Request, mockRes as Response);
@@ -224,10 +227,11 @@ describe('Response Wrapper Security Tests', () => {
             it('should handle extremely long request IDs', () => {
                 const longRequestId = 'req_' + 'x'.repeat(10000);
                 const reqWithLongId = createMockRequest({
-                get: jest.fn().mockImplementation((header: string) => {
+                get: jest.fn(((header: string): string | string[] | undefined => {
                     if (header === 'X-Request-ID') return longRequestId;
+                    if (header === 'set-cookie') return undefined as string[] | undefined;
                     return undefined;
-                })
+                })) as Request['get']
                 });
 
                 const wrapperWithLongId = new ResponseWrapper(reqWithLongId as Request, mockRes as Response);
@@ -445,7 +449,10 @@ describe('Response Wrapper Security Tests', () => {
     describe('Request ID Security', () => {
         it('should generate secure request IDs', () => {
             const reqWithoutId = createMockRequest({
-                get: jest.fn().mockReturnValue(undefined)
+                get: ((name: string) => {
+                    if (name === 'set-cookie') return undefined as string[] | undefined;
+                    return undefined;
+                }) as Request['get']
             });
             const wrapperWithoutId = new ResponseWrapper(reqWithoutId as Request, mockRes as Response);
 
@@ -478,10 +485,11 @@ describe('Response Wrapper Security Tests', () => {
 
             injectionAttempts.forEach(maliciousId => {
                 const reqWithMaliciousId = createMockRequest({
-                get: jest.fn().mockImplementation((header: string) => {
+                get: jest.fn(((header: string): string | string[] | undefined => {
                     if (header === 'X-Request-ID') return maliciousId;
+                    if (header === 'set-cookie') return undefined as string[] | undefined;
                     return undefined;
-                })
+                })) as Request['get']
                 });
 
                 const maliciousWrapper = new ResponseWrapper(reqWithMaliciousId as Request, createMockResponse() as Response);
@@ -556,7 +564,7 @@ describe('Response Wrapper Security Tests', () => {
                 get maliciousGetter() {
                 throw new Error('Malicious getter accessed');
                 },
-                set maliciousSetter(value) {
+                set maliciousSetter(value: any) {
                 throw new Error('Malicious setter accessed');
                 }
             };

@@ -13,17 +13,18 @@ import {
 
 // Mock Express Request and Response
 const createMockRequest = (overrides: Partial<Request> = {}): Partial<Request> => ({
-    get: jest.fn().mockImplementation((header: string) => {
+    get: ((header: string) => {
+        if (header === 'set-cookie') return [] as string[]; // Return an empty array for set-cookie as required by Express types
         if (header === 'X-Request-ID') return 'test-request-id';
         return undefined;
-    }),
+    }) as Request['get'],
     ...overrides
 });
 
 const createMockResponse = (): Partial<Response> => ({
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn().mockReturnThis(),
-    send: jest.fn().mockReturnThis()
+    status: jest.fn().mockImplementation(function (this: Response) { return this; }) as unknown as Response['status'],
+    json: jest.fn().mockImplementation(function (this: Response) { return this; }) as unknown as Response['json'],
+    send: jest.fn().mockImplementation(function (this: Response) { return this; }) as unknown as Response['send']
 });
 
 describe('ResponseWrapper Utility Tests', () => {
@@ -253,7 +254,7 @@ describe('ResponseWrapper Utility Tests', () => {
         describe('request ID handling', () => {
             it('should generate request ID when not provided', () => {
                 const reqWithoutId = createMockRequest({
-                get: jest.fn().mockReturnValue(undefined)
+                    get: jest.fn((name: string) => undefined)
                 });
                 const wrapperWithoutId = new ResponseWrapper(reqWithoutId as Request, mockRes as Response);
                 
@@ -610,7 +611,7 @@ describe('ResponseWrapper Utility Tests', () => {
             // Since the current implementation doesn't handle this error gracefully,
             // we should expect it to throw and catch it properly
             expect(() => {
-            const wrapperWithBadReq = new ResponseWrapper(malformedReq as Request, mockRes as Response);
+            const wrapperWithBadReq = new ResponseWrapper(malformedReq as unknown as Request, mockRes as Response);
             wrapperWithBadReq.success({ test: 'data' });
             }).toThrow('Header access error');
 
@@ -627,7 +628,7 @@ describe('ResponseWrapper Utility Tests', () => {
             send: jest.fn().mockReturnThis()
             };
 
-            const wrapperWithFailures = new ResponseWrapper(mockReq as Request, mockResWithFailures as Response);
+            const wrapperWithFailures = new ResponseWrapper(mockReq as Request, mockResWithFailures as unknown as Response);
 
             // Current implementation will throw on status() call
             expect(() => {
@@ -870,7 +871,10 @@ describe('ResponseWrapper Utility Tests', () => {
     describe('Consistency with Error Handler', () => {
         it('should use the same request ID format as error handler', () => {
             const reqWithoutId = createMockRequest({
-                get: jest.fn().mockReturnValue(undefined)
+                get: jest.fn((name: string) => name === "set-cookie" ? undefined : undefined) as {
+                    (name: "set-cookie"): string[] | undefined;
+                    (name: string): string | undefined;
+                }
             });
             const wrapperWithoutId = new ResponseWrapper(reqWithoutId as Request, mockRes as Response);
             

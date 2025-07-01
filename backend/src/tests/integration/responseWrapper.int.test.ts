@@ -6,7 +6,8 @@ import {
   responseWrapperMiddleware,
   ResponseMessages,
   ResponseUtils,
-  TypedResponse} from '../../utils/responseWrapper';
+  TypedResponse
+} from '../../utils/responseWrapper';
 
 describe('Response Wrapper Integration Tests', () => {
     let app: express.Application;
@@ -20,154 +21,154 @@ describe('Response Wrapper Integration Tests', () => {
 
     describe('Complete Response Flow Integration', () => {
         beforeEach(() => {
-        // Setup test routes that demonstrate different response patterns
-        
-        // Basic success response
-        app.get('/api/test/success', (req: Request, res: Response) => {
-            const data = { id: 1, name: 'Test User', email: 'test@example.com' };
-            return res.success(data, { message: 'User retrieved successfully' });
-        });
-
-        // Created response (201)
-        app.post('/api/test/create', (req: Request, res: Response) => {
-            const userData = req.body;
-            const newUser = { id: Date.now(), ...userData };
-            return res.created(newUser, { message: ResponseMessages.CREATED });
-        });
-
-        // Accepted response (202) for async operations
-        app.post('/api/test/async', (req: Request, res: Response) => {
-            const taskData = { taskId: `task_${Date.now()}`, status: 'queued' };
-            return res.accepted(taskData, { message: 'Task queued for processing' });
-        });
-
-        // No content response (204)
-        app.delete('/api/test/delete/:id', (req: Request, res: Response) => {
-            // Simulate deletion
-            return res.noContent();
-        });
-
-        // Paginated response
-        app.get('/api/test/users', (req: Request, res: Response) => {
-            const { page, limit } = ResponseUtils.validatePagination(req.query.page, req.query.limit);
+            // Setup test routes that demonstrate different response patterns
             
-            // Mock data
-            const totalUsers = 150;
-            const users = Array.from({ length: Math.min(limit, totalUsers) }, (_, i) => ({
-            id: (page - 1) * limit + i + 1,
-            name: `User ${(page - 1) * limit + i + 1}`,
-            email: `user${(page - 1) * limit + i + 1}@example.com`
-            }));
-
-            const pagination = ResponseUtils.createPagination(page, limit, totalUsers);
-            
-            return res.successWithPagination(users, pagination, {
-            message: ResponseMessages.LIST_RETRIEVED
+            // Basic success response
+            app.get('/api/test/success', (req: Request, res: Response) => {
+                const data = { id: 1, name: 'Test User', email: 'test@example.com' };
+                res.success(data, { message: 'User retrieved successfully' });
             });
-        });
 
-        // Response with meta data (filters, sorting, caching)
-        app.get('/api/test/search', (req: Request, res: Response) => {
-            const { page, limit } = ResponseUtils.validatePagination(req.query.page, req.query.limit);
-            const query = req.query.q as string || '';
-            const sortBy = req.query.sortBy as string || 'name';
-            const order = req.query.order as 'asc' | 'desc' || 'asc';
-            
-            // Mock search results
-            const results = [
-            { id: 1, name: 'John Doe', relevance: 0.95 },
-            { id: 2, name: 'Jane Smith', relevance: 0.87 }
-            ];
-
-            const pagination = ResponseUtils.createPagination(page, limit, results.length);
-
-            return res.successWithPagination(results, pagination, {
-            message: ResponseMessages.SEARCH_COMPLETED,
-            meta: {
-                query,
-                sort: { field: sortBy, order },
-                cached: false,
-                processingTime: 25
-            }
+            // Created response (201)
+            app.post('/api/test/create', (req: Request, res: Response) => {
+                const userData = req.body;
+                const newUser = { id: Date.now(), ...userData };
+                res.created(newUser, { message: ResponseMessages.CREATED });
             });
-        });
 
-        // Custom status code
-        app.post('/api/test/custom-status', (req: Request, res: Response) => {
-            const data = { message: 'Custom operation completed' };
-            return res.success(data, { statusCode: 207, message: 'Multi-status response' });
-        });
-
-        // Using TypedResponse helpers
-        app.get('/api/test/typed-user', (req: Request, res: Response) => {
-            const user = { id: 1, name: 'John Doe', email: 'john@example.com' };
-            const responseData = TypedResponse.user.profile(user);
-            return res.success(responseData.data, { message: responseData.message });
-        });
-
-        app.post('/api/test/typed-auth', (req: Request, res: Response) => {
-            const authData = { 
-            user: { id: 1, email: 'user@example.com' }, 
-            token: 'jwt-token-123',
-            refreshToken: 'refresh-token-456'
-            };
-            const responseData = TypedResponse.auth.login(authData);
-            return res.success(responseData.data, { message: responseData.message });
-        });
-
-        // Error handling (should still work with existing error handler)
-        app.get('/api/test/error', (req: Request, res: Response, next: NextFunction) => {
-            const error = new Error('Test error for integration');
-            next(error);
-        });
-
-        // Large data response
-        app.get('/api/test/large-data', (req: Request, res: Response) => {
-            const largeDataset = Array.from({ length: 1000 }, (_, i) => ({
-            id: i,
-            name: `Item ${i}`,
-            description: 'Lorem ipsum '.repeat(10),
-            metadata: {
-                created: new Date().toISOString(),
-                tags: ['tag1', 'tag2', 'tag3']
-            }
-            }));
-
-            return res.success(largeDataset, { 
-            message: 'Large dataset retrieved',
-            meta: { count: largeDataset.length }
+            // Accepted response (202) for async operations
+            app.post('/api/test/async', (req: Request, res: Response) => {
+                const taskData = { taskId: `task_${Date.now()}`, status: 'queued' };
+                res.accepted(taskData, { message: 'Task queued for processing' });
             });
-        });
 
-        // Response with special characters and unicode
-        app.get('/api/test/unicode', (req: Request, res: Response) => {
-            const unicodeData = {
-            name: '🚀 Unicode Test ñáéíóú',
-            chinese: '测试数据',
-            arabic: 'اختبار البيانات',
-            emoji: '😀😍🎉🚀💻',
-            mathematical: '∑∆∏∫√≈≠≤≥'
-            };
-
-            return res.success(unicodeData, { 
-            message: 'Unicode data retrieved successfully' 
+            // No content response (204)
+            app.delete('/api/test/delete/:id', (req: Request, res: Response) => {
+                // Simulate deletion
+                res.noContent();
             });
-        });
 
-        // File upload simulation
-        app.post('/api/test/upload', (req: Request, res: Response) => {
-            const fileInfo = {
-            id: Date.now(),
-            filename: 'test-file.jpg',
-            originalName: 'my-photo.jpg',
-            size: 1024567,
-            mimetype: 'image/jpeg',
-            uploadedAt: new Date().toISOString()
-            };
+            // Paginated response
+            app.get('/api/test/users', (req: Request, res: Response) => {
+                const { page, limit } = ResponseUtils.validatePagination(req.query.page, req.query.limit);
+                
+                // Mock data
+                const totalUsers = 150;
+                const users = Array.from({ length: Math.min(limit, totalUsers) }, (_, i) => ({
+                    id: (page - 1) * limit + i + 1,
+                    name: `User ${(page - 1) * limit + i + 1}`,
+                    email: `user${(page - 1) * limit + i + 1}@example.com`
+                }));
 
-            const responseData = TypedResponse.file.uploaded(fileInfo);
-            return res.created(responseData.data, { message: responseData.message });
-        });
+                const pagination = ResponseUtils.createPagination(page, limit, totalUsers);
+
+                res.successWithPagination(users, pagination, {
+                    message: ResponseMessages.LIST_RETRIEVED
+                });
+            });
+
+            // Response with meta data (filters, sorting, caching)
+            app.get('/api/test/search', (req: Request, res: Response) => {
+                const { page, limit } = ResponseUtils.validatePagination(req.query.page, req.query.limit);
+                const query = req.query.q as string || '';
+                const sortBy = req.query.sortBy as string || 'name';
+                const order = req.query.order as 'asc' | 'desc' || 'asc';
+                
+                // Mock search results
+                const results = [
+                    { id: 1, name: 'John Doe', relevance: 0.95 },
+                    { id: 2, name: 'Jane Smith', relevance: 0.87 }
+                ];
+
+                const pagination = ResponseUtils.createPagination(page, limit, results.length);
+
+                res.successWithPagination(results, pagination, {
+                    message: ResponseMessages.SEARCH_COMPLETED,
+                    meta: {
+                        query,
+                        sort: { field: sortBy, order },
+                        cached: false,
+                        processingTime: 25
+                    }
+                });
+            });
+
+            // Custom status code
+            app.post('/api/test/custom-status', (req: Request, res: Response) => {
+                const data = { message: 'Custom operation completed' };
+                res.success(data, { statusCode: 207, message: 'Multi-status response' });
+            });
+
+            // Using TypedResponse helpers
+            app.get('/api/test/typed-user', (req: Request, res: Response) => {
+                const user = { id: 1, name: 'John Doe', email: 'john@example.com' };
+                const responseData = TypedResponse.user.profile(user);
+                res.success(responseData.data, { message: responseData.message });
+            });
+
+            app.post('/api/test/typed-auth', (req: Request, res: Response) => {
+                const authData = { 
+                    user: { id: 1, email: 'user@example.com' }, 
+                    token: 'jwt-token-123',
+                    refreshToken: 'refresh-token-456'
+                };
+                const responseData = TypedResponse.auth.login(authData);
+                res.success(responseData.data, { message: responseData.message });
+            });
+
+            // Error handling (should still work with existing error handler)
+            app.get('/api/test/error', (req: Request, res: Response, next: NextFunction) => {
+                const error = new Error('Test error for integration');
+                next(error);
+            });
+
+            // Large data response
+            app.get('/api/test/large-data', (req: Request, res: Response) => {
+                const largeDataset = Array.from({ length: 1000 }, (_, i) => ({
+                    id: i,
+                    name: `Item ${i}`,
+                    description: 'Lorem ipsum '.repeat(10),
+                    metadata: {
+                        created: new Date().toISOString(),
+                        tags: ['tag1', 'tag2', 'tag3']
+                    }
+                }));
+
+                res.success(largeDataset, { 
+                    message: 'Large dataset retrieved',
+                    meta: { count: largeDataset.length }
+                });
+            });
+
+            // Response with special characters and unicode
+            app.get('/api/test/unicode', (req: Request, res: Response) => {
+                const unicodeData = {
+                    name: '🚀 Unicode Test ñáéíóú',
+                    chinese: '测试数据',
+                    arabic: 'اختبار البيانات',
+                    emoji: '😀😍🎉🚀💻',
+                    mathematical: '∑∆∏∫√≈≠≤≥'
+                };
+
+                res.success(unicodeData, { 
+                    message: 'Unicode data retrieved successfully' 
+                });
+            });
+
+            // File upload simulation
+            app.post('/api/test/upload', (req: Request, res: Response) => {
+                const fileInfo = {
+                    id: Date.now(),
+                    filename: 'test-file.jpg',
+                    originalName: 'my-photo.jpg',
+                    size: 1024567,
+                    mimetype: 'image/jpeg',
+                    uploadedAt: new Date().toISOString()
+                };
+
+                const responseData = TypedResponse.file.uploaded(fileInfo);
+                res.created(responseData.data, { message: responseData.message });
+            });
         });
 
         describe('Basic Response Patterns', () => {
@@ -207,18 +208,18 @@ describe('Response Wrapper Integration Tests', () => {
                 .expect(201);
 
                 expect(response.body).toMatchObject({
-                success: true,
-                data: {
-                    id: expect.any(Number),
-                    name: 'New User',
-                    email: 'new@example.com'
-                },
-                message: ResponseMessages.CREATED,
-                timestamp: expect.any(String),
-                requestId: expect.any(String),
-                meta: {
-                    processingTime: expect.any(Number)
-                }
+                    success: true,
+                    data: {
+                        id: expect.any(Number),
+                        name: 'New User',
+                        email: 'new@example.com'
+                    },
+                    message: ResponseMessages.CREATED,
+                    timestamp: expect.any(String),
+                    requestId: expect.any(String),
+                    meta: {
+                        processingTime: expect.any(Number)
+                    }
                 });
             });
 
@@ -229,17 +230,17 @@ describe('Response Wrapper Integration Tests', () => {
                 .expect(202);
 
                 expect(response.body).toMatchObject({
-                success: true,
-                data: {
-                    taskId: expect.stringMatching(/^task_\d+$/),
-                    status: 'queued'
-                },
-                message: 'Task queued for processing',
-                timestamp: expect.any(String),
-                requestId: expect.any(String),
-                meta: {
-                    processingTime: expect.any(Number)
-                }
+                    success: true,
+                    data: {
+                        taskId: expect.stringMatching(/^task_\d+$/),
+                        status: 'queued'
+                    },
+                    message: 'Task queued for processing',
+                    timestamp: expect.any(String),
+                    requestId: expect.any(String),
+                    meta: {
+                        processingTime: expect.any(Number)
+                    }
                 });
             });
 
@@ -258,14 +259,14 @@ describe('Response Wrapper Integration Tests', () => {
                 .expect(207);
 
                 expect(response.body).toMatchObject({
-                success: true,
-                data: { message: 'Custom operation completed' },
-                message: 'Multi-status response',
-                timestamp: expect.any(String),
-                requestId: expect.any(String),
-                meta: {
-                    processingTime: expect.any(Number)
-                }
+                    success: true,
+                    data: { message: 'Custom operation completed' },
+                    message: 'Multi-status response',
+                    timestamp: expect.any(String),
+                    requestId: expect.any(String),
+                    meta: {
+                        processingTime: expect.any(Number)
+                    }
                 });
             });
         });
@@ -310,12 +311,12 @@ describe('Response Wrapper Integration Tests', () => {
                 .expect(200);
 
                 expect(response.body.meta.pagination).toMatchObject({
-                page: 2,
-                limit: 5,
-                total: 150,
-                totalPages: 30,
-                hasNext: true,
-                hasPrev: true
+                    page: 2,
+                    limit: 5,
+                    total: 150,
+                    totalPages: 30,
+                    hasNext: true,
+                    hasPrev: true
                 });
 
                 expect(response.body.data).toHaveLength(5);
@@ -328,12 +329,12 @@ describe('Response Wrapper Integration Tests', () => {
                 .expect(200);
 
                 expect(response.body.meta.pagination).toMatchObject({
-                page: 15,
-                limit: 10,
-                total: 150,
-                totalPages: 15,
-                hasNext: false,
-                hasPrev: true
+                    page: 15,
+                    limit: 10,
+                    total: 150,
+                    totalPages: 15,
+                    hasNext: false,
+                    hasPrev: true
                 });
 
                 expect(response.body.data).toHaveLength(10);
@@ -613,7 +614,7 @@ describe('Response Wrapper Integration Tests', () => {
         describe('Edge Cases and Error Scenarios', () => {
             it('should handle empty data gracefully', async () => {
                 app.get('/api/test/empty', (req: Request, res: Response) => {
-                return res.success(null);
+                    res.success(null);
                 });
 
                 const response = await request(app)
@@ -634,7 +635,7 @@ describe('Response Wrapper Integration Tests', () => {
             it('should handle array data', async () => {
                 app.get('/api/test/array', (req: Request, res: Response) => {
                 const data = [1, 2, 3, 'test', { nested: true }];
-                return res.success(data);
+                    res.success(data);
                 });
 
                 const response = await request(app)
@@ -646,13 +647,13 @@ describe('Response Wrapper Integration Tests', () => {
 
             it('should handle boolean and number data', async () => {
                 app.get('/api/test/primitives', (req: Request, res: Response) => {
-                return res.success({ 
-                    boolean: true, 
-                    number: 42, 
-                    zero: 0, 
-                    negative: -1,
-                    float: 3.14
-                });
+                    res.success({ 
+                        boolean: true, 
+                        number: 42, 
+                        zero: 0, 
+                        negative: -1,
+                        float: 3.14
+                    });
                 });
 
                 const response = await request(app)
@@ -660,11 +661,11 @@ describe('Response Wrapper Integration Tests', () => {
                 .expect(200);
 
                 expect(response.body.data).toEqual({
-                boolean: true,
-                number: 42,
-                zero: 0,
-                negative: -1,
-                float: 3.14
+                    boolean: true,
+                    number: 42,
+                    zero: 0,
+                    negative: -1,
+                    float: 3.14
                 });
             });
 
@@ -682,7 +683,7 @@ describe('Response Wrapper Integration Tests', () => {
                     }
                     }
                 };
-                return res.success(deepData);
+                res.success(deepData);
                 });
 
                 const response = await request(app)
@@ -697,13 +698,13 @@ describe('Response Wrapper Integration Tests', () => {
             it('should work with additional middleware in the chain', async () => {
                 // Add a custom middleware that modifies request
                 app.use('/api/test/middleware', (req: Request, res: Response, next: NextFunction) => {
-                (req as any).customData = { middleware: 'executed' };
-                next();
+                    (req as any).customData = { middleware: 'executed' };
+                    next();
                 });
 
                 app.get('/api/test/middleware/test', (req: Request, res: Response) => {
                 const customData = (req as any).customData;
-                return res.success(customData, { message: 'Middleware test successful' });
+                    res.success(customData, { message: 'Middleware test successful' });
                 });
 
                 const response = await request(app)
@@ -711,12 +712,12 @@ describe('Response Wrapper Integration Tests', () => {
                 .expect(200);
 
                 expect(response.body).toMatchObject({
-                success: true,
-                data: { middleware: 'executed' },
-                message: 'Middleware test successful',
-                meta: {
-                    processingTime: expect.any(Number)
-                }
+                    success: true,
+                    data: { middleware: 'executed' },
+                    message: 'Middleware test successful',
+                    meta: {
+                        processingTime: expect.any(Number)
+                    }
                 });
             });
 
@@ -729,7 +730,7 @@ describe('Response Wrapper Integration Tests', () => {
                 });
 
                 app.post('/api/test/complex/endpoint', (req: Request, res: Response) => {
-                return res.created(req.body, { message: 'Complex middleware chain successful' });
+                    res.created(req.body, { message: 'Complex middleware chain successful' });
                 });
 
                 const response = await request(app)
@@ -738,12 +739,12 @@ describe('Response Wrapper Integration Tests', () => {
                 .expect(201);
 
                 expect(response.body).toMatchObject({
-                success: true,
-                data: { test: 'data' },
-                message: 'Complex middleware chain successful',
-                meta: {
-                    processingTime: expect.any(Number)
-                }
+                    success: true,
+                    data: { test: 'data' },
+                    message: 'Complex middleware chain successful',
+                    meta: {
+                        processingTime: expect.any(Number)
+                    }
                 });
 
                 expect(response.headers['x-custom-header']).toBe('test-value');
@@ -832,28 +833,28 @@ describe('Response Wrapper Integration Tests', () => {
 
             // Setup basic success route
             errorApp.get('/api/test/success', (req: Request, res: Response) => {
-            const data = { id: 1, name: 'Test User', email: 'test@example.com' };
-            return res.success(data, { message: 'User retrieved successfully' });
+                const data = { id: 1, name: 'Test User', email: 'test@example.com' };
+                res.success(data, { message: 'User retrieved successfully' });
             });
 
             // Add a route that throws an error to test error handler integration
             errorApp.get('/api/test/trigger-error', (req: Request, res: Response, next: NextFunction) => {
-            const error = new Error('Integration test error');
-            next(error);
+                const error = new Error('Integration test error');
+                next(error);
             });
 
             // Mock error handler for testing
             errorApp.use((err: any, req: Request, res: Response, next: NextFunction) => {
-            res.status(500).json({
-                success: false,
-                error: {
-                code: 'INTERNAL_SERVER_ERROR',
-                message: err.message,
-                statusCode: 500,
-                timestamp: new Date().toISOString(),
-                requestId: req.get('X-Request-ID') || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-                }
-            });
+                res.status(500).json({
+                    success: false,
+                    error: {
+                    code: 'INTERNAL_SERVER_ERROR',
+                    message: err.message,
+                    statusCode: 500,
+                    timestamp: new Date().toISOString(),
+                    requestId: req.get('X-Request-ID') || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+                    }
+                });
             });
         });
 
