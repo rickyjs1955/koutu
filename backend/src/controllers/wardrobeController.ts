@@ -1,703 +1,752 @@
-/**
- * @fileoverview Wardrobe Controller - Handles all wardrobe-related HTTP requests
- * 
- * This controller manages the complete wardrobe lifecycle including:
- * - Creating, reading, updating, and deleting wardrobes
- * - Managing garment-wardrobe relationships
- * - Comprehensive input validation and error handling
- * - User authentication and authorization
- * 
- * @author Your Team
- * @version 1.0.0
- * @since 2024
- */
+// /backend/src/controllers/wardrobeController.ts - Fixed Flutter-compatible version
 
 import { Request, Response, NextFunction } from 'express';
-import { ApiError } from '../utils/ApiError';
+import { EnhancedApiError } from '../middlewares/errorHandler';
 import { wardrobeModel } from '../models/wardrobeModel';
 import { garmentModel } from '../models/garmentModel';
+import { sanitization } from '../utils/sanitize';
+import { ResponseUtils } from '../utils/responseWrapper';
 
 /**
- * Lenient UUID regex - accepts all valid UUID formats (v1, v3, v4, v5, nil)
- * Still provides security against injection attacks and malformed IDs
- * 
- * Pattern breakdown:
- * - [0-9a-f]{8}: 8 hexadecimal characters
- * - [0-9a-f]{4}: 4 hexadecimal characters (repeated 3 times)
- * - Case insensitive flag (/i) allows uppercase and lowercase
- * 
- * @example
- * Valid UUIDs:
- * - "550e8400-e29b-41d4-a716-446655440000" (UUID v4)
- * - "00000000-0000-0000-0000-000000000000" (nil UUID)
- * - "A0B1C2D3-E4F5-6789-ABCD-EF0123456789" (uppercase)
+ * Enhanced input validation with type checking for wardrobe operations
  */
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const validateAndSanitizeWardrobeInput = (name: any, description: any) => {
+  // Handle type confusion attacks
+  if (Array.isArray(name) || Array.isArray(description)) {
+    throw EnhancedApiError.validation('Invalid input format', 'name|description');
+  }
+  
+  if (name !== null && typeof name === 'object') {
+    throw EnhancedApiError.validation('Invalid name format', 'name');
+  }
+  
+  if (description !== null && typeof description === 'object' && description !== undefined) {
+    throw EnhancedApiError.validation('Invalid description format', 'description');
+  }
+
+  // Check for missing name (required field)
+  if (!name) {
+    throw EnhancedApiError.validation('Wardrobe name is required', 'name');
+  }
+
+  // Convert to strings for processing
+  const nameStr = String(name).trim();
+  const descriptionStr = description !== null && description !== undefined ? String(description).trim() : '';
+
+  // Validate after conversion (catches whitespace-only inputs)
+  if (!nameStr) {
+    throw EnhancedApiError.validation('Wardrobe name cannot be empty', 'name');
+  }
+
+  return { name: nameStr, description: descriptionStr };
+};
 
 /**
- * Invalid name characters regex - rejects problematic characters in wardrobe names
- * Allows: letters, numbers, spaces, hyphens, underscores, dots
- * Rejects: @#$%^&*()+=[]{}|\:";'<>?,/
- * 
- * @rationale Security and display consistency
+ * Enhanced wardrobe name validation
  */
-const INVALID_NAME_CHARS = /[@#$%^&*()+=\[\]{}|\\:";'<>?,/]/;
+const validateWardrobeName = (name: string): void => {
+  // Length validation
+  if (name.length > 100) {
+    throw EnhancedApiError.validation('Wardrobe name cannot exceed 100 characters', 'name', name.length);
+  }
 
-/**
- * Wardrobe Controller
- * 
- * Handles all HTTP requests related to wardrobe management.
- * Provides comprehensive CRUD operations with robust validation,
- * error handling, and security measures.
- * 
- * @namespace wardrobeController
- */
-export const wardrobeController = {
-  /**
-   * Creates a new wardrobe for the authenticated user
-   * 
-   * @async
-   * @function createWardrobe
-   * @param {Request} req - Express request object
-   * @param {Object} req.body - Request body
-   * @param {string} req.body.name - Wardrobe name (required, 1-100 chars)
-   * @param {string} [req.body.description] - Wardrobe description (optional, max 1000 chars)
-   * @param {Object} req.user - Authenticated user object
-   * @param {string} req.user.id - User ID
-   * @param {Response} res - Express response object
-   * @param {NextFunction} next - Express next function for error handling
-   * 
-   * @returns {Promise<void>} 201 status with created wardrobe data
-   * 
-   * @throws {ApiError} 401 - User not authenticated
-   * @throws {ApiError} 400 - Validation errors (missing/invalid name, invalid description)
-   * @throws {ApiError} 500 - Internal server error
-   * 
-   * @example
-   * // Request body
-   * {
-   *   "name": "Summer Collection",
-   *   "description": "Light and airy clothes for summer"
-   * }
-   * 
-   * // Response (201)
-   * {
-   *   "status": "success",
-   *   "data": {
-   *     "wardrobe": {
-   *       "id": "550e8400-e29b-41d4-a716-446655440000",
-   *       "user_id": "user-uuid",
-   *       "name": "Summer Collection",
-   *       "description": "Light and airy clothes for summer",
-   *       "created_at": "2024-01-01T00:00:00.000Z",
-   *       "updated_at": "2024-01-01T00:00:00.000Z"
-   *     }
-   *   },
-   *   "message": "Wardrobe created successfully"
-   * }
-   * 
-   * @validation
-   * - Name: Required, string, 1-100 characters, no special characters (@#$%^&*()+=[]{}|\:";'<>?,/)
-   * - Description: Optional, string, max 1000 characters, accepts undefined/null
-   * - User: Must be authenticated
-   */
-  async createWardrobe(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { name, description } = req.body;
-      
-      if (!req.user) {
-        return next(ApiError.unauthorized('User not authenticated'));
-      }
-      
-      // Basic validation - name is required
-      if (!name || typeof name !== 'string' || name.trim().length === 0) {
-        return next(ApiError.badRequest('Wardrobe name is required', 'MISSING_NAME'));
-      }
-      
-      // Check for invalid characters in name
-      if (INVALID_NAME_CHARS.test(name)) {
-        return next(ApiError.badRequest('Name contains invalid characters', 'INVALID_NAME_CHARS'));
-      }
-      
-      if (name.trim().length > 100) {
-        return next(ApiError.badRequest('Wardrobe name cannot exceed 100 characters', 'NAME_TOO_LONG'));
-      }
-      
-      // Optional description validation - handles null, undefined, and strings
-      if (description !== undefined && description !== null && typeof description !== 'string') {
-        return next(ApiError.badRequest('Description must be a string', 'INVALID_DESCRIPTION_TYPE'));
-      }
-      
-      if (description && description.length > 1000) {
-        return next(ApiError.badRequest('Description cannot exceed 1000 characters', 'DESCRIPTION_TOO_LONG'));
-      }
-      
-      const wardrobe = await wardrobeModel.create({
-        user_id: req.user.id,
-        name: name.trim(),
-        description: description?.trim() || ''
-      });
-      
-      res.status(201).json({
-        status: 'success',
-        data: { wardrobe },
-        message: 'Wardrobe created successfully'
-      });
-    } catch (error) {
-      console.error('Error creating wardrobe:', error);
-      next(ApiError.internal('Failed to create wardrobe'));
-    }
-  },
-  
-  /**
-   * Retrieves all wardrobes for the authenticated user
-   * 
-   * @async
-   * @function getWardrobes
-   * @param {Request} req - Express request object
-   * @param {Object} req.user - Authenticated user object
-   * @param {string} req.user.id - User ID
-   * @param {Response} res - Express response object
-   * @param {NextFunction} next - Express next function for error handling
-   * 
-   * @returns {Promise<void>} 200 status with user's wardrobes and count
-   * 
-   * @throws {ApiError} 401 - User not authenticated
-   * @throws {ApiError} 500 - Internal server error
-   * 
-   * @example
-   * // Response (200)
-   * {
-   *   "status": "success",
-   *   "data": {
-   *     "wardrobes": [
-   *       {
-   *         "id": "wardrobe-uuid-1",
-   *         "user_id": "user-uuid",
-   *         "name": "Summer Collection",
-   *         "description": "Light clothes",
-   *         "created_at": "2024-01-01T00:00:00.000Z",
-   *         "updated_at": "2024-01-01T00:00:00.000Z"
-   *       }
-   *     ],
-   *     "count": 1
-   *   }
-   * }
-   */
-  async getWardrobes(req: Request, res: Response, next: NextFunction) {
-    try {
-      if (!req.user) {
-        return next(ApiError.unauthorized('User not authenticated'));
-      }
-      
-      const wardrobes = await wardrobeModel.findByUserId(req.user.id);
-      
-      res.status(200).json({
-        status: 'success',
-        data: { 
-          wardrobes,
-          count: wardrobes.length 
-        }
-      });
-    } catch (error) {
-      console.error('Error retrieving wardrobes:', error);
-      next(ApiError.internal('Failed to retrieve wardrobes'));
-    }
-  },
-  
-  /**
-   * Retrieves a specific wardrobe with its garments for the authenticated user
-   * 
-   * @async
-   * @function getWardrobe
-   * @param {Request} req - Express request object
-   * @param {Object} req.params - URL parameters
-   * @param {string} req.params.id - Wardrobe UUID
-   * @param {Object} req.user - Authenticated user object
-   * @param {string} req.user.id - User ID
-   * @param {Response} res - Express response object
-   * @param {NextFunction} next - Express next function for error handling
-   * 
-   * @returns {Promise<void>} 200 status with wardrobe data including garments
-   * 
-   * @throws {ApiError} 401 - User not authenticated
-   * @throws {ApiError} 400 - Invalid UUID format
-   * @throws {ApiError} 404 - Wardrobe not found
-   * @throws {ApiError} 403 - User doesn't own the wardrobe
-   * @throws {ApiError} 500 - Internal server error
-   * 
-   * @example
-   * // Request: GET /wardrobes/550e8400-e29b-41d4-a716-446655440000
-   * 
-   * // Response (200)
-   * {
-   *   "status": "success",
-   *   "data": {
-   *     "wardrobe": {
-   *       "id": "550e8400-e29b-41d4-a716-446655440000",
-   *       "user_id": "user-uuid",
-   *       "name": "Summer Collection",
-   *       "description": "Light clothes",
-   *       "created_at": "2024-01-01T00:00:00.000Z",
-   *       "updated_at": "2024-01-01T00:00:00.000Z",
-   *       "garments": [
-   *         {
-   *           "id": "garment-uuid",
-   *           "metadata": { "category": "shirt", "color": "blue" },
-   *           "position": 0
-   *         }
-   *       ]
-   *     }
-   *   }
-   * }
-   * 
-   * @security Ensures user can only access their own wardrobes
-   */
-  async getWardrobe(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
-      
-      if (!req.user) {
-        return next(ApiError.unauthorized('User not authenticated'));
-      }
-      
-      if (!UUID_REGEX.test(id)) {
-        return next(ApiError.badRequest('Invalid wardrobe ID format', 'INVALID_UUID'));
-      }
-      
-      const wardrobe = await wardrobeModel.findById(id);
-      
-      if (!wardrobe) {
-        return next(ApiError.notFound('Wardrobe not found'));
-      }
-      
-      if (wardrobe.user_id !== req.user.id) {
-        return next(ApiError.forbidden('You do not have permission to access this wardrobe'));
-      }
-      
-      // Get garments in the wardrobe
-      const garments = await wardrobeModel.getGarments(id);
-      
-      res.status(200).json({
-        status: 'success',
-        data: {
-          wardrobe: {
-            ...wardrobe,
-            garments
-          }
-        }
-      });
-    } catch (error) {
-      console.error('Error retrieving wardrobe:', error);
-      next(ApiError.internal('Failed to retrieve wardrobe'));
-    }
-  },
-  
-  /**
-   * Updates an existing wardrobe (partial updates supported)
-   * 
-   * @async
-   * @function updateWardrobe
-   * @param {Request} req - Express request object
-   * @param {Object} req.params - URL parameters
-   * @param {string} req.params.id - Wardrobe UUID
-   * @param {Object} req.body - Request body (partial update)
-   * @param {string} [req.body.name] - New wardrobe name (optional)
-   * @param {string} [req.body.description] - New wardrobe description (optional)
-   * @param {Object} req.user - Authenticated user object
-   * @param {Response} res - Express response object
-   * @param {NextFunction} next - Express next function for error handling
-   * 
-   * @returns {Promise<void>} 200 status with updated wardrobe data
-   * 
-   * @throws {ApiError} 401 - User not authenticated
-   * @throws {ApiError} 400 - Invalid UUID or validation errors
-   * @throws {ApiError} 404 - Wardrobe not found
-   * @throws {ApiError} 403 - User doesn't own the wardrobe
-   * @throws {ApiError} 500 - Internal server error
-   * 
-   * @example
-   * // Request: PATCH /wardrobes/550e8400-e29b-41d4-a716-446655440000
-   * {
-   *   "name": "Updated Summer Collection"
-   * }
-   * 
-   * // Response (200)
-   * {
-   *   "status": "success",
-   *   "data": {
-   *     "wardrobe": {
-   *       "id": "550e8400-e29b-41d4-a716-446655440000",
-   *       "name": "Updated Summer Collection",
-   *       "description": "Original description",
-   *       "updated_at": "2024-01-01T01:00:00.000Z"
-   *     }
-   *   },
-   *   "message": "Wardrobe updated successfully"
-   * }
-   * 
-   * @validation Same rules as createWardrobe for provided fields
-   */
-  async updateWardrobe(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
-      const { name, description } = req.body;
-      
-      if (!req.user) {
-        return next(ApiError.unauthorized('User not authenticated'));
-      }
-      
-      if (!UUID_REGEX.test(id)) {
-        return next(ApiError.badRequest('Invalid wardrobe ID format', 'INVALID_UUID'));
-      }
-      
-      const wardrobe = await wardrobeModel.findById(id);
-      
-      if (!wardrobe) {
-        return next(ApiError.notFound('Wardrobe not found'));
-      }
-      
-      if (wardrobe.user_id !== req.user.id) {
-        return next(ApiError.forbidden('You do not have permission to update this wardrobe'));
-      }
-      
-      // Validate updates if provided
-      if (name !== undefined) {
-        if (typeof name !== 'string' || name.trim().length === 0) {
-          return next(ApiError.badRequest('Name must be a non-empty string', 'INVALID_NAME'));
-        }
-        
-        if (INVALID_NAME_CHARS.test(name)) {
-          return next(ApiError.badRequest('Name contains invalid characters', 'INVALID_NAME_CHARS'));
-        }
-        
-        if (name.trim().length > 100) {
-          return next(ApiError.badRequest('Name cannot exceed 100 characters', 'NAME_TOO_LONG'));
-        }
-      }
-      
-      if (description !== undefined && description !== null && typeof description !== 'string') {
-        return next(ApiError.badRequest('Description must be a string', 'INVALID_DESCRIPTION_TYPE'));
-      }
-      
-      if (description && description.length > 1000) {
-        return next(ApiError.badRequest('Description cannot exceed 1000 characters', 'DESCRIPTION_TOO_LONG'));
-      }
-      
-      const updatedWardrobe = await wardrobeModel.update(id, {
-        name: name?.trim(),
-        description: description?.trim()
-      });
-      
-      res.status(200).json({
-        status: 'success',
-        data: { wardrobe: updatedWardrobe },
-        message: 'Wardrobe updated successfully'
-      });
-    } catch (error) {
-      console.error('Error updating wardrobe:', error);
-      next(ApiError.internal('Failed to update wardrobe'));
-    }
-  },
-  
-  /**
-   * Adds a garment to a wardrobe at the specified position
-   * 
-   * @async
-   * @function addGarmentToWardrobe
-   * @param {Request} req - Express request object
-   * @param {Object} req.params - URL parameters
-   * @param {string} req.params.id - Wardrobe UUID
-   * @param {Object} req.body - Request body
-   * @param {string} req.body.garmentId - Garment UUID to add
-   * @param {number} [req.body.position=0] - Position in wardrobe (default: 0)
-   * @param {Object} req.user - Authenticated user object
-   * @param {Response} res - Express response object
-   * @param {NextFunction} next - Express next function for error handling
-   * 
-   * @returns {Promise<void>} 200 status with success message
-   * 
-   * @throws {ApiError} 401 - User not authenticated
-   * @throws {ApiError} 400 - Invalid UUIDs or position
-   * @throws {ApiError} 404 - Wardrobe or garment not found
-   * @throws {ApiError} 403 - User doesn't own wardrobe/garment
-   * @throws {ApiError} 500 - Internal server error
-   * 
-   * @example
-   * // Request: POST /wardrobes/wardrobe-uuid/garments
-   * {
-   *   "garmentId": "garment-uuid",
-   *   "position": 2
-   * }
-   * 
-   * // Response (200)
-   * {
-   *   "status": "success",
-   *   "data": null,
-   *   "message": "Garment added to wardrobe successfully"
-   * }
-   * 
-   * @validation
-   * - Position: Non-negative number, string numbers auto-converted
-   * - Both wardrobe and garment must belong to authenticated user
-   */
-  async addGarmentToWardrobe(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
-      const { garmentId, position } = req.body;
-      
-      if (!req.user) {
-        return next(ApiError.unauthorized('User not authenticated'));
-      }
-      
-      if (!UUID_REGEX.test(id)) {
-        return next(ApiError.badRequest('Invalid wardrobe ID format', 'INVALID_UUID'));
-      }
-      
-      if (!garmentId || !UUID_REGEX.test(garmentId)) {
-        return next(ApiError.badRequest('Valid garment ID is required', 'INVALID_GARMENT_ID'));
-      }
-      
-      // Validate position if provided
-      if (position !== undefined) {
-        const pos = Number(position);
-        if (isNaN(pos) || pos < 0) {
-          return next(ApiError.badRequest('Position must be a non-negative number', 'INVALID_POSITION'));
-        }
-      }
-      
-      const wardrobe = await wardrobeModel.findById(id);
-      
-      if (!wardrobe) {
-        return next(ApiError.notFound('Wardrobe not found'));
-      }
-      
-      if (wardrobe.user_id !== req.user.id) {
-        return next(ApiError.forbidden('You do not have permission to modify this wardrobe'));
-      }
-      
-      // FIXED: Better error handling for garment lookup
-      let garment;
-      try {
-        garment = await garmentModel.findById(garmentId);
-      } catch (error) {
-        console.error('Error finding garment:', error);
-        // If there's a database error finding the garment, treat as not found
-        return next(ApiError.notFound('Garment not found', 'GARMENT_NOT_FOUND'));
-      }
-      
-      // FIXED: Ensure we check for null garment
-      if (!garment) {
-        return next(ApiError.notFound('Garment not found', 'GARMENT_NOT_FOUND'));
-      }
-      
-      // FIXED: Check user ownership of garment
-      if (garment.user_id !== req.user.id) {
-        return next(ApiError.forbidden('You do not have permission to use this garment', 'GARMENT_ACCESS_DENIED'));
-      }
-      
-      // IMPROVED: Try to add garment with proper error handling
-      try {
-        await wardrobeModel.addGarment(
-          id, 
-          garmentId, 
-          position !== undefined ? Number(position) : 0,
-          { allowUpdate: false } // Strict mode for API calls
-        );
-      } catch (addError) {
-        console.error('Error adding garment to wardrobe:', addError);
-        
-        // Check for duplicate errors
-        if (addError instanceof Error && addError.message && 
-            (addError.message.includes('duplicate') || 
-            addError.message.includes('already in wardrobe'))) {
-          return next(ApiError.conflict('Garment already in wardrobe'));
-        }
-        
-        // For other database errors, return a generic error
-        return next(ApiError.internal('Failed to add garment to wardrobe'));
-      }
-      
-      res.status(200).json({
-        status: 'success',
-        data: null,
-        message: 'Garment added to wardrobe successfully'
-      });
-    } catch (error) {
-      console.error('Error adding garment to wardrobe:', error);
-      next(ApiError.internal('Failed to add garment to wardrobe'));
-    }
-  },
-  
-  /**
-   * Removes a garment from a wardrobe
-   * 
-   * @async
-   * @function removeGarmentFromWardrobe
-   * @param {Request} req - Express request object
-   * @param {Object} req.params - URL parameters
-   * @param {string} req.params.id - Wardrobe UUID
-   * @param {string} req.params.itemId - Garment UUID to remove
-   * @param {Object} req.user - Authenticated user object
-   * @param {Response} res - Express response object
-   * @param {NextFunction} next - Express next function for error handling
-   * 
-   * @returns {Promise<void>} 200 status with success message
-   * 
-   * @throws {ApiError} 401 - User not authenticated
-   * @throws {ApiError} 400 - Invalid UUID format
-   * @throws {ApiError} 404 - Wardrobe not found or garment not in wardrobe
-   * @throws {ApiError} 403 - User doesn't own the wardrobe
-   * @throws {ApiError} 500 - Internal server error
-   * 
-   * @example
-   * // Request: DELETE /wardrobes/wardrobe-uuid/garments/garment-uuid
-   * 
-   * // Response (200)
-   * {
-   *   "status": "success",
-   *   "data": null,
-   *   "message": "Garment removed from wardrobe successfully"
-   * }
-   */
-  async removeGarmentFromWardrobe(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id, itemId } = req.params;
-      
-      if (!req.user) {
-        return next(ApiError.unauthorized('User not authenticated'));
-      }
-      
-      if (!UUID_REGEX.test(id)) {
-        return next(ApiError.badRequest('Invalid wardrobe ID format', 'INVALID_UUID'));
-      }
-      
-      if (!UUID_REGEX.test(itemId)) {
-        return next(ApiError.badRequest('Invalid item ID format', 'INVALID_ITEM_UUID'));
-      }
-      
-      const wardrobe = await wardrobeModel.findById(id);
-      
-      if (!wardrobe) {
-        return next(ApiError.notFound('Wardrobe not found'));
-      }
-      
-      if (wardrobe.user_id !== req.user.id) {
-        return next(ApiError.forbidden('You do not have permission to modify this wardrobe'));
-      }
-      
-      const removed = await wardrobeModel.removeGarment(id, itemId);
-      
-      if (!removed) {
-        return next(ApiError.notFound('Garment not found in wardrobe', 'GARMENT_NOT_IN_WARDROBE'));
-      }
-      
-      res.status(200).json({
-        status: 'success',
-        data: null,
-        message: 'Garment removed from wardrobe successfully'
-      });
-    } catch (error) {
-      console.error('Error removing garment from wardrobe:', error);
-      next(ApiError.internal('Failed to remove garment from wardrobe'));
-    }
-  },
-  
-  /**
-   * Deletes a wardrobe and all its relationships
-   * 
-   * @async
-   * @function deleteWardrobe
-   * @param {Request} req - Express request object
-   * @param {Object} req.params - URL parameters
-   * @param {string} req.params.id - Wardrobe UUID to delete
-   * @param {Object} req.user - Authenticated user object
-   * @param {Response} res - Express response object
-   * @param {NextFunction} next - Express next function for error handling
-   * 
-   * @returns {Promise<void>} 200 status with success message
-   * 
-   * @throws {ApiError} 401 - User not authenticated
-   * @throws {ApiError} 400 - Invalid UUID format
-   * @throws {ApiError} 404 - Wardrobe not found
-   * @throws {ApiError} 403 - User doesn't own the wardrobe
-   * @throws {ApiError} 500 - Internal server error or deletion failure
-   * 
-   * @example
-   * // Request: DELETE /wardrobes/550e8400-e29b-41d4-a716-446655440000
-   * 
-   * // Response (200)
-   * {
-   *   "status": "success",
-   *   "data": null,
-   *   "message": "Wardrobe deleted successfully"
-   * }
-   * 
-   * @warning This operation is irreversible. All garment relationships are also removed.
-   */
-  async deleteWardrobe(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
-      
-      if (!req.user) {
-        return next(ApiError.unauthorized('User not authenticated'));
-      }
-      
-      if (!UUID_REGEX.test(id)) {
-        return next(ApiError.badRequest('Invalid wardrobe ID format', 'INVALID_UUID'));
-      }
-      
-      const wardrobe = await wardrobeModel.findById(id);
-      
-      if (!wardrobe) {
-        return next(ApiError.notFound('Wardrobe not found'));
-      }
-      
-      if (wardrobe.user_id !== req.user.id) {
-        return next(ApiError.forbidden('You do not have permission to delete this wardrobe'));
-      }
-      
-      const deleted = await wardrobeModel.delete(id);
-      
-      if (!deleted) {
-        return next(ApiError.internal('Failed to delete wardrobe'));
-      }
-      
-      res.status(200).json({
-        status: 'success',
-        data: null,
-        message: 'Wardrobe deleted successfully'
-      });
-    } catch (error) {
-      console.error('Error deleting wardrobe:', error);
-      next(ApiError.internal('Failed to delete wardrobe'));
-    }
+  // Character validation - reject problematic characters
+  const invalidChars = /[@#$%^&*()+=\[\]{}|\\:";'<>?,/]/;
+  if (invalidChars.test(name)) {
+    throw EnhancedApiError.validation(
+      'Name contains invalid characters. Only letters, numbers, spaces, hyphens, underscores, and dots are allowed',
+      'name',
+      { invalidChars: name.match(invalidChars) }
+    );
+  }
+
+  // Prevent names that are only special characters or whitespace
+  if (!/[a-zA-Z0-9]/.test(name)) {
+    throw EnhancedApiError.validation('Name must contain at least one letter or number', 'name');
   }
 };
 
 /**
- * @typedef {Object} Wardrobe
- * @property {string} id - UUID of the wardrobe
- * @property {string} user_id - UUID of the owner
- * @property {string} name - Name of the wardrobe (1-100 chars)
- * @property {string} description - Description of the wardrobe (0-1000 chars)
- * @property {Date} created_at - Creation timestamp
- * @property {Date} updated_at - Last update timestamp
+ * Enhanced description validation
  */
+const validateWardrobeDescription = (description: string): void => {
+  if (description && description.length > 1000) {
+    throw EnhancedApiError.validation('Description cannot exceed 1000 characters', 'description', description.length);
+  }
+};
 
 /**
- * @typedef {Object} ApiResponse
- * @property {string} status - Response status ('success' or 'error')
- * @property {*} data - Response data (wardrobe object, array, or null)
- * @property {string} [message] - Success message
- * @property {string} [error] - Error message
- * @property {string} [code] - Error code
+ * Validate UUID format with enhanced error messages
  */
+const validateUUID = (id: string, fieldName: string): void => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(id)) {
+    throw EnhancedApiError.validation(`Invalid ${fieldName} format`, fieldName, id);
+  }
+};
 
 /**
- * @typedef {Object} AuthenticatedRequest
- * @extends {Request}
- * @property {Object} user - Authenticated user object
- * @property {string} user.id - User UUID
- * @property {string} user.email - User email
+ * Validate position parameter for garment placement
  */
+const validatePosition = (position: any): number => {
+  if (position === undefined || position === null) {
+    return 0; // Default position
+  }
+
+  const pos = Number(position);
+  if (isNaN(pos) || pos < 0) {
+    throw EnhancedApiError.validation('Position must be a non-negative number', 'position', position);
+  }
+
+  if (pos > 1000) {
+    throw EnhancedApiError.validation('Position cannot exceed 1000', 'position', pos);
+  }
+
+  return Math.floor(pos); // Ensure integer
+};
+
+export const wardrobeController = {
+  /**
+   * Create a new wardrobe
+   * Flutter-optimized response format
+   */
+  async createWardrobe(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        throw EnhancedApiError.authenticationRequired('User authentication required');
+      }
+
+      const { name, description } = validateAndSanitizeWardrobeInput(req.body.name, req.body.description);
+
+      // Enhanced validation
+      validateWardrobeName(name);
+      validateWardrobeDescription(description);
+
+      const wardrobeData = {
+        user_id: req.user.id,
+        name: sanitization.sanitizeUserInput(name),
+        description: description ? sanitization.sanitizeUserInput(description) : ''
+      };
+
+      const wardrobe = await wardrobeModel.create(wardrobeData);
+
+      // Flutter-optimized response
+      res.created(
+        { wardrobe },
+        {
+          message: 'Wardrobe created successfully',
+          meta: {
+            wardrobeId: wardrobe.id,
+            nameLength: name.length,
+            hasDescription: !!description,
+            createdAt: new Date().toISOString()
+          }
+        }
+      );
+
+    } catch (error: any) {
+      console.error('Error creating wardrobe:', error);
+      
+      if (error instanceof EnhancedApiError) {
+        throw error;
+      }
+      
+      // Handle database constraint errors
+      if (error?.code === '23505' || error?.message?.includes('duplicate')) {
+        throw EnhancedApiError.conflict('A wardrobe with this name already exists', 'name');
+      }
+      
+      throw EnhancedApiError.internalError('Failed to create wardrobe', error);
+    }
+  },
+
+  /**
+   * Get all wardrobes for user
+   * Flutter-optimized response format with pagination support
+   */
+  async getWardrobes(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        throw EnhancedApiError.authenticationRequired('User authentication required');
+      }
+
+      // Handle pagination with ResponseUtils
+      let pagination: { page: number; limit: number } | undefined;
+      
+      if (req.query.page !== undefined || req.query.limit !== undefined) {
+        const validatedPagination = ResponseUtils.validatePagination(req.query.page, req.query.limit);
+        
+        // Wardrobe-specific limit validation
+        if (validatedPagination.limit > 50) {
+          throw EnhancedApiError.validation('Limit cannot exceed 50 wardrobes per page', 'limit', validatedPagination.limit);
+        }
+        
+        pagination = validatedPagination;
+      }
+
+      // Get wardrobes (pagination needs to be handled in service layer)
+      const wardrobes = await wardrobeModel.findByUserId(req.user.id);
+
+      // Apply client-side pagination if needed (temporary solution)
+      let paginatedWardrobes = wardrobes;
+      if (pagination) {
+        const startIndex = (pagination.page - 1) * pagination.limit;
+        const endIndex = startIndex + pagination.limit;
+        paginatedWardrobes = wardrobes.slice(startIndex, endIndex);
+      }
+
+      // Sanitize response data
+      const safeWardrobes = paginatedWardrobes.map(wardrobe => ({
+        ...wardrobe,
+        name: sanitization.sanitizeUserInput(wardrobe.name),
+        description: wardrobe.description ? sanitization.sanitizeUserInput(wardrobe.description) : ''
+      }));
+
+      // Flutter-optimized response - Fixed to return array directly
+      if (pagination) {
+        const totalCount = wardrobes.length;
+        const paginationMeta = ResponseUtils.createPagination(
+          pagination.page,
+          pagination.limit,
+          totalCount
+        );
+        
+        res.successWithPagination(safeWardrobes, paginationMeta, {
+          message: 'Wardrobes retrieved successfully',
+          meta: {
+            userId: req.user.id,
+            count: safeWardrobes.length
+          }
+        });
+      } else {
+        res.success(safeWardrobes, {
+          message: 'Wardrobes retrieved successfully',
+          meta: {
+            count: safeWardrobes.length,
+            userId: req.user.id
+          }
+        });
+      }
+
+    } catch (error: any) {
+      console.error('Error retrieving wardrobes:', error);
+      
+      if (error instanceof EnhancedApiError) {
+        throw error;
+      }
+      
+      throw EnhancedApiError.internalError('Failed to retrieve wardrobes', error);
+    }
+  },
+
+  /**
+   * Get single wardrobe with garments
+   * Flutter-optimized response format
+   */
+  async getWardrobe(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        throw EnhancedApiError.authenticationRequired('User authentication required');
+      }
+
+      const wardrobeId = req.params.id;
+      validateUUID(wardrobeId, 'wardrobeId');
+
+      const wardrobe = await wardrobeModel.findById(wardrobeId);
+      
+      if (!wardrobe) {
+        throw EnhancedApiError.notFound('Wardrobe not found', 'wardrobe');
+      }
+
+      if (wardrobe.user_id !== req.user.id) {
+        throw EnhancedApiError.authorizationDenied('You do not have permission to access this wardrobe', 'wardrobe');
+      }
+
+      // Get garments in the wardrobe
+      const garments = await wardrobeModel.getGarments(wardrobeId);
+
+      // Sanitize response data
+      const safeWardrobe = {
+        ...wardrobe,
+        name: sanitization.sanitizeUserInput(wardrobe.name),
+        description: wardrobe.description ? sanitization.sanitizeUserInput(wardrobe.description) : '',
+        garments: garments.map(garment => ({
+          ...garment,
+          metadata: garment.metadata ? sanitization.sanitizeForSecurity(garment.metadata) : {}
+        }))
+      };
+
+      // Flutter-optimized response
+      res.success(
+        { wardrobe: safeWardrobe },
+        {
+          message: 'Wardrobe retrieved successfully',
+          meta: {
+            wardrobeId,
+            garmentCount: garments.length,
+            hasGarments: garments.length > 0
+          }
+        }
+      );
+
+    } catch (error: any) {
+      console.error('Error retrieving wardrobe:', error);
+      
+      if (error instanceof EnhancedApiError) {
+        throw error;
+      }
+      
+      throw EnhancedApiError.internalError('Failed to retrieve wardrobe', error);
+    }
+  },
+
+  /**
+   * Update wardrobe
+   * Flutter-optimized response format
+   */
+  async updateWardrobe(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        throw EnhancedApiError.authenticationRequired('User authentication required');
+      }
+
+      const wardrobeId = req.params.id;
+      validateUUID(wardrobeId, 'wardrobeId');
+
+      const wardrobe = await wardrobeModel.findById(wardrobeId);
+      
+      if (!wardrobe) {
+        throw EnhancedApiError.notFound('Wardrobe not found', 'wardrobe');
+      }
+
+      if (wardrobe.user_id !== req.user.id) {
+        throw EnhancedApiError.authorizationDenied('You do not have permission to update this wardrobe', 'wardrobe');
+      }
+
+      // Validate update data
+      const updates: any = {};
+      const updatedFields: string[] = [];
+
+      if (req.body.hasOwnProperty('name')) {
+        if (!req.body.name) {
+          throw EnhancedApiError.validation('Name cannot be empty', 'name');
+        }
+        const nameStr = String(req.body.name).trim();
+        validateWardrobeName(nameStr);
+        updates.name = sanitization.sanitizeUserInput(nameStr);
+        updatedFields.push('name');
+      }
+
+      if (req.body.hasOwnProperty('description')) {
+        const descStr = req.body.description !== null && req.body.description !== undefined 
+          ? String(req.body.description).trim() 
+          : '';
+        validateWardrobeDescription(descStr);
+        updates.description = descStr ? sanitization.sanitizeUserInput(descStr) : '';
+        updatedFields.push('description');
+      }
+
+      if (updatedFields.length === 0) {
+        throw EnhancedApiError.validation('At least one field must be provided for update', 'update_data');
+      }
+
+      const updatedWardrobe = await wardrobeModel.update(wardrobeId, updates);
+
+      if (!updatedWardrobe) {
+        throw EnhancedApiError.internalError('Failed to update wardrobe');
+      }
+
+      // Sanitize response
+      const safeWardrobe = {
+        ...updatedWardrobe,
+        name: sanitization.sanitizeUserInput(updatedWardrobe.name),
+        description: updatedWardrobe.description ? sanitization.sanitizeUserInput(updatedWardrobe.description) : ''
+      };
+
+      // Flutter-optimized response
+      res.success(
+        { wardrobe: safeWardrobe },
+        {
+          message: 'Wardrobe updated successfully',
+          meta: {
+            wardrobeId,
+            updatedFields,
+            updatedAt: new Date().toISOString()
+          }
+        }
+      );
+
+    } catch (error: any) {
+      console.error('Error updating wardrobe:', error);
+      
+      if (error instanceof EnhancedApiError) {
+        throw error;
+      }
+      
+      throw EnhancedApiError.internalError('Failed to update wardrobe', error);
+    }
+  },
+
+  /**
+   * Add garment to wardrobe
+   * Flutter-optimized response format
+   */
+  async addGarmentToWardrobe(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        throw EnhancedApiError.authenticationRequired('User authentication required');
+      }
+
+      const wardrobeId = req.params.id;
+      const { garmentId, position } = req.body;
+
+      validateUUID(wardrobeId, 'wardrobeId');
+
+      if (!garmentId) {
+        throw EnhancedApiError.validation('Garment ID is required', 'garmentId');
+      }
+      validateUUID(garmentId, 'garmentId');
+
+      const validatedPosition = validatePosition(position);
+
+      // Verify wardrobe ownership
+      const wardrobe = await wardrobeModel.findById(wardrobeId);
+      if (!wardrobe) {
+        throw EnhancedApiError.notFound('Wardrobe not found', 'wardrobe');
+      }
+
+      if (wardrobe.user_id !== req.user.id) {
+        throw EnhancedApiError.authorizationDenied('You do not have permission to modify this wardrobe', 'wardrobe');
+      }
+
+      // Verify garment ownership
+      const garment = await garmentModel.findById(garmentId);
+      if (!garment) {
+        throw EnhancedApiError.notFound('Garment not found', 'garment');
+      }
+
+      if (garment.user_id !== req.user.id) {
+        throw EnhancedApiError.authorizationDenied('You do not have permission to use this garment', 'garment');
+      }
+
+      // Add garment to wardrobe
+      try {
+        await wardrobeModel.addGarment(wardrobeId, garmentId, validatedPosition);
+      } catch (addError: any) {
+        if (addError.code === '23505' || addError.message?.includes('duplicate')) {
+          throw EnhancedApiError.conflict('Garment is already in this wardrobe', 'garment_wardrobe');
+        }
+        throw addError;
+      }
+
+      // Flutter-optimized response
+      res.success(
+        {},
+        {
+          message: 'Garment added to wardrobe successfully',
+          meta: {
+            wardrobeId,
+            garmentId,
+            position: validatedPosition,
+            addedAt: new Date().toISOString()
+          }
+        }
+      );
+
+    } catch (error: any) {
+      console.error('Error adding garment to wardrobe:', error);
+      
+      if (error instanceof EnhancedApiError) {
+        throw error;
+      }
+      
+      throw EnhancedApiError.internalError('Failed to add garment to wardrobe', error);
+    }
+  },
+
+  /**
+   * Remove garment from wardrobe
+   * Flutter-optimized response format
+   */
+  async removeGarmentFromWardrobe(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        throw EnhancedApiError.authenticationRequired('User authentication required');
+      }
+
+      const wardrobeId = req.params.id;
+      const garmentId = req.params.itemId;
+
+      validateUUID(wardrobeId, 'wardrobeId');
+      validateUUID(garmentId, 'itemId'); // Changed to match expected error code
+
+      // Verify wardrobe ownership
+      const wardrobe = await wardrobeModel.findById(wardrobeId);
+      if (!wardrobe) {
+        throw EnhancedApiError.notFound('Wardrobe not found', 'wardrobe');
+      }
+
+      if (wardrobe.user_id !== req.user.id) {
+        throw EnhancedApiError.authorizationDenied('You do not have permission to modify this wardrobe', 'wardrobe');
+      }
+
+      // Remove garment from wardrobe
+      const removed = await wardrobeModel.removeGarment(wardrobeId, garmentId);
+      
+      if (!removed) {
+        throw EnhancedApiError.notFound('Garment not found in wardrobe', 'garment_wardrobe');
+      }
+
+      // Flutter-optimized response
+      res.success(
+        {},
+        {
+          message: 'Garment removed from wardrobe successfully',
+          meta: {
+            wardrobeId,
+            removedGarmentId: garmentId,
+            removedAt: new Date().toISOString()
+          }
+        }
+      );
+
+    } catch (error: any) {
+      console.error('Error removing garment from wardrobe:', error);
+      
+      if (error instanceof EnhancedApiError) {
+        throw error;
+      }
+      
+      throw EnhancedApiError.internalError('Failed to remove garment from wardrobe', error);
+    }
+  },
+
+  /**
+   * Delete wardrobe
+   * Flutter-optimized response format
+   */
+  async deleteWardrobe(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        throw EnhancedApiError.authenticationRequired('User authentication required');
+      }
+
+      const wardrobeId = req.params.id;
+      validateUUID(wardrobeId, 'wardrobeId');
+
+      const wardrobe = await wardrobeModel.findById(wardrobeId);
+      
+      if (!wardrobe) {
+        throw EnhancedApiError.notFound('Wardrobe not found', 'wardrobe');
+      }
+
+      if (wardrobe.user_id !== req.user.id) {
+        throw EnhancedApiError.authorizationDenied('You do not have permission to delete this wardrobe', 'wardrobe');
+      }
+
+      // Get garment count before deletion for meta info
+      const garments = await wardrobeModel.getGarments(wardrobeId);
+      const garmentCount = garments.length;
+
+      const deleted = await wardrobeModel.delete(wardrobeId);
+      
+      if (!deleted) {
+        throw EnhancedApiError.internalError('Failed to delete wardrobe');
+      }
+
+      // Flutter-optimized response
+      res.success(
+        {},
+        {
+          message: 'Wardrobe deleted successfully',
+          meta: {
+            deletedWardrobeId: wardrobeId,
+            deletedGarmentRelationships: garmentCount,
+            deletedAt: new Date().toISOString()
+          }
+        }
+      );
+
+    } catch (error: any) {
+      console.error('Error deleting wardrobe:', error);
+      
+      if (error instanceof EnhancedApiError) {
+        throw error;
+      }
+      
+      throw EnhancedApiError.internalError('Failed to delete wardrobe', error);
+    }
+  },
+
+  /**
+   * Reorder garments in wardrobe (Simplified implementation)
+   * Flutter-optimized response format
+   */
+  async reorderGarments(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        throw EnhancedApiError.authenticationRequired('User authentication required');
+      }
+
+      const wardrobeId = req.params.id;
+      const { garmentPositions } = req.body;
+
+      validateUUID(wardrobeId, 'wardrobeId');
+
+      if (!garmentPositions || !Array.isArray(garmentPositions)) {
+        throw EnhancedApiError.validation('Garment positions array is required', 'garmentPositions');
+      }
+
+      if (garmentPositions.length === 0) {
+        throw EnhancedApiError.validation('At least one garment position is required', 'garmentPositions');
+      }
+
+      if (garmentPositions.length > 100) {
+        throw EnhancedApiError.validation('Cannot reorder more than 100 garments at once', 'garmentPositions', garmentPositions.length);
+      }
+
+      // Verify wardrobe ownership
+      const wardrobe = await wardrobeModel.findById(wardrobeId);
+      if (!wardrobe) {
+        throw EnhancedApiError.notFound('Wardrobe not found', 'wardrobe');
+      }
+
+      if (wardrobe.user_id !== req.user.id) {
+        throw EnhancedApiError.authorizationDenied('You do not have permission to modify this wardrobe', 'wardrobe');
+      }
+
+      // Validate garment positions structure
+      const validatedPositions = garmentPositions.map((item: any, index: number) => {
+        if (!item || typeof item !== 'object') {
+          throw EnhancedApiError.validation(`Invalid garment position at index ${index}`, 'garmentPositions', index);
+        }
+
+        if (!item.garmentId) {
+          throw EnhancedApiError.validation(`Garment ID is required at index ${index}`, 'garmentPositions', index);
+        }
+
+        validateUUID(item.garmentId, `garmentPositions[${index}].garmentId`);
+        const position = validatePosition(item.position);
+
+        return {
+          garmentId: item.garmentId,
+          position
+        };
+      });
+
+      // Check for duplicate garment IDs
+      const garmentIds = validatedPositions.map(p => p.garmentId);
+      const uniqueIds = new Set(garmentIds);
+      if (uniqueIds.size !== garmentIds.length) {
+        throw EnhancedApiError.validation('Duplicate garment IDs are not allowed', 'garmentPositions');
+      }
+
+      // Simplified implementation: Remove and re-add garments in new positions
+      // This is a temporary solution until the model supports batch reordering
+      try {
+        for (const { garmentId, position } of validatedPositions) {
+          // Remove the garment first
+          await wardrobeModel.removeGarment(wardrobeId, garmentId);
+          // Add it back with new position
+          await wardrobeModel.addGarment(wardrobeId, garmentId, position);
+        }
+      } catch (reorderError: any) {
+        console.error('Error during garment reordering:', reorderError);
+        throw EnhancedApiError.internalError('Failed to reorder garments. Some positions may have been updated.');
+      }
+
+      // Flutter-optimized response
+      res.success(
+        {},
+        {
+          message: 'Garments reordered successfully',
+          meta: {
+            wardrobeId,
+            reorderedCount: validatedPositions.length,
+            garmentIds: garmentIds,
+            reorderedAt: new Date().toISOString()
+          }
+        }
+      );
+
+    } catch (error: any) {
+      console.error('Error reordering garments:', error);
+      
+      if (error instanceof EnhancedApiError) {
+        throw error;
+      }
+      
+      throw EnhancedApiError.internalError('Failed to reorder garments', error);
+    }
+  },
+
+  /**
+   * Get wardrobe statistics
+   * Flutter-optimized response format
+   */
+  async getWardrobeStats(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        throw EnhancedApiError.authenticationRequired('User authentication required');
+      }
+
+      const wardrobeId = req.params.id;
+      validateUUID(wardrobeId, 'wardrobeId');
+
+      // Verify wardrobe ownership
+      const wardrobe = await wardrobeModel.findById(wardrobeId);
+      if (!wardrobe) {
+        throw EnhancedApiError.notFound('Wardrobe not found', 'wardrobe');
+      }
+
+      if (wardrobe.user_id !== req.user.id) {
+        throw EnhancedApiError.authorizationDenied('You do not have permission to access this wardrobe', 'wardrobe');
+      }
+
+      // Get garments and calculate statistics
+      const garments = await wardrobeModel.getGarments(wardrobeId);
+      
+      const stats = {
+        totalGarments: garments.length,
+        categories: {} as Record<string, number>,
+        colors: {} as Record<string, number>,
+        lastUpdated: wardrobe.updated_at,
+        createdAt: wardrobe.created_at
+      };
+
+      // Analyze garment metadata for categories and colors
+      garments.forEach(garment => {
+        if (garment.metadata) {
+          const category = garment.metadata.category || 'uncategorized';
+          const color = garment.metadata.color || 'unknown';
+          
+          stats.categories[category] = (stats.categories[category] || 0) + 1;
+          stats.colors[color] = (stats.colors[color] || 0) + 1;
+        }
+      });
+
+      // Flutter-optimized response
+      res.success(
+        { stats },
+        {
+          message: 'Wardrobe statistics retrieved successfully',
+          meta: {
+            wardrobeId,
+            analysisDate: new Date().toISOString(),
+            categoriesCount: Object.keys(stats.categories).length,
+            colorsCount: Object.keys(stats.colors).length
+          }
+        }
+      );
+
+    } catch (error: any) {
+      console.error('Error retrieving wardrobe stats:', error);
+      
+      if (error instanceof EnhancedApiError) {
+        throw error;
+      }
+      
+      throw EnhancedApiError.internalError('Failed to retrieve wardrobe statistics', error);
+    }
+  }
+};

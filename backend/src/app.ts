@@ -4,6 +4,7 @@ import cors from 'cors';
 import { config } from './config';
 import { errorHandler } from './middlewares/errorHandler';
 import { securityMiddleware } from './middlewares/security';
+import { responseWrapperMiddleware } from './utils/responseWrapper';
 
 // Route imports
 import { authRoutes } from './routes/authRoutes';
@@ -17,6 +18,11 @@ import { oauthRoutes } from './routes/oauthRoutes';
 
 // Initialize express app
 const app = express();
+
+// ==================== FLUTTER-FRIENDLY ERROR HANDLING ====================
+// Use a custom error handler that works well with Flutter apps
+app.use(errorHandler);
+app.use(responseWrapperMiddleware);
 
 // ==================== FLUTTER-SPECIFIC CORS CONFIGURATION ====================
 // Flutter apps make requests without traditional web origins

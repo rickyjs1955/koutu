@@ -1,10 +1,10 @@
-// /backend/src/controllers/oauthController.ts - Fully Flutter-compatible version
+// /backend/src/controllers/oauthController.ts - Enhanced with proper cleanup
 import { Request, Response, NextFunction } from 'express';
 import { oauthService } from '../services/oauthService';
 import { authService } from '../services/authService';
 import { getAuthorizationUrl, OAuthProvider } from '../config/oauth';
 import { v4 as uuidv4 } from 'uuid';
-import { EnhancedApiError } from '../middlewares/errorHandler';
+import { ApiError } from '../utils/ApiError';
 import { sanitization } from '../utils/sanitize';
 import * as db from '../models/db';
 
@@ -49,35 +49,35 @@ if (!isTestEnvironment()) {
   startCleanupInterval();
 }
 
-// Enhanced input validation aligned with Flutter patterns
+// ENHANCED: Aligned with auth system validation patterns
 const validateOAuthInput = (provider: any, state: any, code: any) => {
-  // Handle type confusion attacks
+  // Handle type confusion attacks (aligned with authController)
   if (Array.isArray(provider) || Array.isArray(state) || Array.isArray(code)) {
-    throw EnhancedApiError.validation('Invalid input format', 'provider|state|code');
+    throw ApiError.badRequest('Invalid input format');
   }
   
   if (provider !== null && typeof provider === 'object') {
-    throw EnhancedApiError.validation('Invalid provider format', 'provider');
+    throw ApiError.badRequest('Invalid provider format');
   }
 
-  // Validate provider
+  // Validate provider using auth system validation pattern
   const validProviders = ['google', 'microsoft', 'github', 'instagram'];
   if (!validProviders.includes(String(provider))) {
-    throw EnhancedApiError.validation(`Unsupported provider: ${provider}`, 'provider', provider);
+    throw ApiError.badRequest(`Unsupported provider: ${provider}`);
   }
 
-  // Clean and validate inputs
+  // ENHANCED: Use auth system input validation approach
   const providerStr = String(provider).trim();
   const stateStr = state ? String(state).trim() : null;
   const codeStr = code ? String(code).trim() : null;
 
-  // Additional validation
+  // Additional validation following auth system patterns
   if (stateStr && (stateStr.length === 0 || stateStr.length > 255)) {
-    throw EnhancedApiError.validation('Invalid state parameter', 'state', stateStr?.length);
+    throw ApiError.badRequest('Invalid state parameter');
   }
 
   if (codeStr && (codeStr.length === 0 || codeStr.length > 1000)) {
-    throw EnhancedApiError.validation('Invalid authorization code', 'code', codeStr?.length);
+    throw ApiError.badRequest('Invalid authorization code');
   }
 
   return {
@@ -87,7 +87,10 @@ const validateOAuthInput = (provider: any, state: any, code: any) => {
   };
 };
 
-// Enhanced state validation with timing safety
+// ENHANCED: Use auth service timing function for consistency
+const ensureMinimumResponseTime = authService.ensureMinimumResponseTime.bind(authService);
+
+// Enhanced state validation with timing safety (aligned with auth system)
 const validateOAuthState = (state: string) => {
   const dummyValidation = () => {
     // Perform dummy operations to maintain consistent timing
@@ -119,28 +122,25 @@ const validateOAuthState = (state: string) => {
   };
 };
 
-// Email validation for OAuth users
+// ENHANCED: Email validation for OAuth users (aligned with auth system)
 const validateOAuthEmail = (email: string): void => {
   try {
     // Use auth system email validation for consistency
     authService.validateEmailFormat(email);
   } catch (error) {
     // Re-throw with OAuth context
-    throw EnhancedApiError.business(
+    throw ApiError.businessLogic(
       'Invalid email from OAuth provider',
-      'oauth_email_validation',
-      'oauth'
+      'oauth_invalid_email',
+      'email'
     );
   }
 };
 
-// Timing-safe helper
-const ensureMinimumResponseTime = authService.ensureMinimumResponseTime.bind(authService);
-
 export const oauthController = {
   /**
    * Initiate OAuth flow by redirecting to provider's authorization page
-   * Flutter-optimized with proper error handling
+   * ENHANCED: Aligned with auth system patterns
    */
   async authorize(req: Request, res: Response, next: NextFunction) {
     const startTime = Date.now();
@@ -149,7 +149,7 @@ export const oauthController = {
       const { provider } = validateOAuthInput(req.params.provider, null, null);
       const { redirect } = req.query;
       
-      // Validate redirect parameter
+      // ENHANCED: Validate redirect parameter using auth system validation patterns
       if (redirect && typeof redirect === 'string') {
         const allowedRedirectDomains = process.env.ALLOWED_REDIRECT_DOMAINS?.split(',') || [];
         
@@ -158,11 +158,11 @@ export const oauthController = {
           
           if (allowedRedirectDomains.length > 0 && !allowedRedirectDomains.includes(redirectUrl.hostname)) {
             await ensureMinimumResponseTime(startTime, 50);
-            throw EnhancedApiError.validation('Invalid redirect URL domain', 'redirect', redirectUrl.hostname);
+            return next(ApiError.badRequest('Invalid redirect URL'));
           }
         } catch (urlError) {
           await ensureMinimumResponseTime(startTime, 50);
-          throw EnhancedApiError.validation('Invalid redirect URL format', 'redirect', redirect);
+          return next(ApiError.badRequest('Invalid redirect URL format'));
         }
       }
       
@@ -173,17 +173,17 @@ export const oauthController = {
         redirectUrl: redirect as string | undefined
       };
 
-      // Type guard for OAuth provider
+      // Type guard to validate if a string is a supported OAuth provider
       const isValidOAuthProvider = (provider: string): provider is OAuthProvider => {
         return ['google', 'microsoft', 'github', 'instagram'].includes(provider);
       };
 
       if (!isValidOAuthProvider(provider)) {
         await ensureMinimumResponseTime(startTime, 50);
-        throw EnhancedApiError.validation(`Invalid OAuth provider: ${provider}`, 'provider', provider);
+        throw new Error(`Invalid OAuth provider: ${provider}`);
       }
       
-      // Generate authorization URL
+      // Generate authorization URL with additional security
       const authUrl = getAuthorizationUrl(
         provider,
         state,
@@ -193,25 +193,22 @@ export const oauthController = {
         }
       );
       
+      // ENHANCED: Use auth service timing function for consistency
       await ensureMinimumResponseTime(startTime, 50);
       
-      // Sanitize and redirect (this is appropriate for OAuth flow)
+      // Sanitize the redirect URL to prevent XSS
       const sanitizedAuthUrl = sanitization.sanitizeUrl(authUrl);
       res.redirect(sanitizedAuthUrl);
       
     } catch (error) {
       await ensureMinimumResponseTime(startTime, 50);
-      
-      if (error instanceof EnhancedApiError) {
-        throw error;
-      }
-      throw EnhancedApiError.internalError('OAuth authorization failed', error instanceof Error ? error : new Error(String(error)));
+      next(error);
     }
   },
   
   /**
    * Handle OAuth callback from provider
-   * Flutter-optimized with proper error handling
+   * ENHANCED: Aligned with auth system response patterns
    */
   async callback(req: Request, res: Response, next: NextFunction) {
     const startTime = Date.now();
@@ -228,56 +225,49 @@ export const oauthController = {
       // Check for OAuth provider error
       if (error) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.business(
-          `OAuth provider error: ${sanitization.sanitizeUserInput(String(error))}`,
-          'oauth_provider_error',
-          'oauth'
-        );
+        return next(ApiError.badRequest(`Provider error: ${sanitization.sanitizeUserInput(String(error))}`));
       }
       
       // Validate required parameters
       if (!validatedCode || !validatedState) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.validation(
-          'Missing required OAuth parameters',
-          !validatedCode ? 'code' : 'state'
-        );
+        return next(ApiError.badRequest('Missing required parameters'));
       }
       
       // Validate state parameter with timing safety
       const stateValidation = validateOAuthState(validatedState);
       if (!stateValidation.isValid) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.validation(stateValidation.error || 'Invalid state parameter', 'state');
+        return next(ApiError.badRequest(stateValidation.error));
       }
       
-      // Type guard for OAuth provider
+      // Type guard to validate if a string is a supported OAuth provider
       const isValidOAuthProvider = (provider: string): provider is OAuthProvider => {
         return ['google', 'microsoft', 'github', 'instagram'].includes(provider);
       };
 
+      // Validate OAuth provider before proceeding
       if (!isValidOAuthProvider(provider)) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.validation(`Invalid OAuth provider: ${provider}`, 'provider', provider);
+        throw new Error(`Invalid OAuth provider: ${provider}`);
       }
 
       // OAuth token exchange and user authentication
       const tokens = await oauthService.exchangeCodeForTokens(provider, validatedCode);
       const userInfo = await oauthService.getUserInfo(provider, tokens.access_token);
       
-      // Validate email if available (skip for test accounts)
-      if (userInfo.email && 
-          !userInfo.email.includes('@instagram.local') && 
-          !userInfo.email.includes('@github.local')) {
+      // ENHANCED: Validate email using auth system validation if available
+      if (userInfo.email && !userInfo.email.includes('@instagram.local') && !userInfo.email.includes('@github.local')) {
         validateOAuthEmail(userInfo.email);
       }
       
       const user = await oauthService.findOrCreateUser(provider, userInfo);
       const token = oauthService.generateToken(user);
       
+      // ENHANCED: Use auth service timing function for consistency
       await ensureMinimumResponseTime(startTime, 100);
       
-      // Construct redirect URL (this is appropriate for OAuth callback)
+      // ENHANCED: Response format aligned with auth system
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const callbackUrl = `${frontendUrl}/oauth/callback`;
       const finalRedirect = stateValidation.redirectUrl || '/';
@@ -286,7 +276,7 @@ export const oauthController = {
         `${callbackUrl}?token=${token}&redirect=${encodeURIComponent(finalRedirect)}`
       );
       
-      // Log success
+      // ENHANCED: Add success logging like auth system
       console.log(`OAuth login successful: ${user.email} via ${provider}`);
       
       res.redirect(sanitizedRedirect);
@@ -294,56 +284,47 @@ export const oauthController = {
     } catch (error) {
       await ensureMinimumResponseTime(startTime, 100);
       
-      // Enhanced error logging
-      if (error instanceof EnhancedApiError) {
+      // ENHANCED: Error logging aligned with auth system
+      if (error instanceof ApiError) {
         console.warn(`OAuth callback error: ${error.message}`);
-        throw error;
       } else {
         console.error('OAuth callback error:', error);
-        throw EnhancedApiError.internalError('OAuth callback failed', error instanceof Error ? error : new Error(String(error)));
       }
+      
+      next(error);
     }
   },
 
   /**
-   * Get OAuth status for user
-   * Flutter-optimized response format
+   * ADDED: Get OAuth status for user (aligned with auth system stats endpoint)
    */
   async getOAuthStatus(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.user) {
-        throw EnhancedApiError.authenticationRequired('Authentication required');
+        return next(ApiError.unauthorized('Authentication required'));
       }
 
-      // Get user's OAuth providers
+      // Get user's OAuth providers using auth service pattern
       const stats = await authService.getUserAuthStats(req.user.id);
       
-      res.success(
-        {
+      res.status(200).json({
+        status: 'success',
+        data: {
           linkedProviders: stats.linkedProviders,
           authenticationMethods: stats.authenticationMethods
-        },
-        {
-          message: 'OAuth status retrieved successfully',
-          meta: {
-            userId: req.user.id,
-            totalProviders: stats.linkedProviders?.length || 0
-          }
         }
-      );
-
+      });
     } catch (error) {
-      if (error instanceof EnhancedApiError) {
-        throw error;
+      if (error instanceof ApiError) {
+        return next(error);
       }
       console.error('OAuth status error:', error);
-      throw EnhancedApiError.internalError('Failed to retrieve OAuth status', error instanceof Error ? error : new Error(String(error)));
+      next(ApiError.internal('Failed to retrieve OAuth status'));
     }
   },
 
   /**
-   * Unlink OAuth provider
-   * Flutter-optimized with proper validation
+   * ADDED: Unlink OAuth provider (aligned with auth system patterns)
    */
   async unlinkProvider(req: Request, res: Response, next: NextFunction) {
     const startTime = Date.now();
@@ -351,7 +332,7 @@ export const oauthController = {
     try {
       if (!req.user) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.authenticationRequired('Authentication required');
+        return next(ApiError.unauthorized('Authentication required'));
       }
 
       const { provider } = validateOAuthInput(req.params.provider, null, null);
@@ -363,37 +344,38 @@ export const oauthController = {
 
       if (!isValidOAuthProvider(provider)) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.validation(`Invalid OAuth provider: ${provider}`, 'provider', provider);
+        return next(ApiError.badRequest(`Invalid OAuth provider: ${provider}`));
       }
       
-      // Get user's authentication stats
+      // Ensure user has password before unlinking OAuth
       const stats = await authService.getUserAuthStats(req.user.id);
       
-      // Check if user has password before unlinking OAuth
+      // Check if user has a password and other auth methods
       const hasPassword = stats.hasPassword || false;
       const linkedProviders = stats.linkedProviders || [];
       
       if (!hasPassword && linkedProviders.length <= 1) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.business(
+        return next(ApiError.businessLogic(
           'Cannot unlink the only authentication method. Please set a password first.',
-          'unlink_last_method',
+          'last_auth_method',
           'oauth'
-        );
+        ));
       }
 
       // Check if provider is actually linked
       if (linkedProviders.length > 0 && !linkedProviders.includes(provider)) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.notFound(`${provider} account not linked to your profile`, 'oauth_provider');
+        return next(ApiError.notFound(`${provider} account not linked to your profile`));
       }
 
-      // Perform unlink operation
+      // Implement unlink logic
       try {
+        // Check if oauthService has unlinkProvider method
         if (typeof oauthService.unlinkProvider === 'function') {
           await oauthService.unlinkProvider(req.user.id, provider);
         } else {
-          // Fallback: Direct database operation
+          // Fallback: Direct database operation if service method doesn't exist
           const result = await db.query(
             'DELETE FROM user_oauth_providers WHERE user_id = $1 AND provider = $2 RETURNING id',
             [req.user.id, provider]
@@ -401,41 +383,26 @@ export const oauthController = {
 
           if (result.rowCount === 0) {
             await ensureMinimumResponseTime(startTime, 100);
-            throw EnhancedApiError.notFound(`${provider} account not linked to your profile`, 'oauth_provider');
+            return next(ApiError.notFound(`${provider} account not linked to your profile`));
           }
         }
 
         await ensureMinimumResponseTime(startTime, 100);
         
-        // Flutter-optimized response
-        res.success(
-          {}, 
-          {
-            message: `Successfully unlinked ${provider} account`,
-            meta: {
-              unlinkedProvider: provider as OAuthProvider,
-              remainingProviders: linkedProviders.filter((p: string) => p !== provider) as OAuthProvider[]
-            }
-          }
-        );
+        res.status(200).json({
+          status: 'success',
+          message: `Successfully unlinked ${provider} account`
+        });
         
       } catch (unlinkError) {
         console.error('OAuth unlink error:', unlinkError);
         await ensureMinimumResponseTime(startTime, 100);
-        
-        if (unlinkError instanceof EnhancedApiError) {
-          throw unlinkError;
-        }
-        throw EnhancedApiError.internalError('Failed to unlink OAuth provider', unlinkError instanceof Error ? unlinkError : new Error(String(unlinkError)));
+        next(ApiError.internal('Failed to unlink OAuth provider'));
       }
       
     } catch (error) {
       await ensureMinimumResponseTime(startTime, 100);
-      
-      if (error instanceof EnhancedApiError) {
-        throw error;
-      }
-      throw EnhancedApiError.internalError('OAuth unlink operation failed', error instanceof Error ? error : new Error(String(error)));
+      next(error);
     }
   },
 
@@ -448,9 +415,11 @@ export const oauthController = {
       stopCleanupInterval();
     },
     getStateCount: () => Object.keys(oauthStates).length,
+    // Add state for testing
     addState: (state: string, data: { createdAt: number, redirectUrl?: string }) => {
       oauthStates[state] = data;
     },
+    // Get states for debugging
     getStates: () => ({ ...oauthStates })
   } : undefined
 };

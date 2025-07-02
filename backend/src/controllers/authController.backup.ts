@@ -1,9 +1,9 @@
-// /backend/src/controllers/authController.ts - Fully Flutter-compatible version
+// /backend/src/controllers/authController.ts - Clean production version
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { userModel, CreateUserInput } from '../models/userModel';
-import { EnhancedApiError } from '../middlewares/errorHandler';
+import { ApiError } from '../utils/ApiError';
 import { sanitization } from '../utils/sanitize';
 
 /**
@@ -12,20 +12,20 @@ import { sanitization } from '../utils/sanitize';
 const validateAndSanitizeInput = (email: any, password: any): { email: string; password: string } => {
   // Handle type confusion attacks
   if (Array.isArray(email) || Array.isArray(password)) {
-    throw EnhancedApiError.validation('Invalid input format', 'email|password');
+    throw ApiError.badRequest('Invalid input format');
   }
   
   if (email !== null && typeof email === 'object') {
-    throw EnhancedApiError.validation('Invalid input format', 'email');
+    throw ApiError.badRequest('Invalid input format');
   }
   
   if (password !== null && typeof password === 'object') {
-    throw EnhancedApiError.validation('Invalid input format', 'password');
+    throw ApiError.badRequest('Invalid input format');
   }
 
   // Check for missing values BEFORE conversion
   if (!email || !password) {
-    throw EnhancedApiError.validation('Email and password are required', !email ? 'email' : 'password');
+    throw ApiError.badRequest('Email and password are required');
   }
 
   // Convert to strings for processing
@@ -34,7 +34,7 @@ const validateAndSanitizeInput = (email: any, password: any): { email: string; p
 
   // Validate after conversion (catches whitespace-only inputs)
   if (!emailStr || !passwordStr) {
-    throw EnhancedApiError.validation('Email and password cannot be empty', !emailStr ? 'email' : 'password');
+    throw ApiError.badRequest('Email and password are required');
   }
 
   return { email: emailStr, password: passwordStr };
@@ -46,7 +46,7 @@ const validateAndSanitizeInput = (email: any, password: any): { email: string; p
 const validatePassword = (password: string): void => {
   // Check actual length FIRST for truly short passwords
   if (password.length < 8) {
-    throw EnhancedApiError.validation('Password must be at least 8 characters long', 'password', password.length);
+    throw ApiError.badRequest('Password must be at least 8 characters long');
   }
 
   // Check for weak patterns that should be treated as "too short" even if 8+ chars
@@ -74,7 +74,7 @@ const validatePassword = (password: string): void => {
 
   if (isWeakPattern) {
     // Treat weak patterns as "too short" regardless of actual length
-    throw EnhancedApiError.validation('Password must be at least 8 characters long', 'password');
+    throw ApiError.badRequest('Password must be at least 8 characters long');
   }
 
   // Only check complexity for passwords that aren't weak patterns
@@ -86,10 +86,7 @@ const validatePassword = (password: string): void => {
   const complexityScore = [hasUpperCase, hasLowerCase, hasNumbers, hasSpecialChar].filter(Boolean).length;
 
   if (complexityScore < 3) {
-    throw EnhancedApiError.validation(
-      'Password must contain at least 3 of the following: uppercase letters, lowercase letters, numbers, special characters',
-      'password'
-    );
+    throw ApiError.badRequest('Password must contain at least 3 of the following: uppercase letters, lowercase letters, numbers, special characters');
   }
 };
 
@@ -118,7 +115,7 @@ const performTimingSafeAuth = async (email: string, password: string) => {
         await new Promise(resolve => setTimeout(resolve, 100 - elapsed));
       }
       
-      throw EnhancedApiError.authenticationRequired('Invalid credentials');
+      throw ApiError.unauthorized('Invalid credentials');
     }
 
     const isPasswordValid = await userModel.validatePassword(user, password);
@@ -130,7 +127,7 @@ const performTimingSafeAuth = async (email: string, password: string) => {
         await new Promise(resolve => setTimeout(resolve, 100 - elapsed));
       }
       
-      throw EnhancedApiError.authenticationRequired('Invalid credentials');
+      throw ApiError.unauthorized('Invalid credentials');
     }
 
     // Ensure minimum response time even for success
@@ -151,81 +148,53 @@ const performTimingSafeAuth = async (email: string, password: string) => {
 };
 
 export const authController = {
-  /**
-   * Register a new user
-   * Flutter-optimized response format
-   */
   async register(req: Request, res: Response, next: NextFunction) {
     try {
       const { email, password } = validateAndSanitizeInput(req.body.email, req.body.password);
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
-        throw EnhancedApiError.validation('Invalid email format', 'email', email);
+        return next(ApiError.badRequest('Invalid email format'));
       }
 
       // Enhanced password validation
       validatePassword(password);
 
       const userData: CreateUserInput = { email, password };
-      
-      try {
-        const newUser = await userModel.create(userData);
+      const newUser = await userModel.create(userData);
 
-        const token = jwt.sign(
-          {
-            id: newUser.id,
-            email: newUser.email
-          },
-          config.jwtSecret || 'fallback_secret',
-          {
-            expiresIn: '1d'
-          }
-        );
-
-        // Sanitize email in response to prevent XSS
-        const sanitizedUser = {
+      const token = jwt.sign(
+        {
           id: newUser.id,
-          email: sanitization.sanitizeUserInput(newUser.email)
-        };
-
-        // Flutter-optimized response
-        res.created(
-          {
-            user: sanitizedUser,
-            token
-          },
-          {
-            message: 'User registered successfully',
-            meta: {
-              userAgent: req.get('User-Agent')?.includes('Flutter') ? 'flutter' : 'web'
-            }
-          }
-        );
-
-      } catch (createError: any) {
-        // Handle duplicate email errors
-        if (createError.code === '23505' || createError.message?.includes('duplicate')) {
-          throw EnhancedApiError.conflict('Email already exists', 'email');
+          email: newUser.email
+        },
+        config.jwtSecret || 'fallback_secret',
+        {
+          expiresIn: '1d'
         }
-        throw EnhancedApiError.internalError('Registration failed', createError);
-      }
-
-    } catch (error: any) {
-      if (error instanceof EnhancedApiError) {
-        throw error;
-      }
-      throw EnhancedApiError.internalError(
-        'Registration failed due to an internal server error',
-        error
       );
+
+      // Sanitize email in response to prevent XSS
+      const sanitizedUser = {
+        id: newUser.id,
+        email: sanitization.sanitizeUserInput(newUser.email)
+      };
+
+      res.status(201).json({
+        status: 'success',
+        data: {
+          user: sanitizedUser,
+          token
+        }
+      });
+    } catch (error: any) {
+      if (error instanceof ApiError) {
+        return next(error);
+      }
+      return next(ApiError.internal('Registration failed due to an internal server error. Please try again.', 'REGISTRATION_FAILED', error));
     }
   },
 
-  /**
-   * Login user
-   * Flutter-optimized response format
-   */
   async login(req: Request, res: Response, next: NextFunction) {
     try {
       const { email, password } = validateAndSanitizeInput(req.body.email, req.body.password);
@@ -250,37 +219,25 @@ export const authController = {
         email: sanitization.sanitizeUserInput(user.email)
       };
 
-      // Flutter-optimized response
-      res.success(
-        {
+      res.status(200).json({
+        status: 'success',
+        data: {
           user: sanitizedUser,
           token
-        },
-        {
-          message: 'Login successful',
-          meta: {
-            userAgent: req.get('User-Agent')?.includes('Flutter') ? 'flutter' : 'web',
-            loginTime: new Date().toISOString()
-          }
         }
-      );
-
+      });
     } catch (error: any) {
-      if (error instanceof EnhancedApiError) {
-        throw error;
+      if (error instanceof ApiError) {
+        return next(error);
       }
-      throw EnhancedApiError.internalError('Login failed due to an internal server error', error);
+      return next(ApiError.internal('Login failed due to an internal server error. Please try again.', 'LOGIN_FAILED', error));
     }
   },
 
-  /**
-   * Get current user profile
-   * Flutter-optimized response format
-   */
   async me(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.user) {
-        throw EnhancedApiError.authenticationRequired('Authentication required');
+        return next(ApiError.unauthorized('Not authenticated'));
       }
 
       // Sanitize email in response to prevent XSS
@@ -289,24 +246,17 @@ export const authController = {
         email: sanitization.sanitizeUserInput(req.user.email)
       };
 
-      // Flutter-optimized response
-      res.success(
-        {
+      res.status(200).json({
+        status: 'success',
+        data: {
           user: sanitizedUser
-        },
-        {
-          message: 'User profile retrieved successfully',
-          meta: {
-            lastAccess: new Date().toISOString()
-          }
         }
-      );
-
+      });
     } catch (error: any) {
-      if (error instanceof EnhancedApiError) {
-        throw error;
+      if (error instanceof ApiError) {
+        return next(error);
       }
-      throw EnhancedApiError.internalError('Failed to retrieve user profile', error);
+      return next(ApiError.internal('Failed to retrieve user data.', 'PROFILE_FETCH_FAILED', error));
     }
   }
 };

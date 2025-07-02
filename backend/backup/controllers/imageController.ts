@@ -1,7 +1,7 @@
-// /backend/src/controllers/imageController.ts - Fully Flutter-compatible version
+// /backend/src/controllers/imageController.ts - FIXED TypeScript Issues
 import { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import { EnhancedApiError } from '../middlewares/errorHandler';
+import { ApiError } from '../utils/ApiError';
 import { config } from '../config';
 import { imageService } from '../services/imageService';
 import { sanitization } from '../utils/sanitize';
@@ -35,10 +35,7 @@ const upload = multer({
 });
 
 export const imageController = {
-  /**
-   * Upload middleware with enhanced error handling
-   * Flutter-optimized for mobile file uploads
-   */
+  // Upload middleware with enhanced error handling - FIXED: Make async
   uploadMiddleware: sanitization.wrapImageController(
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       return new Promise((resolve) => {
@@ -46,24 +43,25 @@ export const imageController = {
           if (err instanceof multer.MulterError) {
             switch (err.code) {
               case 'LIMIT_FILE_SIZE':
-                throw EnhancedApiError.validation(
+                next(ApiError.badRequest(
                   `File too large. Maximum size: ${Math.round(config.maxFileSize / (1024 * 1024))}MB`,
-                  'file_size',
-                  { maxSizeMB: Math.round(config.maxFileSize / (1024 * 1024)) }
-                );
+                  'FILE_TOO_LARGE'
+                ));
+                break;
               case 'LIMIT_FILE_COUNT':
-                throw EnhancedApiError.validation('Only one file allowed', 'file_count');
+                next(ApiError.badRequest('Only one file allowed', 'TOO_MANY_FILES'));
+                break;
               case 'LIMIT_UNEXPECTED_FILE':
-                throw EnhancedApiError.validation('Use "image" field name for file upload', 'field_name');
+                next(ApiError.badRequest('Use "image" field name', 'UNEXPECTED_FILE_FIELD'));
+                break;
               default:
-                throw EnhancedApiError.validation(`Upload error: ${err.message}`, 'upload_error');
+                next(ApiError.badRequest(`Upload error: ${err.message}`, 'UPLOAD_ERROR'));
             }
           } else if (err) {
-            throw EnhancedApiError.validation(
-              'File too large. Maximum size: 8MB',
-              'file_size',
-              { maxSizeMB: 8 }
-            );
+            next(ApiError.badRequest(
+              `File too large. Maximum size: 8MB`, // Hardcode since we know the limit
+              'FILE_TOO_LARGE'
+            ));
           } else {
             next();
           }
@@ -74,14 +72,11 @@ export const imageController = {
     'file upload'
   ),
 
-  /**
-   * Upload image - delegate to service
-   * Flutter-optimized response format
-   */
+  // Upload image - delegate to service
   uploadImage: sanitization.wrapImageController(
     async (req: Request, res: Response, next: NextFunction) => {
       if (!req.file) {
-        throw EnhancedApiError.validation('No image file provided', 'file');
+        return next(ApiError.badRequest('No image file provided', 'MISSING_FILE'));
       }
 
       const userId = req.user!.id;
@@ -98,46 +93,26 @@ export const imageController = {
       // Sanitize response
       const safeImage = sanitization.sanitizeImageForResponse(image);
       
-      // Flutter-optimized response
-      res.created(
-        { image: safeImage },
-        { 
-          message: 'Image uploaded successfully',
-          meta: {
-            fileSize: req.file.size,
-            fileSizeKB: Math.round(req.file.size / 1024),
-            mimetype: req.file.mimetype,
-            platform: req.get('User-Agent')?.includes('Flutter') ? 'flutter' : 'web'
-          }
-        }
-      );
+      res.status(201).json({
+        status: 'success',
+        data: { image: safeImage },
+        message: 'Image uploaded successfully'
+      });
     },
     'uploading'
   ),
 
-  /**
-   * Get images - delegate to service
-   * Flutter-optimized with pagination support
-   */
+  // Get images - delegate to service - FIXED: Proper type casting
   getImages: sanitization.wrapImageController(
     async (req: Request, res: Response, next: NextFunction) => {
       const userId = req.user!.id;
       
-      // Proper type handling for query parameters
+      // FIXED: Proper type handling for query parameters
       const options = {
         status: req.query.status as 'new' | 'processed' | 'labeled' | undefined,
         limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
         offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined
       };
-      
-      // Validate parameters
-      if (options.limit && (isNaN(options.limit) || options.limit < 1 || options.limit > 100)) {
-        throw EnhancedApiError.validation('Limit must be between 1 and 100', 'limit', options.limit);
-      }
-      
-      if (options.offset && (isNaN(options.offset) || options.offset < 0)) {
-        throw EnhancedApiError.validation('Offset must be 0 or greater', 'offset', options.offset);
-      }
       
       const images = await imageService.getUserImages(userId, options);
       
@@ -146,29 +121,22 @@ export const imageController = {
         sanitization.sanitizeImageForResponse(image)
       );
       
-      // Flutter-optimized response
-      res.success(
-        safeImages,
-        {
-          message: 'Images retrieved successfully',
-          meta: {
-            count: safeImages.length,
-            filters: {
-              status: options.status,
-              limit: options.limit,
-              offset: options.offset
-            }
-          }
+      res.status(200).json({
+        status: 'success',
+        data: { 
+          images: safeImages,
+          count: safeImages.length,
+          pagination: req.query.limit ? {
+            limit: options.limit,
+            offset: options.offset
+          } : undefined
         }
-      );
+      });
     },
     'retrieving'
   ),
 
-  /**
-   * Get single image - delegate to service
-   * Flutter-optimized response format
-   */
+  // Get single image - delegate to service
   getImage: sanitization.wrapImageController(
     async (req: Request, res: Response, next: NextFunction) => {
       const userId = req.user!.id;
@@ -177,60 +145,34 @@ export const imageController = {
       const image = await imageService.getImageById(imageId, userId);
       const safeImage = sanitization.sanitizeImageForResponse(image);
       
-      // Flutter-optimized response
-      res.success(
-        { image: safeImage },
-        {
-          message: 'Image retrieved successfully',
-          meta: {
-            imageId,
-            status: image.status
-          }
-        }
-      );
+      res.status(200).json({
+        status: 'success',
+        data: { image: safeImage }
+      });
     },
     'retrieving'
   ),
 
-  /**
-   * Update image status - delegate to service
-   * Flutter-optimized response format
-   */
+  // Update image status - delegate to service
   updateImageStatus: sanitization.wrapImageController(
     async (req: Request, res: Response, next: NextFunction) => {
       const userId = req.user!.id;
       const imageId = req.params.id; // Already validated by middleware
       const { status } = req.body; // Already validated by middleware
       
-      // Get current image to track previous status
-      const currentImage = await imageService.getImageById(imageId, userId);
-      const previousStatus = currentImage.status;
-      
       const updatedImage = await imageService.updateImageStatus(imageId, userId, status);
       const safeImage = sanitization.sanitizeImageForResponse(updatedImage);
       
-      // Flutter-optimized response
-      res.success(
-        { image: safeImage },
-        {
-          message: `Image status updated to ${status}`,
-          meta: {
-            imageId,
-            previousStatus,
-            newStatus: status,
-            statusChanged: previousStatus !== status,
-            statusTransition: `${previousStatus} → ${status}`
-          }
-        }
-      );
+      res.status(200).json({
+        status: 'success',
+        data: { image: safeImage },
+        message: `Image status updated to ${status}`
+      });
     },
     'updating status'
   ),
 
-  /**
-   * Generate thumbnail - delegate to service
-   * Flutter-optimized response format
-   */
+  // Generate thumbnail - delegate to service
   generateThumbnail: sanitization.wrapImageController(
     async (req: Request, res: Response, next: NextFunction) => {
       const userId = req.user!.id;
@@ -239,35 +181,21 @@ export const imageController = {
       
       // Validate size parameter
       if (size < 50 || size > 500) {
-        throw EnhancedApiError.validation(
-          'Thumbnail size must be between 50 and 500 pixels',
-          'size',
-          { min: 50, max: 500, provided: size }
-        );
+        return next(ApiError.badRequest('Thumbnail size must be between 50 and 500 pixels', 'INVALID_SIZE'));
       }
       
       const result = await imageService.generateThumbnail(imageId, userId, size);
       
-      // Flutter-optimized response
-      res.success(
-        result,
-        {
-          message: 'Thumbnail generated successfully',
-          meta: {
-            imageId,
-            thumbnailSize: size,
-            generatedAt: new Date().toISOString()
-          }
-        }
-      );
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        message: 'Thumbnail generated successfully'
+      });
     },
     'generating thumbnail'
   ),
 
-  /**
-   * Optimize image - delegate to service
-   * Flutter-optimized response format
-   */
+  // Optimize image - delegate to service
   optimizeImage: sanitization.wrapImageController(
     async (req: Request, res: Response, next: NextFunction) => {
       const userId = req.user!.id;
@@ -275,27 +203,16 @@ export const imageController = {
       
       const result = await imageService.optimizeForWeb(imageId, userId);
       
-      // Flutter-optimized response with available information
-      res.success(
-        result,
-        {
-          message: 'Image optimized successfully',
-          meta: {
-            imageId,
-            optimizedAt: new Date().toISOString(),
-            operation: 'web_optimization',
-            hasOptimizedVersion: !!result.optimizedPath
-          }
-        }
-      );
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        message: 'Image optimized successfully'
+      });
     },
     'optimizing'
   ),
 
-  /**
-   * Delete image - delegate to service
-   * Flutter-optimized response format
-   */
+  // Delete image - delegate to service
   deleteImage: sanitization.wrapImageController(
     async (req: Request, res: Response, next: NextFunction) => {
       const userId = req.user!.id;
@@ -303,50 +220,31 @@ export const imageController = {
       
       await imageService.deleteImage(imageId, userId);
       
-      // Flutter-optimized response
-      res.success(
-        {},
-        {
-          message: 'Image deleted successfully',
-          meta: {
-            deletedImageId: imageId,
-            deletedAt: new Date().toISOString()
-          }
-        }
-      );
+      res.status(200).json({
+        status: 'success',
+        data: null,
+        message: 'Image deleted successfully'
+      });
     },
     'deleting'
   ),
 
-  /**
-   * Get user stats - delegate to service
-   * Flutter-optimized response format
-   */
+  // Get user stats - delegate to service
   getUserStats: sanitization.wrapImageController(
     async (req: Request, res: Response, next: NextFunction) => {
       const userId = req.user!.id;
       
       const stats = await imageService.getUserImageStats(userId);
       
-      // Flutter-optimized response
-      res.success(
-        { stats },
-        {
-          message: 'Image statistics retrieved successfully',
-          meta: {
-            userId,
-            generatedAt: new Date().toISOString()
-          }
-        }
-      );
+      res.status(200).json({
+        status: 'success',
+        data: { stats }
+      });
     },
     'retrieving stats'
   ),
 
-  /**
-   * Batch update status - delegate to service
-   * Flutter-optimized response format
-   */
+  // Batch update status - delegate to service
   batchUpdateStatus: sanitization.wrapImageController(
     async (req: Request, res: Response, next: NextFunction) => {
       const userId = req.user!.id;
@@ -354,20 +252,11 @@ export const imageController = {
       
       const result = await imageService.batchUpdateStatus(imageIds, userId, status);
       
-      // Flutter-optimized response
-      res.success(
-        result,
-        {
-          message: `Batch updated ${result.updatedCount} of ${result.total} images`,
-          meta: {
-            operation: 'batch_update_status',
-            targetStatus: status,
-            requestedCount: imageIds.length,
-            successCount: result.updatedCount,
-            failedCount: result.total - result.updatedCount
-          }
-        }
-      );
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        message: `Batch updated ${result.updatedCount} of ${result.total} images`
+      });
     },
     'batch updating'
   )
