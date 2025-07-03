@@ -126,12 +126,31 @@ sanitize.oauth.security.test.ts✅
 oauthValidate
 
 Flutter-ready
-1. /backend/src/app.ts                                     ✅Unit ✅Integration ✅Security
-2. /backend/src/utils/responseWrapper.ts                   ✅Unit ✅Integration ✅Security
-3. /backend/src/controllers/imageController.ts             ❌Unit ❌Integration ❌Security
-4. /backend/src/controllers/polygonController.ts           ❌Unit ❌Integration ❌Security  
-5. /backend/src/controllers/garmentController.ts           ❌Unit ❌Integration ❌Security
-6. /backend/src/controllers/wardrobeController.ts          ✅Unit ✅Integration ✅Security
-7. /backend/src/controllers/exportController.ts            ❌Unit ❌Integration ❌Security
-8. /backend/src/controllers/authController.ts              ❌Unit ✅Integration ❌Security
-9. /backend/src/controllers/oauthController.ts             ❌Unit ❌Integration ❌Security
+High Priority
+1.  /backend/src/app.ts                                     ✅Unit ✅Integration ✅Security
+2.  /backend/src/utils/responseWrapper.ts                   ✅Unit ✅Integration ✅Security
+3.  /backend/src/controllers/imageController.ts             ❌Unit ❌Integration ❌Security
+4.  /backend/src/controllers/polygonController.ts           ❌Unit ❌Integration ❌Security  
+5.  /backend/src/controllers/garmentController.ts           ✅Unit ✅Integration ✅Security
+6.  /backend/src/controllers/wardrobeController.ts          ✅Unit ✅Integration ✅Security
+7.  /backend/src/controllers/exportController.ts            ❌Unit ❌Integration ❌Security
+8.  /backend/src/controllers/authController.ts              ❌Unit ✅Integration ❌Security
+9.  /backend/src/controllers/oauthController.ts             ❌Unit ❌Integration ❌Security
+Medium Priority
+10. /backend/src/middlewares/validate.ts                    ❌Unit ❌Integration ❌Security
+11. /backend/src/routes/fileRoutes.ts                       ❌Unit ❌Integration ❌Security
+12. /backend/src/middlewares/auth.ts                        ❌Unit ❌Integration ❌Security
+13. /backend/src/middlewares/security.ts                    ❌Unit ❌Integration ❌Security
+14. /backend/src/routes/imageRoutes.ts                      ❌Unit ❌Integration ❌Security
+15. /backend/src/routes/wardrobeRoutes.ts                   ❌Unit ❌Integration ❌Security
+Low Priority
+16. /shared/src/schemas/index.ts                            ❌Unit ❌Integration ❌Security
+17. /shared/src/schemas/user.ts                             ❌Unit ❌Integration ❌Security
+18. /shared/src/schemas/garment.ts                          ❌Unit ❌Integration ❌Security
+19. /shared/src/schemas/image.ts                            ❌Unit ❌Integration ❌Security
+20. /backend/src/routes/authRoutes.ts                       ❌Unit ❌Integration ❌Security
+21. /backend/src/routes/polygonRoutes.ts                    ❌Unit ❌Integration ❌Security
+22. /backend/src/routes/exportRoutes.ts                     ❌Unit ❌Integration ❌Security
+
+
+
