@@ -135,7 +135,7 @@ High Priority
 6.  /backend/src/controllers/wardrobeController.ts          ✅Unit ✅Integration ✅Security
 7.  /backend/src/controllers/exportController.ts            ✅Unit ✅Integration ✅Security
 8.  /backend/src/controllers/authController.ts              ✅Unit ✅Integration ✅Security
-9.  /backend/src/controllers/oauthController.ts             ❌Unit ❌Integration ❌Security
+9.  /backend/src/controllers/oauthController.ts             ✅Unit ✅Integration ✅Security
 Medium Priority
 10. /backend/src/middlewares/validate.ts                    ❌Unit ❌Integration ❌Security
 11. /backend/src/routes/fileRoutes.ts                       ❌Unit ❌Integration ❌Security

@@ -1,4 +1,4 @@
-// /backend/src/controllers/oauthController.ts - Fully Flutter-compatible version
+// /backend/src/controllers/oauthController.ts - Fixed version for tests
 import { Request, Response, NextFunction } from 'express';
 import { oauthService } from '../services/oauthService';
 import { authService } from '../services/authService';
@@ -153,16 +153,18 @@ export const oauthController = {
       if (redirect && typeof redirect === 'string') {
         const allowedRedirectDomains = process.env.ALLOWED_REDIRECT_DOMAINS?.split(',') || [];
         
-        try {
-          const redirectUrl = new URL(redirect, process.env.FRONTEND_URL);
-          
-          if (allowedRedirectDomains.length > 0 && !allowedRedirectDomains.includes(redirectUrl.hostname)) {
+        if (allowedRedirectDomains.length > 0) {
+          try {
+            const redirectUrl = new URL(redirect, process.env.FRONTEND_URL);
+            
+            if (!allowedRedirectDomains.includes(redirectUrl.hostname)) {
+              await ensureMinimumResponseTime(startTime, 50);
+              return next(EnhancedApiError.validation('Invalid redirect URL domain', 'redirect', redirectUrl.hostname));
+            }
+          } catch (urlError) {
             await ensureMinimumResponseTime(startTime, 50);
-            throw EnhancedApiError.validation('Invalid redirect URL domain', 'redirect', redirectUrl.hostname);
+            return next(EnhancedApiError.validation('Invalid redirect URL format', 'redirect', redirect));
           }
-        } catch (urlError) {
-          await ensureMinimumResponseTime(startTime, 50);
-          throw EnhancedApiError.validation('Invalid redirect URL format', 'redirect', redirect);
         }
       }
       
@@ -180,7 +182,7 @@ export const oauthController = {
 
       if (!isValidOAuthProvider(provider)) {
         await ensureMinimumResponseTime(startTime, 50);
-        throw EnhancedApiError.validation(`Invalid OAuth provider: ${provider}`, 'provider', provider);
+        return next(EnhancedApiError.validation(`Invalid OAuth provider: ${provider}`, 'provider', provider));
       }
       
       // Generate authorization URL
@@ -203,9 +205,9 @@ export const oauthController = {
       await ensureMinimumResponseTime(startTime, 50);
       
       if (error instanceof EnhancedApiError) {
-        throw error;
+        return next(error);
       }
-      throw EnhancedApiError.internalError('OAuth authorization failed', error instanceof Error ? error : new Error(String(error)));
+      return next(EnhancedApiError.internalError('OAuth authorization failed', error instanceof Error ? error : new Error(String(error))));
     }
   },
   
@@ -220,35 +222,35 @@ export const oauthController = {
       const { provider } = validateOAuthInput(req.params.provider, null, null);
       const { code, state, error } = req.query;
       
+      // Check for OAuth provider error first
+      if (error) {
+        await ensureMinimumResponseTime(startTime, 100);
+        return next(EnhancedApiError.business(
+          `OAuth provider error: ${sanitization.sanitizeUserInput(String(error))}`,
+          'oauth_provider_error',
+          'oauth'
+        ));
+      }
+      
       // Validate input types
       const { state: validatedState, code: validatedCode } = validateOAuthInput(
         provider, state, code
       );
       
-      // Check for OAuth provider error
-      if (error) {
-        await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.business(
-          `OAuth provider error: ${sanitization.sanitizeUserInput(String(error))}`,
-          'oauth_provider_error',
-          'oauth'
-        );
-      }
-      
       // Validate required parameters
       if (!validatedCode || !validatedState) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.validation(
+        return next(EnhancedApiError.validation(
           'Missing required OAuth parameters',
           !validatedCode ? 'code' : 'state'
-        );
+        ));
       }
       
       // Validate state parameter with timing safety
       const stateValidation = validateOAuthState(validatedState);
       if (!stateValidation.isValid) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.validation(stateValidation.error || 'Invalid state parameter', 'state');
+        return next(EnhancedApiError.validation(stateValidation.error || 'Invalid state parameter', 'state'));
       }
       
       // Type guard for OAuth provider
@@ -258,7 +260,7 @@ export const oauthController = {
 
       if (!isValidOAuthProvider(provider)) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.validation(`Invalid OAuth provider: ${provider}`, 'provider', provider);
+        return next(EnhancedApiError.validation(`Invalid OAuth provider: ${provider}`, 'provider', provider));
       }
 
       // OAuth token exchange and user authentication
@@ -294,13 +296,13 @@ export const oauthController = {
     } catch (error) {
       await ensureMinimumResponseTime(startTime, 100);
       
-      // Enhanced error logging
+      // Enhanced error logging and handling
       if (error instanceof EnhancedApiError) {
         console.warn(`OAuth callback error: ${error.message}`);
-        throw error;
+        return next(error);
       } else {
         console.error('OAuth callback error:', error);
-        throw EnhancedApiError.internalError('OAuth callback failed', error instanceof Error ? error : new Error(String(error)));
+        return next(EnhancedApiError.internalError('OAuth callback failed', error instanceof Error ? error : new Error(String(error))));
       }
     }
   },
@@ -312,7 +314,7 @@ export const oauthController = {
   async getOAuthStatus(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.user) {
-        throw EnhancedApiError.authenticationRequired('Authentication required');
+        return next(EnhancedApiError.authenticationRequired('Authentication required'));
       }
 
       // Get user's OAuth providers
@@ -334,10 +336,10 @@ export const oauthController = {
 
     } catch (error) {
       if (error instanceof EnhancedApiError) {
-        throw error;
+        return next(error);
       }
       console.error('OAuth status error:', error);
-      throw EnhancedApiError.internalError('Failed to retrieve OAuth status', error instanceof Error ? error : new Error(String(error)));
+      return next(EnhancedApiError.internalError('Failed to retrieve OAuth status', error instanceof Error ? error : new Error(String(error))));
     }
   },
 
@@ -351,7 +353,7 @@ export const oauthController = {
     try {
       if (!req.user) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.authenticationRequired('Authentication required');
+        return next(EnhancedApiError.authenticationRequired('Authentication required'));
       }
 
       const { provider } = validateOAuthInput(req.params.provider, null, null);
@@ -363,7 +365,7 @@ export const oauthController = {
 
       if (!isValidOAuthProvider(provider)) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.validation(`Invalid OAuth provider: ${provider}`, 'provider', provider);
+        return next(EnhancedApiError.validation(`Invalid OAuth provider: ${provider}`, 'provider', provider));
       }
       
       // Get user's authentication stats
@@ -375,17 +377,17 @@ export const oauthController = {
       
       if (!hasPassword && linkedProviders.length <= 1) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.business(
+        return next(EnhancedApiError.business(
           'Cannot unlink the only authentication method. Please set a password first.',
           'unlink_last_method',
           'oauth'
-        );
+        ));
       }
 
       // Check if provider is actually linked
       if (linkedProviders.length > 0 && !linkedProviders.includes(provider)) {
         await ensureMinimumResponseTime(startTime, 100);
-        throw EnhancedApiError.notFound(`${provider} account not linked to your profile`, 'oauth_provider');
+        return next(EnhancedApiError.notFound(`${provider} account not linked to your profile`, 'oauth_provider'));
       }
 
       // Perform unlink operation
@@ -401,7 +403,7 @@ export const oauthController = {
 
           if (result.rowCount === 0) {
             await ensureMinimumResponseTime(startTime, 100);
-            throw EnhancedApiError.notFound(`${provider} account not linked to your profile`, 'oauth_provider');
+            return next(EnhancedApiError.notFound(`${provider} account not linked to your profile`, 'oauth_provider'));
           }
         }
 
@@ -424,18 +426,18 @@ export const oauthController = {
         await ensureMinimumResponseTime(startTime, 100);
         
         if (unlinkError instanceof EnhancedApiError) {
-          throw unlinkError;
+          return next(unlinkError);
         }
-        throw EnhancedApiError.internalError('Failed to unlink OAuth provider', unlinkError instanceof Error ? unlinkError : new Error(String(unlinkError)));
+        return next(EnhancedApiError.internalError('Failed to unlink OAuth provider', unlinkError instanceof Error ? unlinkError : new Error(String(unlinkError))));
       }
       
     } catch (error) {
       await ensureMinimumResponseTime(startTime, 100);
       
       if (error instanceof EnhancedApiError) {
-        throw error;
+        return next(error);
       }
-      throw EnhancedApiError.internalError('OAuth unlink operation failed', error instanceof Error ? error : new Error(String(error)));
+      return next(EnhancedApiError.internalError('OAuth unlink operation failed', error instanceof Error ? error : new Error(String(error))));
     }
   },
 
