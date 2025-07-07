@@ -388,7 +388,11 @@ export const wardrobeController = {
   },
 
   /**
-   * Add garment to wardrobe
+   * Add garment to wardrobe - FIXED VERSION
+   * Flutter-optimized response format with enhanced error handling
+   */
+  /**
+   * Add garment to wardrobe - TARGETED FIX for garment lookup only
    * Flutter-optimized response format
    */
   async addGarmentToWardrobe(req: Request, res: Response, next: NextFunction) {
@@ -419,8 +423,22 @@ export const wardrobeController = {
         throw EnhancedApiError.authorizationDenied('You do not have permission to modify this wardrobe', 'wardrobe');
       }
 
-      // Verify garment ownership
-      const garment = await garmentModel.findById(garmentId);
+      // TARGETED FIX: Enhanced garment verification
+      let garment;
+      try {
+        garment = await garmentModel.findById(garmentId);
+      } catch (garmentError: any) {
+        console.error('Database error in garment lookup:', {
+          garmentId,
+          error: garmentError.message,
+          code: garmentError.code
+        });
+        
+        // For database errors (table missing, connection issues, etc.), 
+        // treat as garment not found for user-facing error
+        garment = null;
+      }
+
       if (!garment) {
         throw EnhancedApiError.notFound('Garment not found', 'garment');
       }

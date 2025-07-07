@@ -28,6 +28,10 @@ const validateAndSanitizeInput = (email: any, password: any): { email: string; p
     throw EnhancedApiError.validation('Email and password are required', !email ? 'email' : 'password');
   }
 
+  if (email.length > 320) { // RFC 5321 limit
+    throw EnhancedApiError.validation('Email address is too long', 'email');
+  }
+
   // Convert to strings for processing
   const emailStr = String(email).trim();
   const passwordStr = String(password).trim();
