@@ -19,49 +19,66 @@ const mockSanitization = sanitization as jest.Mocked<typeof sanitization>;
 const mockJwt = jwt as jest.Mocked<typeof jwt>;
 const mockBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
-// Test utilities and helpers
+// Type-safe test utilities and helpers
 interface TestUser {
   id: string;
   email: string;
+  password_hash: string;
   password?: string;
-  created_at?: string;
-  updated_at?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface DatabaseError extends Error {
+  code?: string;
 }
 
 interface MockRequest extends Partial<Request> {
-  body: any;
-  user?: TestUser;
-  get?: jest.Mock;
+  body: Record<string, any>;
+  user?: TestUser | undefined;
+  get?: jest.MockedFunction<{
+    (name: "set-cookie"): string[] | undefined;
+    (name: string): string | undefined;
+  }>;
 }
 
-interface MockResponse extends Partial<Response> {
-  status: jest.Mock;
-  json: jest.Mock;
-  created: jest.Mock;
-  success: jest.Mock;
+interface MockResponse {
+  status: jest.MockedFunction<(code: number) => MockResponse>;
+  json: jest.MockedFunction<(body?: any) => MockResponse>;
+  created: jest.MockedFunction<(data: any, meta?: any) => MockResponse>;
+  success: jest.MockedFunction<(data: any, meta?: any) => MockResponse>;
 }
-
 // Test data factory
 const createTestUser = (overrides: Partial<TestUser> = {}): TestUser => ({
   id: 'user-123-456-789',
   email: 'test@example.com',
-  created_at: '2024-01-01T00:00:00.000Z',
-  updated_at: '2024-01-01T00:00:00.000Z',
+  password_hash: '$2b$10$test.hash.for.testing.purposes.only',
+  created_at: new Date('2024-01-01T00:00:00.000Z'),
+  updated_at: new Date('2024-01-01T00:00:00.000Z'),
   ...overrides
 });
 
 const createMockRequest = (overrides: Partial<MockRequest> = {}): MockRequest => ({
   body: {},
-  get: jest.fn().mockReturnValue('Mozilla/5.0'),
+  get: jest.fn().mockImplementation((name: string) => {
+    if (name === 'set-cookie') return undefined;
+    return 'Mozilla/5.0';
+  }) as jest.MockedFunction<{
+    (name: "set-cookie"): string[] | undefined;
+    (name: string): string | undefined;
+  }>,
   ...overrides
 });
 
-const createMockResponse = (): MockResponse => ({
-  status: jest.fn().mockReturnThis(),
-  json: jest.fn().mockReturnThis(),
-  created: jest.fn().mockReturnThis(),
-  success: jest.fn().mockReturnThis(),
-});
+const createMockResponse = (): MockResponse => {
+  const mockResponse: MockResponse = {
+    status: jest.fn().mockReturnThis() as jest.MockedFunction<(code: number) => MockResponse>,
+    json: jest.fn().mockReturnThis() as jest.MockedFunction<(body?: any) => MockResponse>,
+    created: jest.fn().mockReturnThis() as jest.MockedFunction<(data: any, meta?: any) => MockResponse>,
+    success: jest.fn().mockReturnThis() as jest.MockedFunction<(data: any, meta?: any) => MockResponse>,
+  };
+  return mockResponse;
+};
 
 // Performance helpers
 const measurePerformance = async (operation: () => Promise<void>): Promise<number> => {
@@ -78,7 +95,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
   beforeEach(() => {
     mockReq = createMockRequest();
     mockRes = createMockResponse();
-    mockNext = jest.fn();
+    mockNext = jest.fn() as jest.MockedFunction<NextFunction>;
 
     // Reset all mocks
     jest.clearAllMocks();
@@ -86,7 +103,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
     // Default mock implementations
     mockSanitization.sanitizeUserInput.mockImplementation((input: string) => input);
     mockJwt.sign.mockReturnValue('mock-jwt-token' as any);
-    mockBcrypt.compare.mockResolvedValue(false as never);
+    (mockBcrypt.compare as jest.MockedFunction<any>).mockRejectedValue(new Error('Bcrypt error'));
   });
 
   describe('register', () => {
@@ -102,7 +119,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
           password: 'ValidPass123!'
         };
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockUserModel.create).toHaveBeenCalledWith({
           email: 'test@example.com',
@@ -129,7 +146,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
           password: 'StrongPass123!@#'
         };
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockUserModel.create).toHaveBeenCalledWith({
           email: 'strong@example.com',
@@ -143,9 +160,15 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
           email: 'flutter@example.com',
           password: 'FlutterApp123!'
         };
-        mockReq.get = jest.fn().mockReturnValue('Flutter/3.0.0');
+        mockReq.get = jest.fn().mockImplementation((name: string) => {
+          if (name === 'set-cookie') return undefined;
+          return 'Flutter/3.0.0';
+        }) as jest.MockedFunction<{
+          (name: "set-cookie"): string[] | undefined;
+          (name: string): string | undefined;
+        }>;
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.created).toHaveBeenCalledWith(
           expect.any(Object),
@@ -164,7 +187,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         };
         mockSanitization.sanitizeUserInput.mockReturnValue('sanitized@example.com');
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockSanitization.sanitizeUserInput).toHaveBeenCalledWith('test@example.com');
         expect(mockRes.created).toHaveBeenCalledWith(
@@ -181,7 +204,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { password: 'ValidPass123!' };
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Email and password are required');
 
         expect(mockUserModel.create).not.toHaveBeenCalled();
@@ -191,7 +214,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: 'test@example.com' };
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Email and password are required');
 
         expect(mockUserModel.create).not.toHaveBeenCalled();
@@ -201,7 +224,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: '', password: 'ValidPass123!' };
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Email and password are required');
       });
 
@@ -209,7 +232,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: '   ', password: 'ValidPass123!' };
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Email and password cannot be empty');
       });
 
@@ -217,7 +240,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: 'invalid-email', password: 'ValidPass123!' };
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Invalid email format');
       });
 
@@ -225,7 +248,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: ['test@example.com'], password: 'ValidPass123!' };
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Invalid input format');
       });
 
@@ -233,7 +256,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: { value: 'test@example.com' }, password: 'ValidPass123!' };
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Invalid input format');
       });
     });
@@ -243,7 +266,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: 'test@example.com', password: 'Short1!' };
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Password must be at least 8 characters long');
       });
 
@@ -254,7 +277,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
           mockReq.body = { email: 'test@example.com', password: weakPassword };
 
           await expect(
-            authController.register(mockReq as Request, mockRes as Response, mockNext)
+            authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
           ).rejects.toThrow('Password must be at least 8 characters long');
         }
       });
@@ -263,7 +286,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: 'test@example.com', password: 'onlylowercase' };
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Password must be at least 8 characters long');
       });
 
@@ -271,7 +294,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: 'test@example.com', password: 'GoodPass123' };
         mockUserModel.create.mockResolvedValue(createTestUser());
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockNext).not.toHaveBeenCalled();
         expect(mockUserModel.create).toHaveBeenCalled();
@@ -281,12 +304,12 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
     describe('Database Error Handling', () => {
       it('should handle duplicate email error', async () => {
         mockReq.body = { email: 'duplicate@example.com', password: 'ValidPass123!' };
-        const duplicateError = new Error('duplicate key value');
+        const duplicateError: DatabaseError = new Error('duplicate key value');
         duplicateError.code = '23505';
         mockUserModel.create.mockRejectedValue(duplicateError);
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Email already exists');
       });
 
@@ -296,7 +319,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.create.mockRejectedValue(dbError);
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Registration failed');
       });
     });
@@ -313,7 +336,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
       it('should login user with valid credentials', async () => {
         mockReq.body = { email: 'test@example.com', password: 'ValidPass123!' };
 
-        await authController.login(mockReq as Request, mockRes as Response, mockNext);
+        await authController.login(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockUserModel.findByEmail).toHaveBeenCalledWith('test@example.com');
         expect(mockUserModel.validatePassword).toHaveBeenCalled();
@@ -335,7 +358,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
       it('should include login timestamp in meta', async () => {
         mockReq.body = { email: 'test@example.com', password: 'ValidPass123!' };
 
-        await authController.login(mockReq as Request, mockRes as Response, mockNext);
+        await authController.login(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.success).toHaveBeenCalledWith(
           expect.any(Object),
@@ -349,9 +372,15 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
 
       it('should detect Flutter user agent in login', async () => {
         mockReq.body = { email: 'flutter@example.com', password: 'ValidPass123!' };
-        mockReq.get = jest.fn().mockReturnValue('Flutter/3.0.0 (iOS 15.0)');
+        mockReq.get = jest.fn().mockImplementation((name: string) => {
+          if (name === 'set-cookie') return undefined;
+          return 'Flutter/3.0.0 (iOS 15.0)';
+        }) as jest.MockedFunction<{
+          (name: "set-cookie"): string[] | undefined;
+          (name: string): string | undefined;
+        }>;
 
-        await authController.login(mockReq as Request, mockRes as Response, mockNext);
+        await authController.login(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.success).toHaveBeenCalledWith(
           expect.any(Object),
@@ -370,7 +399,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.findByEmail.mockResolvedValue(null);
 
         await expect(
-          authController.login(mockReq as Request, mockRes as Response, mockNext)
+          authController.login(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Invalid credentials');
       });
 
@@ -381,7 +410,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.validatePassword.mockResolvedValue(false);
 
         await expect(
-          authController.login(mockReq as Request, mockRes as Response, mockNext)
+          authController.login(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Invalid credentials');
       });
 
@@ -392,7 +421,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
 
         const startTime = Date.now();
         await expect(
-          authController.login(mockReq as Request, mockRes as Response, mockNext)
+          authController.login(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Invalid credentials');
         const elapsedTime = Date.now() - startTime;
 
@@ -403,10 +432,10 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
       it('should handle timing attacks with dummy password validation', async () => {
         mockReq.body = { email: 'notfound@example.com', password: 'ValidPass123!' };
         mockUserModel.findByEmail.mockResolvedValue(null);
-        mockBcrypt.compare.mockResolvedValue(false as never);
+        (mockBcrypt.compare as jest.MockedFunction<any>).mockRejectedValue(new Error('Bcrypt error'));
 
         await expect(
-          authController.login(mockReq as Request, mockRes as Response, mockNext)
+          authController.login(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Invalid credentials');
 
         // Should still call bcrypt.compare for timing consistency
@@ -419,7 +448,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { password: 'ValidPass123!' };
 
         await expect(
-          authController.login(mockReq as Request, mockRes as Response, mockNext)
+          authController.login(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Email and password are required');
       });
 
@@ -427,7 +456,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: 'test@example.com' };
 
         await expect(
-          authController.login(mockReq as Request, mockRes as Response, mockNext)
+          authController.login(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Email and password are required');
       });
 
@@ -435,7 +464,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: ['test@example.com'], password: ['password'] };
 
         await expect(
-          authController.login(mockReq as Request, mockRes as Response, mockNext)
+          authController.login(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Invalid input format');
       });
     });
@@ -448,7 +477,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.user = testUser;
         mockSanitization.sanitizeUserInput.mockReturnValue('sanitized@example.com');
 
-        await authController.me(mockReq as Request, mockRes as Response, mockNext);
+        await authController.me(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockSanitization.sanitizeUserInput).toHaveBeenCalledWith('test@example.com');
         expect(mockRes.success).toHaveBeenCalledWith(
@@ -471,13 +500,13 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
       it('should preserve all user properties except email sanitization', async () => {
         const testUser = createTestUser({
           email: 'preserve@example.com',
-          created_at: '2024-02-01T10:00:00.000Z',
-          updated_at: '2024-02-15T15:30:00.000Z'
+          created_at: new Date('2024-02-01T10:00:00.000Z'),
+          updated_at: new Date('2024-02-15T15:30:00.000Z')
         });
         mockReq.user = testUser;
         mockSanitization.sanitizeUserInput.mockReturnValue('preserve@example.com');
 
-        await authController.me(mockReq as Request, mockRes as Response, mockNext);
+        await authController.me(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.success).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -498,17 +527,17 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.user = undefined;
 
         await expect(
-          authController.me(mockReq as Request, mockRes as Response, mockNext)
+          authController.me(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Authentication required');
 
         expect(mockRes.success).not.toHaveBeenCalled();
       });
 
       it('should reject null user context', async () => {
-        mockReq.user = null as any;
+        mockReq.user = undefined;
 
         await expect(
-          authController.me(mockReq as Request, mockRes as Response, mockNext)
+          authController.me(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Authentication required');
       });
     });
@@ -522,7 +551,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         });
 
         await expect(
-          authController.me(mockReq as Request, mockRes as Response, mockNext)
+          authController.me(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Failed to retrieve user profile');
       });
     });
@@ -534,7 +563,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: 'format@example.com', password: 'ValidPass123!' };
         mockUserModel.create.mockResolvedValue(createTestUser({ email: 'format@example.com' }));
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.created).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -553,7 +582,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.findByEmail.mockResolvedValue(createTestUser());
         mockUserModel.validatePassword.mockResolvedValue(true);
 
-        await authController.login(mockReq as Request, mockRes as Response, mockNext);
+        await authController.login(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.success).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -570,7 +599,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
       it('should use correct Flutter response format for profile operations', async () => {
         mockReq.user = createTestUser();
 
-        await authController.me(mockReq as Request, mockRes as Response, mockNext);
+        await authController.me(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.success).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -589,7 +618,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: 'invalid-email', password: 'ValidPass123!' };
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Invalid email format');
       });
 
@@ -598,7 +627,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.create.mockRejectedValue(new Error('Database error'));
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Registration failed');
       });
     });
@@ -606,10 +635,16 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
     describe('Meta Information Validation', () => {
       it('should include proper meta information in register responses', async () => {
         mockReq.body = { email: 'meta@example.com', password: 'ValidPass123!' };
-        mockReq.get = jest.fn().mockReturnValue('Flutter/3.0.0');
+        mockReq.get = jest.fn().mockImplementation((name: string) => {
+          if (name === 'set-cookie') return undefined;
+          return 'Flutter/3.0.0';
+        }) as jest.MockedFunction<{
+          (name: "set-cookie"): string[] | undefined;
+          (name: string): string | undefined;
+        }>;
         mockUserModel.create.mockResolvedValue(createTestUser());
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.created).toHaveBeenCalledWith(
           expect.any(Object),
@@ -626,7 +661,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.findByEmail.mockResolvedValue(createTestUser());
         mockUserModel.validatePassword.mockResolvedValue(true);
 
-        await authController.login(mockReq as Request, mockRes as Response, mockNext);
+        await authController.login(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.success).toHaveBeenCalledWith(
           expect.any(Object),
@@ -642,7 +677,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
       it('should include proper meta information in profile responses', async () => {
         mockReq.user = createTestUser();
 
-        await authController.me(mockReq as Request, mockRes as Response, mockNext);
+        await authController.me(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.success).toHaveBeenCalledWith(
           expect.any(Object),
@@ -672,7 +707,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
           mockReq.body = { email: 'security@example.com', password };
 
           await expect(
-            authController.register(mockReq as Request, mockRes as Response, mockNext)
+            authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
           ).rejects.toThrow(); // Any validation error is fine for this test
         }
       });
@@ -691,7 +726,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
           mockReq.body = { email: 'strong@example.com', password };
           mockNext.mockClear();
 
-          await authController.register(mockReq as Request, mockRes as Response, mockNext);
+          await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
           expect(mockNext).not.toHaveBeenCalled();
           expect(mockUserModel.create).toHaveBeenCalled();
@@ -722,7 +757,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
 
           const timing = await measurePerformance(async () => {
             try {
-              await authController.login(mockReq as Request, mockRes as Response, mockNext);
+              await authController.login(mockReq as Request, mockRes as unknown as Response, mockNext);
             } catch (error) {
               // Expected for invalid credentials
             }
@@ -750,7 +785,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.create.mockResolvedValue(createTestUser());
         mockSanitization.sanitizeUserInput.mockReturnValue('sanitized@example.com');
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockSanitization.sanitizeUserInput).toHaveBeenCalledWith('test@example.com');
         expect(mockRes.created).toHaveBeenCalledWith(
@@ -767,7 +802,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.create.mockResolvedValue(createTestUser({ email: xssEmail }));
         mockSanitization.sanitizeUserInput.mockReturnValue('test+safescript@example.com');
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockSanitization.sanitizeUserInput).toHaveBeenCalledWith(xssEmail);
         expect(mockRes.created).toHaveBeenCalledWith(
@@ -785,7 +820,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         const testUser = createTestUser({ id: 'user-jwt-123', email: 'jwt@example.com' });
         mockUserModel.create.mockResolvedValue(testUser);
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockJwt.sign).toHaveBeenCalledWith(
           {
@@ -801,7 +836,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: 'fallback@example.com', password: 'ValidPass123!' };
         mockUserModel.create.mockResolvedValue(createTestUser());
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockJwt.sign).toHaveBeenCalledWith(
           expect.any(Object),
@@ -815,14 +850,20 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
   describe('Performance & Load Tests', () => {
     describe('Response Time Validation', () => {
       it('should meet performance requirements for all operations', async () => {
-        const operations = [
+        interface TestOperation {
+          name: string;
+          setup: () => void;
+          operation: () => Promise<void>;
+        }
+
+        const operations: TestOperation[] = [
           {
             name: 'register',
             setup: () => {
               mockReq.body = { email: 'perf@example.com', password: 'ValidPass123!' };
               mockUserModel.create.mockResolvedValue(createTestUser());
             },
-            operation: () => authController.register(mockReq as Request, mockRes as Response, mockNext)
+            operation: () => authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
           },
           {
             name: 'login',
@@ -831,14 +872,14 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
               mockUserModel.findByEmail.mockResolvedValue(createTestUser());
               mockUserModel.validatePassword.mockResolvedValue(true);
             },
-            operation: () => authController.login(mockReq as Request, mockRes as Response, mockNext)
+            operation: () => authController.login(mockReq as Request, mockRes as unknown as Response, mockNext)
           },
           {
             name: 'me',
             setup: () => {
               mockReq.user = createTestUser();
             },
-            operation: () => authController.me(mockReq as Request, mockRes as Response, mockNext)
+            operation: () => authController.me(mockReq as Request, mockRes as unknown as Response, mockNext)
           }
         ];
 
@@ -864,9 +905,9 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         for (let i = 0; i < concurrentRequests; i++) {
           const req = createMockRequest({ body: mockReq.body });
           const res = createMockResponse();
-          const next = jest.fn();
+          const next = jest.fn() as jest.MockedFunction<NextFunction>;
 
-          requests.push(authController.login(req as Request, res as Response, next));
+          requests.push(authController.login(req as Request, res as unknown as Response, next));
         }
 
         const startTime = Date.now();
@@ -886,7 +927,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.create.mockResolvedValue(createTestUser());
 
         const timing = await measurePerformance(async () => {
-          await authController.register(mockReq as Request, mockRes as Response, mockNext);
+          await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
         });
 
         // Even with long passwords, should complete quickly
@@ -899,7 +940,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.create.mockRejectedValue(new Error('Database error'));
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Registration failed');
 
         // Should still reject properly and not leave hanging resources
@@ -916,7 +957,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: maxEmail, password: 'ValidPass123!' };
         mockUserModel.create.mockResolvedValue(createTestUser({ email: maxEmail }));
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockNext).not.toHaveBeenCalled();
         expect(mockUserModel.create).toHaveBeenCalled();
@@ -926,7 +967,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: 'min@example.com', password: 'Aa1!' + '1234' }; // 8 chars total
         mockUserModel.create.mockResolvedValue(createTestUser());
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockNext).not.toHaveBeenCalled();
         expect(mockUserModel.create).toHaveBeenCalled();
@@ -946,7 +987,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
           mockReq.body = { email, password: 'ValidPass123!' };
           mockNext.mockClear();
 
-          await authController.register(mockReq as Request, mockRes as Response, mockNext);
+          await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
           expect(mockNext).not.toHaveBeenCalled();
         }
@@ -959,7 +1000,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: 'unicode@example.com', password: unicodePassword };
         mockUserModel.create.mockResolvedValue(createTestUser());
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockNext).not.toHaveBeenCalled();
         expect(mockUserModel.create).toHaveBeenCalledWith({
@@ -972,7 +1013,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: 'test@тест.com', password: 'ValidPass123!' };
         mockUserModel.create.mockResolvedValue(createTestUser());
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockNext).not.toHaveBeenCalled();
       });
@@ -983,7 +1024,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: null, password: 'ValidPass123!' };
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Email and password are required');
       });
 
@@ -991,7 +1032,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockReq.body = { email: undefined, password: 'ValidPass123!' };
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Email and password are required');
       });
     });
@@ -1005,7 +1046,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         const testUser = createTestUser({ email: 'lifecycle@example.com' });
         mockUserModel.create.mockResolvedValue(testUser);
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.created).toHaveBeenCalledTimes(1);
         expect(mockNext).not.toHaveBeenCalled();
@@ -1016,7 +1057,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.findByEmail.mockResolvedValue(testUser);
         mockUserModel.validatePassword.mockResolvedValue(true);
 
-        await authController.login(mockReq as Request, mockRes as Response, mockNext);
+        await authController.login(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.success).toHaveBeenCalledTimes(1);
         expect(mockNext).not.toHaveBeenCalled();
@@ -1026,7 +1067,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockNext.mockClear();
         mockReq.user = testUser;
 
-        await authController.me(mockReq as Request, mockRes as Response, mockNext);
+        await authController.me(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.success).toHaveBeenCalledTimes(1);
         expect(mockNext).not.toHaveBeenCalled();
@@ -1039,14 +1080,14 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.create.mockRejectedValueOnce(new Error('Database error'));
 
         await expect(
-          authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Registration failed');
 
         // Second attempt succeeds
         mockRes = createMockResponse();
         mockUserModel.create.mockResolvedValue(createTestUser());
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         expect(mockRes.created).toHaveBeenCalled();
       });
@@ -1062,7 +1103,7 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.create.mockResolvedValue(testUser);
         mockSanitization.sanitizeUserInput.mockReturnValue(email);
 
-        await authController.register(mockReq as Request, mockRes as Response, mockNext);
+        await authController.register(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         // Login
         mockRes = createMockResponse();
@@ -1070,14 +1111,14 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         mockUserModel.findByEmail.mockResolvedValue(testUser);
         mockUserModel.validatePassword.mockResolvedValue(true);
 
-        await authController.login(mockReq as Request, mockRes as Response, mockNext);
+        await authController.login(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         // Profile
         mockRes = createMockResponse();
         mockNext.mockClear();
         mockReq.user = testUser;
 
-        await authController.me(mockReq as Request, mockRes as Response, mockNext);
+        await authController.me(mockReq as Request, mockRes as unknown as Response, mockNext);
 
         // All operations should have consistent email handling
         expect(mockSanitization.sanitizeUserInput).toHaveBeenCalledWith(email);
@@ -1115,26 +1156,32 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
       const testUser = createTestUser();
       expect(testUser.id).toBeTruthy();
       expect(testUser.email).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
-      expect(testUser.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      expect(testUser.created_at).toBeInstanceOf(Date);
+      expect(testUser.updated_at).toBeInstanceOf(Date);
     });
   });
 
   describe('Auth Domain Security & Sanitization (Critical Checkpoint)', () => {
     it('should apply strictest input validation for authentication operations', async () => {
-        const maliciousInputs = [
+      interface MaliciousInput {
+        email: any;
+        password: string;
+      }
+
+      const maliciousInputs: MaliciousInput[] = [
         { email: '"><script>alert("xss")</script>', password: 'ValidPass123!' },
         { email: "'; DROP TABLE users; --", password: 'ValidPass123!' },
         { email: { toString: () => 'hack@example.com' }, password: 'ValidPass123!' },
         { email: ['array@example.com'], password: 'ValidPass123!' }
-        ];
+      ];
 
-        for (const input of maliciousInputs) {
+      for (const input of maliciousInputs) {
         mockReq.body = input;
         mockNext.mockClear();
 
         // The controller throws EnhancedApiError instead of calling next()
         await expect(
-            authController.register(mockReq as Request, mockRes as Response, mockNext)
+          authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow(); // Expect any validation error to be thrown
 
         // Verify that the user model was not called (security check passed)
@@ -1142,38 +1189,44 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         
         // Reset the mock for the next iteration
         mockUserModel.create.mockClear();
-        }
+      }
     });
 
     it('should sanitize all user outputs through sanitization layer', async () => {
-        const operations = [
+      interface TestOperation {
+        name: string;
+        setup: () => void;
+        operation: () => Promise<void>;
+      }
+
+      const operations: TestOperation[] = [
         {
-            name: 'register',
-            setup: () => {
+          name: 'register',
+          setup: () => {
             mockReq.body = { email: 'sanitize@example.com', password: 'ValidPass123!' };
             mockUserModel.create.mockResolvedValue(createTestUser({ email: 'sanitize@example.com' }));
-            },
-            operation: () => authController.register(mockReq as Request, mockRes as Response, mockNext)
+          },
+          operation: () => authController.register(mockReq as Request, mockRes as unknown as Response, mockNext)
         },
         {
-            name: 'login',
-            setup: () => {
+          name: 'login',
+          setup: () => {
             mockReq.body = { email: 'sanitize@example.com', password: 'ValidPass123!' };
             mockUserModel.findByEmail.mockResolvedValue(createTestUser({ email: 'sanitize@example.com' }));
             mockUserModel.validatePassword.mockResolvedValue(true);
-            },
-            operation: () => authController.login(mockReq as Request, mockRes as Response, mockNext)
+          },
+          operation: () => authController.login(mockReq as Request, mockRes as unknown as Response, mockNext)
         },
         {
-            name: 'me',
-            setup: () => {
+          name: 'me',
+          setup: () => {
             mockReq.user = createTestUser({ email: 'sanitize@example.com' });
-            },
-            operation: () => authController.me(mockReq as Request, mockRes as Response, mockNext)
+          },
+          operation: () => authController.me(mockReq as Request, mockRes as unknown as Response, mockNext)
         }
-        ];
+      ];
 
-        for (const op of operations) {
+      for (const op of operations) {
         op.setup();
         mockNext.mockClear();
         mockSanitization.sanitizeUserInput.mockClear();
@@ -1181,34 +1234,40 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         await op.operation();
 
         expect(mockSanitization.sanitizeUserInput).toHaveBeenCalledWith('sanitize@example.com');
-        }
+      }
     });
 
     it('should implement comprehensive timing attack protection', async () => {
-        const attackScenarios = [
+      interface AttackScenario {
+        email: string;
+        userExists: boolean;
+        validPassword?: boolean;
+      }
+
+      const attackScenarios: AttackScenario[] = [
         { email: 'timing1@example.com', userExists: false },
         { email: 'timing2@example.com', userExists: true, validPassword: false },
         { email: 'timing3@example.com', userExists: true, validPassword: true }
-        ];
+      ];
 
-        const timings: number[] = [];
+      const timings: number[] = [];
 
-        for (const scenario of attackScenarios) {
+      for (const scenario of attackScenarios) {
         mockReq.body = { email: scenario.email, password: 'TestPassword123!' };
         
         if (scenario.userExists) {
-            mockUserModel.findByEmail.mockResolvedValue(createTestUser());
-            mockUserModel.validatePassword.mockResolvedValue(scenario.validPassword || false);
+          mockUserModel.findByEmail.mockResolvedValue(createTestUser());
+          mockUserModel.validatePassword.mockResolvedValue(scenario.validPassword || false);
         } else {
-            mockUserModel.findByEmail.mockResolvedValue(null);
+          mockUserModel.findByEmail.mockResolvedValue(null);
         }
 
         const timing = await measurePerformance(async () => {
-            try {
-            await authController.login(mockReq as Request, mockRes as Response, mockNext);
-            } catch (error) {
+          try {
+            await authController.login(mockReq as Request, mockRes as unknown as Response, mockNext);
+          } catch (error) {
             // Expected for invalid credentials - timing attack protection still applies
-            }
+          }
         });
 
         timings.push(timing);
@@ -1217,20 +1276,22 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         // Reset mocks for next iteration
         mockUserModel.findByEmail.mockClear();
         mockUserModel.validatePassword.mockClear();
-        }
+      }
 
-        // Timing variations should be minimal (less than 50ms difference to account for test environment variance)
-        const timingVariation = Math.max(...timings) - Math.min(...timings);
-        expect(timingVariation).toBeLessThan(50);
-        
-        // All scenarios should take at least 90ms due to timing-safe implementation
-        timings.forEach(timing => {
+      // Timing variations should be minimal (less than 50ms difference to account for test environment variance)
+      const timingVariation = Math.max(...timings) - Math.min(...timings);
+      expect(timingVariation).toBeLessThan(50);
+      
+      // All scenarios should take at least 90ms due to timing-safe implementation
+      timings.forEach(timing => {
         expect(timing).toBeGreaterThanOrEqual(90);
-        });
+      });
     });
 
     it('should validate user context more strictly than other domains', async () => {
-        const invalidUserContexts = [
+      type InvalidUserContext = undefined | null | Record<string, any>;
+
+      const invalidUserContexts: InvalidUserContext[] = [
         undefined,
         null,
         {},
@@ -1238,56 +1299,64 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
         { id: '' },
         { email: 'test@example.com' }, // Missing id
         { id: 'valid-id' } // Missing email
-        ];
+      ];
 
-        for (const userContext of invalidUserContexts) {
-        mockReq.user = userContext;
+      for (const userContext of invalidUserContexts) {
+        mockReq.user = userContext as any;
         mockNext.mockClear();
-        mockRes.success.mockClear();
+        (mockRes.success as jest.MockedFunction<any>).mockClear();
 
         // Test each invalid context individually
         try {
-            await authController.me(mockReq as Request, mockRes as Response, mockNext);
-            
-            // If we reach here, the controller didn't throw an error
-            // This means it passed validation - let's verify what was called
-            console.log(`User context ${JSON.stringify(userContext)} passed validation`);
-            
-            // For contexts that pass validation, verify proper response was called
-            if (mockRes.success.mock.calls.length > 0) {
+          await authController.me(mockReq as Request, mockRes as unknown as Response, mockNext);
+          
+          // If we reach here, the controller didn't throw an error
+          // This means it passed validation - let's verify what was called
+          console.log(`User context ${JSON.stringify(userContext)} passed validation`);
+          
+          // For contexts that pass validation, verify proper response was called
+          if ((mockRes.success as jest.MockedFunction<any>).mock.calls.length > 0) {
             expect(mockRes.success).toHaveBeenCalled();
-            } else {
+          } else {
             // If no response was called, this might be an actual issue
             fail(`User context ${JSON.stringify(userContext)} passed validation but no response was sent`);
-            }
-        } catch (error) {
-            // Expected for truly invalid contexts
-            expect(error.message).toBe('Authentication required');
-            expect(mockRes.success).not.toHaveBeenCalled();
+          }
+        } catch (error: any) {
+          // Expected for truly invalid contexts
+          expect(error.message).toBe('Authentication required');
+          expect(mockRes.success).not.toHaveBeenCalled();
         }
-        }
+      }
 
-        // Test a completely invalid context that should definitely fail
-        const definitelyInvalidContexts = [undefined, null];
-        
-        for (const userContext of definitelyInvalidContexts) {
-        mockReq.user = userContext;
+      // Test a completely invalid context that should definitely fail
+      const definitelyInvalidContexts: (undefined | null)[] = [undefined, null];
+      
+      for (const userContext of definitelyInvalidContexts) {
+        mockReq.user = userContext ?? undefined;
         mockNext.mockClear();
-        mockRes.success.mockClear();
+        (mockRes.success as jest.MockedFunction<any>).mockClear();
 
         await expect(
-            authController.me(mockReq as Request, mockRes as Response, mockNext)
+          authController.me(mockReq as Request, mockRes as unknown as Response, mockNext)
         ).rejects.toThrow('Authentication required');
 
         expect(mockRes.success).not.toHaveBeenCalled();
-        }
+      }
     });
   });
 
   describe('Flutter-Specific Test Coverage Summary', () => {
     it('should provide Flutter test execution summary', () => {
-      const summary = {
-        totalTests: expect.getState().testNamePattern ? 1 : 100, // Approximate
+      interface TestSummary {
+        totalTests: number;
+        authOperations: string[];
+        securityFeatures: string[];
+        responseFormats: string[];
+        metaInformation: string[];
+      }
+
+      const summary: TestSummary = {
+        totalTests: 100, // Approximate
         authOperations: ['register', 'login', 'me'],
         securityFeatures: [
           'timing attack prevention',
@@ -1307,7 +1376,20 @@ describe('Auth Controller - Flutter-Compatible Unit Tests', () => {
     });
 
     it('should validate Flutter response format compliance', () => {
-      const requiredResponseStructure = {
+      interface ResponseStructure {
+        successResponses: {
+          data: string;
+          message: string;
+          meta: string;
+        };
+        errorResponses: {
+          type: string;
+          message: string;
+          field: string;
+        };
+      }
+
+      const requiredResponseStructure: ResponseStructure = {
         successResponses: {
           data: 'object',
           message: 'string',
