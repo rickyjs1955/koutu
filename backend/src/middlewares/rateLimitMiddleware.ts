@@ -11,7 +11,7 @@ interface RateLimitStore {
   };
 }
 
-class RateLimiter {
+export class RateLimiter {
   private store: RateLimitStore = {};
   private cleanupInterval?: NodeJS.Timeout;
 
@@ -58,6 +58,14 @@ class RateLimiter {
           count: 1,
           resetTime: now + this.windowMs
         };
+        
+        // Add rate limit headers
+        res.set({
+          'X-RateLimit-Limit': this.maxRequests.toString(),
+          'X-RateLimit-Remaining': (this.maxRequests - 1).toString(),
+          'X-RateLimit-Reset': Math.ceil(this.store[key].resetTime / 1000).toString()
+        });
+        
         return next();
       }
 
@@ -97,6 +105,19 @@ class RateLimiter {
 
   public reset(): void {
     this.store = {};
+  }
+
+  // Getter methods for testing
+  public getStore(): RateLimitStore {
+    return { ...this.store };
+  }
+
+  public getWindowMs(): number {
+    return this.windowMs;
+  }
+
+  public getMaxRequests(): number {
+    return this.maxRequests;
   }
 }
 

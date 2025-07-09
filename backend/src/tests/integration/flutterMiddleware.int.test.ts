@@ -93,8 +93,8 @@ describe('Flutter Middleware Integration Tests', () => {
     // Apply Flutter middleware stack
     app.use(flutterMiddleware.detection);
     app.use(mockValidationMiddleware); // Use our mock validation middleware
-    app.use(flutterMiddleware.response);
     app.use(flutterMiddleware.performance);
+    app.use(flutterMiddleware.response);
     
     // Test routes
     app.get('/test/detection', (req, res) => {
