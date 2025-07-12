@@ -172,10 +172,13 @@ describe('Security Middleware Unit Tests', () => {
     });
 
     it('should reject POST requests without CSRF token', () => {
-      (mockReq as any).method = 'POST';
-      (mockReq as any).path = '/api/data';
-      (mockReq as any).headers = {};
-      (mockReq as any).session = { csrfToken: 'session-token' };
+      Object.assign(mockReq, {
+        method: 'POST',
+        path: '/api/data',
+        headers: {},
+        session: { csrfToken: 'session-token' },
+        get: jest.fn().mockReturnValue(undefined)
+      });
       
       csrfProtection(mockReq as Request, mockRes as Response, mockNext);
       
@@ -183,16 +186,20 @@ describe('Security Middleware Unit Tests', () => {
       expect(jsonSpy).toHaveBeenCalledWith({
         status: 'error',
         message: 'Invalid CSRF token',
-        code: 'CSRF_INVALID'
+        code: 'CSRF_INVALID',
+        clientType: 'web'
       });
       expect(mockNext).not.toHaveBeenCalled();
     });
 
     it('should reject requests without session CSRF token', () => {
-      (mockReq as any).method = 'POST';
-      (mockReq as any).path = '/api/data';
-      (mockReq as any).headers = { 'x-csrf-token': 'header-token' };
-      (mockReq as any).session = {};
+      Object.assign(mockReq, {
+        method: 'POST',
+        path: '/api/data',
+        headers: { 'x-csrf-token': 'header-token' },
+        session: {},
+        get: jest.fn().mockReturnValue(undefined)
+      });
       
       csrfProtection(mockReq as Request, mockRes as Response, mockNext);
       
@@ -200,17 +207,21 @@ describe('Security Middleware Unit Tests', () => {
       expect(jsonSpy).toHaveBeenCalledWith({
         status: 'error',
         message: 'Invalid CSRF token',
-        code: 'CSRF_INVALID'
+        code: 'CSRF_INVALID',
+        clientType: 'web'
       });
     });
 
     it('should accept requests with valid matching CSRF tokens', () => {
       const validToken = 'valid-csrf-token-123';
       
-      (mockReq as any).method = 'POST';
-      (mockReq as any).path = '/api/data';
-      (mockReq as any).headers = { 'x-csrf-token': validToken };
-      (mockReq as any).session = { csrfToken: validToken };
+      Object.assign(mockReq, {
+        method: 'POST',
+        path: '/api/data',
+        headers: { 'x-csrf-token': validToken },
+        session: { csrfToken: validToken },
+        get: jest.fn().mockReturnValue(undefined)
+      });
       
       csrfProtection(mockReq as Request, mockRes as Response, mockNext);
       
@@ -219,10 +230,13 @@ describe('Security Middleware Unit Tests', () => {
     });
 
     it('should reject requests with mismatched CSRF tokens', () => {
-      (mockReq as any).method = 'POST';
-      (mockReq as any).path = '/api/data';
-      (mockReq as any).headers = { 'x-csrf-token': 'wrong-token' };
-      (mockReq as any).session = { csrfToken: 'correct-token' };
+      Object.assign(mockReq, {
+        method: 'POST',
+        path: '/api/data',
+        headers: { 'x-csrf-token': 'wrong-token' },
+        session: { csrfToken: 'correct-token' },
+        get: jest.fn().mockReturnValue(undefined)
+      });
       
       csrfProtection(mockReq as Request, mockRes as Response, mockNext);
       
@@ -230,14 +244,18 @@ describe('Security Middleware Unit Tests', () => {
       expect(jsonSpy).toHaveBeenCalledWith({
         status: 'error',
         message: 'Invalid CSRF token',
-        code: 'CSRF_INVALID'
+        code: 'CSRF_INVALID',
+        clientType: 'web'
       });
     });
 
     it('should handle PUT requests with CSRF protection', () => {
-      (mockReq as any).method = 'PUT';
-      (mockReq as any).path = '/api/data';
-      (mockReq as any).headers = {};
+      Object.assign(mockReq, {
+        method: 'PUT',
+        path: '/api/data',
+        headers: {},
+        get: jest.fn().mockReturnValue(undefined)
+      });
       
       csrfProtection(mockReq as Request, mockRes as Response, mockNext);
       
@@ -245,9 +263,12 @@ describe('Security Middleware Unit Tests', () => {
     });
 
     it('should handle DELETE requests with CSRF protection', () => {
-      (mockReq as any).method = 'DELETE';
-      (mockReq as any).path = '/api/data';
-      (mockReq as any).headers = {};
+      Object.assign(mockReq, {
+        method: 'DELETE',
+        path: '/api/data',
+        headers: {},
+        get: jest.fn().mockReturnValue(undefined)
+      });
       
       csrfProtection(mockReq as Request, mockRes as Response, mockNext);
       
@@ -255,9 +276,12 @@ describe('Security Middleware Unit Tests', () => {
     });
 
     it('should handle PATCH requests with CSRF protection', () => {
-      (mockReq as any).method = 'PATCH';
-      (mockReq as any).path = '/api/data';
-      (mockReq as any).headers = {};
+      Object.assign(mockReq, {
+        method: 'PATCH',
+        path: '/api/data',
+        headers: {},
+        get: jest.fn().mockReturnValue(undefined)
+      });
       
       csrfProtection(mockReq as Request, mockRes as Response, mockNext);
       
@@ -609,7 +633,8 @@ describe('Security Middleware Unit Tests', () => {
         method: 'POST',
         path: '/api/data',
         headers: null, // Malformed
-        session: { csrfToken: 'valid-token' }
+        session: { csrfToken: 'valid-token' },
+        get: jest.fn().mockReturnValue(undefined)
       };
       
       // CSRF protection should handle null headers gracefully
@@ -626,7 +651,8 @@ describe('Security Middleware Unit Tests', () => {
         method: 'POST',
         path: '/api/data',
         headers: undefined, // Malformed
-        session: { csrfToken: 'valid-token' }
+        session: { csrfToken: 'valid-token' },
+        get: jest.fn().mockReturnValue(undefined)
       };
       
       expect(() => {
@@ -641,7 +667,8 @@ describe('Security Middleware Unit Tests', () => {
         method: 'POST',
         path: '/api/data',
         headers: { 'x-csrf-token': 'valid-token' },
-        session: null // Malformed
+        session: null, // Malformed
+        get: jest.fn().mockReturnValue(undefined)
       };
       
       expect(() => {

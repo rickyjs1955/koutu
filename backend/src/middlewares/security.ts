@@ -242,6 +242,37 @@ function validateFilePath(filepath: string): {
 }
 
 /**
+ * Mobile app user agent detection
+ */
+function isMobileApp(userAgent: string): boolean {
+  return /Flutter|Dart|React Native|Cordova|PhoneGap/i.test(userAgent);
+}
+
+/**
+ * Get CSP directives based on user agent (mobile-friendly)
+ */
+function getCspDirectives(userAgent: string) {
+  const isMobile = isMobileApp(userAgent);
+  
+  return {
+    defaultSrc: ["'self'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    scriptSrc: ["'self'"],
+    imgSrc: ["'self'", "data:", "https:"],
+    connectSrc: ["'self'"],
+    fontSrc: ["'self'"],
+    objectSrc: ["'none'"],
+    mediaSrc: ["'self'"],
+    frameSrc: ["'none'"],
+    baseUri: ["'self'"],
+    formAction: ["'self'"],
+    frameAncestors: ["'none'"],
+    // Skip upgrade directive for mobile apps in development
+    ...(isMobile && config.nodeEnv === 'development' ? {} : { upgradeInsecureRequests: [] })
+  };
+}
+
+/**
  * CORS configuration with test environment support
  */
 const corsOptions = {
@@ -292,41 +323,35 @@ const corsOptions = {
   maxAge: 86400 // 24 hours
 };
 
-/**
- * Content Security Policy configuration
- */
-const cspDirectives = {
-  defaultSrc: ["'self'"],
-  styleSrc: ["'self'", "'unsafe-inline'"],
-  scriptSrc: ["'self'"],
-  imgSrc: ["'self'", "data:", "https:"],
-  connectSrc: ["'self'"],
-  fontSrc: ["'self'"],
-  objectSrc: ["'none'"],
-  mediaSrc: ["'self'"],
-  frameSrc: ["'none'"],
-  baseUri: ["'self'"],
-  formAction: ["'self'"],
-  frameAncestors: ["'none'"],
-  upgradeInsecureRequests: []
-};
 
 /**
- * Rate limiting configurations for different endpoint types
+ * Rate limiting configurations for different endpoint types with mobile app support
  */
-export const createRateLimit = (windowMs: number, max: number, message?: string) => {
+export const createRateLimit = (windowMs: number, max: number, message?: string, mobileMultiplier: number = 2) => {
   return rateLimit({
     windowMs,
-    max,
+    max: (req) => {
+      const userAgent = req.get('User-Agent') || '';
+      const isMobile = isMobileApp(userAgent);
+      // Mobile apps get higher rate limits due to background sync and retry mechanisms
+      return isMobile ? max * mobileMultiplier : max;
+    },
     message: message || 'Too many requests from this IP',
-    standardHeaders: true,
-    legacyHeaders: false,
+    // Remove standardHeaders as it's not in the newer version
+    skip: (req) => {
+      // Skip rate limiting for health checks and certain mobile app endpoints
+      return req.path === '/health' || req.path === '/api/ping';
+    },
     handler: (req, res) => {
+      const userAgent = req.get('User-Agent') || '';
+      const isMobile = isMobileApp(userAgent);
+      
       res.status(429).json({
         status: 'error',
         message: 'Rate limit exceeded',
         code: 'RATE_LIMIT_EXCEEDED',
-        retryAfter: Math.ceil(windowMs / 1000)
+        retryAfter: Math.ceil(windowMs / 1000),
+        clientType: isMobile ? 'mobile' : 'web'
       });
     }
   });
@@ -362,7 +387,7 @@ export const generalSecurity = [
   // Helmet for security headers
   helmet({
     contentSecurityPolicy: {
-      directives: cspDirectives,
+      directives: getCspDirectives(''),
       reportOnly: config.nodeEnv === 'development'
     },
     hsts: {
@@ -375,41 +400,58 @@ export const generalSecurity = [
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
   }),
   
-  // Additional security headers
+  // Additional security headers with mobile app support
   (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Safely get request properties
       const path = req.path || req.url || '';
+      const userAgent = req.get('User-Agent') || '';
+      const isMobile = isMobileApp(userAgent);
       
-      // Prevent clickjacking
-      res.setHeader('X-Frame-Options', 'DENY');
+      // Prevent clickjacking (less restrictive for mobile apps)
+      if (isMobile) {
+        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+      } else {
+        res.setHeader('X-Frame-Options', 'DENY');
+      }
       
       // Prevent MIME type sniffing
       res.setHeader('X-Content-Type-Options', 'nosniff');
       
-      // Enable XSS protection
-      res.setHeader('X-XSS-Protection', '1; mode=block');
+      // Enable XSS protection for web clients
+      if (!isMobile) {
+        res.setHeader('X-XSS-Protection', '1; mode=block');
+      }
       
       // Referrer policy
       res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
       
-      // Feature policy (restrict browser features)
-      res.setHeader('Permissions-Policy', 
-        'geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=()'
-      );
+      // Feature policy (adjust for mobile capabilities)
+      const permissionsPolicy = isMobile 
+        ? 'geolocation=(self), microphone=(self), camera=(self), payment=(), usb=(), magnetometer=(self), gyroscope=(self)'
+        : 'geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=()';
+      res.setHeader('Permissions-Policy', permissionsPolicy);
+      
+      // Server time for mobile app synchronization
+      if (isMobile) {
+        res.setHeader('X-Server-Time', new Date().toISOString());
+      }
       
       // Cache control for sensitive routes
       if (path.includes('/auth/') || path.includes('/api/')) {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        res.setHeader('Surrogate-Control', 'no-store');
+        if (isMobile) {
+          // Allow short-term caching for mobile apps to improve performance
+          res.setHeader('Cache-Control', 'private, max-age=30, must-revalidate');
+        } else {
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+          res.setHeader('Surrogate-Control', 'no-store');
+        }
       }
       
       next();
     } catch (error) {
       console.error('Security headers middleware error:', error);
-      // Still proceed with the request even if headers fail
       next();
     }
   }
@@ -503,13 +545,24 @@ export const fileUploadSecurity = [
 ];
 
 /**
- * CSRF Protection Middleware
+ * CSRF Protection Middleware with Flutter/Mobile app support
  * Note: This is a basic implementation. For production, consider using 'csurf' package
  */
 export const csrfProtection = (req: Request, res: Response, next: NextFunction) => {
   // Skip CSRF for GET requests and certain endpoints
   if (req.method === 'GET' || req.path.includes('/auth/login') || req.path.includes('/auth/register')) {
     return next();
+  }
+  
+  const userAgent = req.get('User-Agent') || '';
+  const isMobile = isMobileApp(userAgent);
+  
+  // Skip CSRF protection for mobile apps using API tokens
+  if (isMobile) {
+    const authHeader = req.get('Authorization');
+    if (authHeader && (authHeader.startsWith('Bearer ') || authHeader.startsWith('API-Key '))) {
+      return next(); // Mobile apps using token auth skip CSRF
+    }
   }
   
   // Defensive programming: handle malformed request objects
@@ -523,7 +576,8 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
     return res.status(403).json({
       status: 'error',
       message: 'Invalid CSRF token',
-      code: 'CSRF_INVALID'
+      code: 'CSRF_INVALID',
+      clientType: isMobile ? 'mobile' : 'web'
     });
   }
   
@@ -553,6 +607,69 @@ export const requestSizeLimits = (req: Request, res: Response, next: NextFunctio
 };
 
 /**
+ * Flutter/Mobile-specific security middleware
+ */
+export const flutterSecurity = [
+  // Request tracking
+  requestIdMiddleware,
+  
+  // Path traversal protection
+  pathTraversalProtection,
+  
+  // CORS optimized for mobile
+  cors(corsOptions),
+  
+  // Helmet with mobile-friendly CSP
+  (req: Request, res: Response, next: NextFunction) => {
+    const userAgent = req.get('User-Agent') || '';
+    const dynamicCsp = getCspDirectives(userAgent);
+    
+    helmet({
+      contentSecurityPolicy: {
+        directives: dynamicCsp,
+        reportOnly: config.nodeEnv === 'development'
+      },
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+      },
+      noSniff: true,
+      xssFilter: false, // Disabled for mobile apps
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+    })(req, res, next);
+  },
+  
+  // Mobile-optimized rate limiting
+  createRateLimit(15 * 60 * 1000, 200, 'Too many requests'), // Higher limits for mobile via function logic
+  
+  // Mobile-specific headers
+  (req: Request, res: Response, next: NextFunction) => {
+    const userAgent = req.get('User-Agent') || '';
+    const isMobile = isMobileApp(userAgent);
+    
+    if (isMobile) {
+      // Headers helpful for Flutter apps
+      res.setHeader('X-Server-Time', new Date().toISOString());
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+      
+      // Allow caching for mobile performance
+      if (!req.path.includes('/auth/')) {
+        res.setHeader('Cache-Control', 'private, max-age=300'); // 5 minutes
+      }
+      
+      // Flutter-specific headers
+      res.setHeader('Access-Control-Expose-Headers', 'X-Server-Time, X-Request-ID, X-Flutter-Compatible');
+      res.setHeader('X-Flutter-Compatible', 'true');
+    }
+    
+    next();
+  }
+];
+
+/**
  * Complete security middleware stack for different use cases
  */
 export const securityMiddleware = {
@@ -560,10 +677,11 @@ export const securityMiddleware = {
   auth: authSecurity,
   api: apiSecurity,
   fileUpload: fileUploadSecurity,
-  file: fileSecurity, // New: specific for file serving
+  file: fileSecurity,
+  flutter: flutterSecurity, // New: Flutter/mobile optimized
   csrf: csrfProtection,
-  pathTraversal: pathTraversalProtection, // Standalone for custom use
-  filePath: filePathSecurity // Standalone for file operations
+  pathTraversal: pathTraversalProtection,
+  filePath: filePathSecurity
 };
 
 /**
