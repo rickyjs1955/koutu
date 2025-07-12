@@ -410,10 +410,12 @@ describe('Auth P2 Integration Tests - Mobile/Flutter Enhancements', () => {
         .send({ refreshToken })
         .expect(401);
 
+      // For security reasons, we don't expose whether a user exists or not
+      // Instead, we return a generic "Invalid or expired refresh token" error
       expect(response.body.error).toEqual({
-        message: 'User not found',
+        message: 'Invalid or expired refresh token',
         type: 'authentication',
-        code: 'user_not_found'
+        code: 'invalid_refresh_token'
       });
     });
 

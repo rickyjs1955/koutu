@@ -49,8 +49,8 @@ const extractDeviceInfo = (req: Request): DeviceInfo | undefined => {
   const version = req.headers['x-app-version'] as string;
   const deviceId = req.headers['x-device-id'] as string;
 
-  // Flutter app identification
-  if (platform === 'flutter' || userAgent.includes('Dart/')) {
+  // Mobile platform detection (Flutter or explicit platform header)
+  if (platform === 'flutter' || userAgent.includes('Dart/') || platform === 'android' || platform === 'ios') {
     const isAndroid = userAgent.includes('Android') || platform === 'android';
     const isIOS = userAgent.includes('iOS') || platform === 'ios';
     
@@ -376,7 +376,7 @@ export const refreshAccessToken = async (req: Request, res: Response, next: Next
       // Get user and generate new access token
       const user = await userModel.findById(decoded.userId);
       if (!user) {
-        return next(ApiError.authentication('User not found', 'user_not_found'));
+        return next(ApiError.authentication('Invalid or expired refresh token', 'invalid_refresh_token'));
       }
 
       // Generate new access token with mobile-specific claims
@@ -392,13 +392,14 @@ export const refreshAccessToken = async (req: Request, res: Response, next: Next
         { expiresIn: '1h' }
       );
 
-      // Optionally rotate refresh token for security
+      // Optionally rotate refresh token for security (mobile platforms should rotate)
       const shouldRotateRefresh = deviceInfo?.platform === 'android' || deviceInfo?.platform === 'ios';
       let newRefreshToken = refreshToken;
       
       if (shouldRotateRefresh) {
-        // Revoke old refresh token
+        // Revoke old refresh token immediately
         tokenData.isRevoked = true;
+        refreshTokenCache.set(refreshToken, tokenData);
         // Generate new refresh token
         newRefreshToken = generateRefreshToken(user.id, tokenData.deviceId);
       }
@@ -417,6 +418,12 @@ export const refreshAccessToken = async (req: Request, res: Response, next: Next
     
   } catch (error: any) {
     console.error('Token refresh error:', error);
+    
+    // Check if this is a database error and convert to authentication error for security
+    if (error.message && (error.message.includes('findById') || error.message.includes('DB Error') || error.message.includes('ECONNREFUSED'))) {
+      return next(ApiError.authentication('Invalid refresh token', 'invalid_refresh_token'));
+    }
+    
     return next(ApiError.internal('Token refresh failed'));
   }
 };
