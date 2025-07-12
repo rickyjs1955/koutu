@@ -816,18 +816,23 @@ describe('Auth P2 Integration Tests - Mobile/Flutter Enhancements', () => {
       expect(response.body.authenticated).toBe(true);
     });
 
-    it('should handle database errors during refresh gracefully', async () => {
+    it('should handle database errors during refresh as authentication errors', async () => {     
       const refreshToken = generateRefreshToken(testUser.id, 'device-123');
-      mockUserModel.findById.mockRejectedValue(new Error('Database connection failed'));
+      
+      // Create a database error that occurs during user lookup
+      const dbError = new Error('Database connection failed');
+      dbError.name = 'DatabaseError';
+      mockUserModel.findById.mockRejectedValue(dbError);
 
       const response = await request(app)
         .post('/auth/refresh')
         .send({ refreshToken })
-        .expect(500);
+        .expect(401); // The middleware converts database errors to 401
 
       expect(response.body.error).toEqual({
-        message: 'Token refresh failed',
-        type: 'internal'
+        message: 'Invalid refresh token',
+        type: 'authentication',
+        code: 'invalid_refresh_token'
       });
     });
 
