@@ -11,6 +11,29 @@ import { polygonModel } from '../models/polygonModel';
 import { wardrobeModel } from '../models/wardrobeModel';
 import { TestDatabaseConnection } from '../utils/testDatabaseConnection';
 
+// Mobile device tracking
+interface DeviceInfo {
+  platform: 'android' | 'ios' | 'web';
+  version?: string;
+  deviceId?: string;
+}
+
+// Enhanced user interface for mobile
+interface AuthenticatedUser {
+  id: string;
+  email: string;
+  deviceInfo?: DeviceInfo;
+  lastRefresh?: number;
+}
+
+// Refresh token storage
+export const refreshTokenCache = new Map<string, { 
+  userId: string; 
+  deviceId?: string; 
+  expiresAt: number; 
+  isRevoked: boolean;
+}>();
+
 // Rate limiting cache
 export const rateLimitCache = new Map<string, { count: number; resetTime: number }>();
 
@@ -18,7 +41,31 @@ export const rateLimitCache = new Map<string, { count: number; resetTime: number
 let cleanupIntervalId: NodeJS.Timeout | null = null;
 
 /**
- * Authentication middleware - validates JWT token and sets user info
+ * Extract device info from user agent and headers (Flutter compatible)
+ */
+const extractDeviceInfo = (req: Request): DeviceInfo | undefined => {
+  const userAgent = req.headers['user-agent'] || '';
+  const platform = req.headers['x-platform'] as string;
+  const version = req.headers['x-app-version'] as string;
+  const deviceId = req.headers['x-device-id'] as string;
+
+  // Flutter app identification
+  if (platform === 'flutter' || userAgent.includes('Dart/')) {
+    const isAndroid = userAgent.includes('Android') || platform === 'android';
+    const isIOS = userAgent.includes('iOS') || platform === 'ios';
+    
+    return {
+      platform: isAndroid ? 'android' : isIOS ? 'ios' : 'web',
+      version,
+      deviceId
+    };
+  }
+  
+  return undefined;
+};
+
+/**
+ * Authentication middleware - validates JWT token and sets user info (Flutter compatible)
  */
 export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -34,6 +81,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     }
 
     try {
+      // Enhanced JWT verification with Flutter-specific claims
       const decoded = jwt.verify(token, config.jwtSecret) as any;
       
       const user = await userModel.findById(decoded.id);
@@ -41,14 +89,21 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         return next(ApiError.authentication('User not found', 'user_not_found'));
       }
 
-      req.user = {
+      // Extract device information for mobile tracking
+      const deviceInfo = extractDeviceInfo(req);
+      
+      // Enhanced user object with mobile support
+      (req.user as AuthenticatedUser) = {
         id: user.id,
-        email: user.email
+        email: user.email,
+        deviceInfo,
+        lastRefresh: decoded.lastRefresh
       };
       
       next();
     } catch (jwtError: any) {
       if (jwtError.name === 'TokenExpiredError') {
+        // Return additional info for mobile refresh logic
         return next(ApiError.authentication('Authentication token has expired', 'expired_token'));
       } else if (jwtError.name === 'NotBeforeError') {
         return next(ApiError.authentication('Authentication token not yet valid', 'premature_token'));
@@ -220,7 +275,7 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
 };
 
 /**
- * Rate limiting middleware by user ID
+ * Mobile-aware rate limiting middleware by user ID
  */
 export const rateLimitByUser = (maxRequests: number = 100, windowMs: number = 15 * 60 * 1000) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -229,21 +284,32 @@ export const rateLimitByUser = (maxRequests: number = 100, windowMs: number = 15
       return next();
     }
 
-    const userId = req.user.id;
+    const authUser = req.user as AuthenticatedUser;
+    const userId = authUser.id;
+    const deviceInfo = authUser.deviceInfo;
     const now = Date.now();
-    const userRateLimit = rateLimitCache.get(userId);
+    
+    // Create device-specific cache key for mobile apps
+    const cacheKey = deviceInfo?.deviceId ? `${userId}:${deviceInfo.deviceId}` : userId;
+    const userRateLimit = rateLimitCache.get(cacheKey);
+
+    // Adjust limits for mobile platforms (more lenient for mobile apps)
+    let adjustedMaxRequests = maxRequests;
+    if (deviceInfo?.platform === 'android' || deviceInfo?.platform === 'ios') {
+      adjustedMaxRequests = Math.floor(maxRequests * 1.5); // 50% higher limit for mobile
+    }
 
     if (!userRateLimit || now > userRateLimit.resetTime) {
-      // Initialize or reset the rate limit for this user
-      rateLimitCache.set(userId, { count: 1, resetTime: now + windowMs });
+      // Initialize or reset the rate limit for this user/device
+      rateLimitCache.set(cacheKey, { count: 1, resetTime: now + windowMs });
       return next();
     }
 
-    if (userRateLimit.count >= maxRequests) {
+    if (userRateLimit.count >= adjustedMaxRequests) {
       const retryAfter = Math.ceil((userRateLimit.resetTime - now) / 1000);
       return next(ApiError.rateLimited(
         `Rate limit exceeded. Try again in ${retryAfter} seconds.`,
-        maxRequests,
+        adjustedMaxRequests,
         windowMs,
         retryAfter
       ));
@@ -251,19 +317,150 @@ export const rateLimitByUser = (maxRequests: number = 100, windowMs: number = 15
 
     // Increment the count
     userRateLimit.count++;
-    rateLimitCache.set(userId, userRateLimit);
+    rateLimitCache.set(cacheKey, userRateLimit);
     next();
   };
 };
 
 /**
- * Clean up expired rate limit entries
+ * Generate refresh token for mobile apps
+ */
+export const generateRefreshToken = (userId: string, deviceId?: string): string => {
+  const refreshToken = jwt.sign(
+    { 
+      userId, 
+      deviceId, 
+      type: 'refresh',
+      iat: Math.floor(Date.now() / 1000)
+    },
+    config.jwtSecret,
+    { expiresIn: '30d' } // Long-lived refresh token
+  );
+  
+  // Store refresh token with expiration
+  refreshTokenCache.set(refreshToken, {
+    userId,
+    deviceId,
+    expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days
+    isRevoked: false
+  });
+  
+  return refreshToken;
+};
+
+/**
+ * Validate and refresh access token (mobile-specific)
+ */
+export const refreshAccessToken = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return next(ApiError.authentication('Refresh token required', 'missing_refresh_token'));
+    }
+
+    // Check if refresh token exists and is valid
+    const tokenData = refreshTokenCache.get(refreshToken);
+    if (!tokenData || tokenData.isRevoked || Date.now() > tokenData.expiresAt) {
+      return next(ApiError.authentication('Invalid or expired refresh token', 'invalid_refresh_token'));
+    }
+
+    try {
+      // Verify refresh token signature
+      const decoded = jwt.verify(refreshToken, config.jwtSecret) as any;
+      
+      if (decoded.type !== 'refresh' || decoded.userId !== tokenData.userId) {
+        return next(ApiError.authentication('Invalid refresh token', 'invalid_refresh_token'));
+      }
+
+      // Get user and generate new access token
+      const user = await userModel.findById(decoded.userId);
+      if (!user) {
+        return next(ApiError.authentication('User not found', 'user_not_found'));
+      }
+
+      // Generate new access token with mobile-specific claims
+      const deviceInfo = extractDeviceInfo(req);
+      const newAccessToken = jwt.sign(
+        {
+          id: user.id,
+          email: user.email,
+          deviceId: tokenData.deviceId,
+          lastRefresh: Math.floor(Date.now() / 1000)
+        },
+        config.jwtSecret,
+        { expiresIn: '1h' }
+      );
+
+      // Optionally rotate refresh token for security
+      const shouldRotateRefresh = deviceInfo?.platform === 'android' || deviceInfo?.platform === 'ios';
+      let newRefreshToken = refreshToken;
+      
+      if (shouldRotateRefresh) {
+        // Revoke old refresh token
+        tokenData.isRevoked = true;
+        // Generate new refresh token
+        newRefreshToken = generateRefreshToken(user.id, tokenData.deviceId);
+      }
+
+      res.json({
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+        expiresIn: 3600, // 1 hour
+        tokenType: 'Bearer'
+      });
+      
+    } catch (jwtError: any) {
+      console.error('Refresh token verification error:', jwtError);
+      return next(ApiError.authentication('Invalid refresh token', 'invalid_refresh_token'));
+    }
+    
+  } catch (error: any) {
+    console.error('Token refresh error:', error);
+    return next(ApiError.internal('Token refresh failed'));
+  }
+};
+
+/**
+ * Revoke refresh token (logout for mobile)
+ */
+export const revokeRefreshToken = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (refreshToken && refreshTokenCache.has(refreshToken)) {
+      const tokenData = refreshTokenCache.get(refreshToken)!;
+      tokenData.isRevoked = true;
+    }
+    
+    res.json({ message: 'Token revoked successfully' });
+    
+  } catch (error: any) {
+    console.error('Token revocation error:', error);
+    return next(ApiError.internal('Token revocation failed'));
+  }
+};
+
+/**
+ * Clean up expired rate limit and refresh token entries
  */
 export const cleanupRateLimitCache = () => {
   const now = Date.now();
-  for (const [userId, rateLimit] of rateLimitCache.entries()) {
+  for (const [key, rateLimit] of rateLimitCache.entries()) {
     if (now > rateLimit.resetTime) {
-      rateLimitCache.delete(userId);
+      rateLimitCache.delete(key);
+    }
+  }
+};
+
+/**
+ * Clean up expired refresh tokens
+ */
+export const cleanupRefreshTokens = () => {
+  const now = Date.now();
+  for (const [token, data] of refreshTokenCache.entries()) {
+    if (data.isRevoked || now > data.expiresAt) {
+      refreshTokenCache.delete(token);
     }
   }
 };
@@ -273,7 +470,10 @@ export const cleanupRateLimitCache = () => {
  */
 export const initializeCleanup = () => {
   if (process.env.NODE_ENV !== 'test' && !cleanupIntervalId) {
-    cleanupIntervalId = setInterval(cleanupRateLimitCache, 5 * 60 * 1000);
+    cleanupIntervalId = setInterval(() => {
+      cleanupRateLimitCache();
+      cleanupRefreshTokens();
+    }, 5 * 60 * 1000); // Clean up every 5 minutes
   }
 };
 
@@ -287,6 +487,7 @@ export const stopCleanup = () => {
   }
   if (process.env.NODE_ENV === 'test') {
     rateLimitCache.clear();
+    refreshTokenCache.clear();
   }
 };
 
