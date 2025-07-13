@@ -15,6 +15,65 @@ const mockImageModel = imageModel as jest.Mocked<typeof imageModel>;
 const mockImageProcessingService = imageProcessingService as jest.Mocked<typeof imageProcessingService>;
 const mockStorageService = storageService as jest.Mocked<typeof storageService>;
 
+// Add type declarations for missing methods
+declare global {
+  var gc: (() => void) | undefined;
+}
+
+interface ImageRecord {
+  id: string;
+  user_id: string;
+  file_path: string;
+  status: 'new' | 'processed' | 'failed';
+  upload_date: string;
+  original_metadata: Record<string, any>;
+}
+
+interface ImageStats {
+  total: number;
+  totalSize: number;
+}
+
+interface ImageMetadata {
+  width: number;
+  height: number;
+  format: string;
+  space: string;
+  density?: number;
+  hasProfile?: boolean;
+  hasAlpha?: boolean;
+  channels?: number;
+  size?: number;
+}
+
+interface ValidationResult {
+  width: number;
+  height: number;
+  format: string;
+  space: string;
+}
+
+interface UploadParams {
+  userId: string;
+  fileBuffer: Buffer;
+  originalFilename: string;
+  mimetype: string;
+  size: number;
+}
+
+interface SyncOperation {
+  id: string;
+  action: 'update' | 'delete' | 'create';
+  data: { status: 'new' | 'processed' | 'failed' };
+  clientTimestamp: string;
+}
+
+interface MobileThumbnailOptions {
+  page: number;
+  limit: number;
+  size: 'small' | 'medium' | 'large';
+}
+
 describe('ImageService Performance Tests', () => {
   const TEST_USER_ID = 'test-user-123';
   const PERFORMANCE_THRESHOLD = {
@@ -73,14 +132,14 @@ describe('ImageService Performance Tests', () => {
         status: 'new',
         upload_date: new Date().toISOString(),
         original_metadata: {}
-      });
+      } as ImageRecord);
       mockImageModel.getUserImageStats.mockResolvedValue({
         total: 10,
         totalSize: 1024 * 1024 * 10 // 10MB
-      });
+      } as ImageStats);
 
       const testBuffer = Buffer.alloc(1024 * 1024); // 1MB test image
-      const uploadParams = {
+      const uploadParams: UploadParams = {
         userId: TEST_USER_ID,
         fileBuffer: testBuffer,
         originalFilename: 'test.jpg',
@@ -131,16 +190,16 @@ describe('ImageService Performance Tests', () => {
         status: 'new',
         upload_date: new Date().toISOString(),
         original_metadata: {}
-      });
+      } as ImageRecord);
       mockImageModel.getUserImageStats.mockResolvedValue({
         total: 10,
         totalSize: 1024 * 1024 * 10
-      });
+      } as ImageStats);
     });
 
     it('should upload small image within performance threshold', async () => {
       const smallBuffer = Buffer.alloc(512 * 1024); // 512KB
-      const uploadParams = {
+      const uploadParams: UploadParams = {
         userId: TEST_USER_ID,
         fileBuffer: smallBuffer,
         originalFilename: 'small.jpg',
@@ -158,7 +217,7 @@ describe('ImageService Performance Tests', () => {
 
     it('should upload large image within reasonable time', async () => {
       const largeBuffer = Buffer.alloc(5 * 1024 * 1024); // 5MB
-      const uploadParams = {
+      const uploadParams: UploadParams = {
         userId: TEST_USER_ID,
         fileBuffer: largeBuffer,
         originalFilename: 'large.jpg',
@@ -176,7 +235,7 @@ describe('ImageService Performance Tests', () => {
 
     it('should handle concurrent uploads efficiently', async () => {
       const testBuffer = Buffer.alloc(1024 * 1024); // 1MB
-      const uploadParams = {
+      const baseUploadParams: UploadParams = {
         userId: TEST_USER_ID,
         fileBuffer: testBuffer,
         originalFilename: 'concurrent.jpg',
@@ -186,7 +245,7 @@ describe('ImageService Performance Tests', () => {
 
       const concurrentUploads = 5;
       const uploadPromises = Array.from({ length: concurrentUploads }, (_, i) => ({
-        ...uploadParams,
+        ...baseUploadParams,
         originalFilename: `concurrent-${i}.jpg`
       }));
 
@@ -201,11 +260,11 @@ describe('ImageService Performance Tests', () => {
 
   describe('Batch Operations Performance', () => {
     beforeEach(() => {
-      const mockImage = {
+      const mockImage: ImageRecord = {
         id: 'test-image-id',
         user_id: TEST_USER_ID,
         file_path: '/test/path/image.jpg',
-        status: 'new' as const,
+        status: 'new',
         upload_date: new Date().toISOString(),
         original_metadata: {}
       };
@@ -239,10 +298,10 @@ describe('ImageService Performance Tests', () => {
     });
 
     it('should handle batch sync operations efficiently', async () => {
-      const operations = Array.from({ length: 50 }, (_, i) => ({
+      const operations: SyncOperation[] = Array.from({ length: 50 }, (_, i) => ({
         id: `image-${i}`,
-        action: 'update' as const,
-        data: { status: 'processed' as const },
+        action: 'update',
+        data: { status: 'processed' },
         clientTimestamp: new Date().toISOString()
       }));
 
@@ -264,7 +323,7 @@ describe('ImageService Performance Tests', () => {
         status: 'new',
         upload_date: new Date().toISOString(),
         original_metadata: {}
-      });
+      } as ImageRecord);
       mockImageProcessingService.generateThumbnail.mockResolvedValue('/test/thumbnails/thumb.jpg');
       mockImageModel.updateMetadata.mockResolvedValue(true);
     });
@@ -306,7 +365,7 @@ describe('ImageService Performance Tests', () => {
           status: 'new',
           upload_date: new Date().toISOString(),
           original_metadata: { width: 1000, height: 800 }
-        }
+        } as ImageRecord
       ]);
       mockImageProcessingService.generateThumbnail.mockResolvedValue('/test/thumbnails/thumb.jpg');
       mockImageProcessingService.optimizeForMobile.mockResolvedValue('/test/optimized/mobile.webp');
@@ -317,11 +376,11 @@ describe('ImageService Performance Tests', () => {
         status: 'new',
         upload_date: new Date().toISOString(),
         original_metadata: { width: 1000, height: 800, size: 1024 * 1024 }
-      });
+      } as ImageRecord);
     });
 
     it('should load mobile thumbnails efficiently', async () => {
-      const options = { page: 1, limit: 20, size: 'medium' as const };
+      const options: MobileThumbnailOptions = { page: 1, limit: 20, size: 'medium' };
 
       const startTime = performance.now();
       await imageService.getMobileThumbnails(TEST_USER_ID, options);
@@ -365,11 +424,11 @@ describe('ImageService Performance Tests', () => {
         status: 'new',
         upload_date: new Date().toISOString(),
         original_metadata: {}
-      });
+      } as ImageRecord);
       mockImageModel.getUserImageStats.mockResolvedValue({
         total: 10,
         totalSize: 1024 * 1024 * 10
-      });
+      } as ImageStats);
       mockImageModel.findById.mockResolvedValue({
         id: 'flutter-image-id',
         user_id: TEST_USER_ID,
@@ -377,11 +436,11 @@ describe('ImageService Performance Tests', () => {
         status: 'new',
         upload_date: new Date().toISOString(),
         original_metadata: {}
-      });
+      } as ImageRecord);
       mockImageModel.updateMetadata.mockResolvedValue(true);
 
       const testBuffer = Buffer.alloc(1024 * 1024); // 1MB
-      const uploadParams = {
+      const uploadParams: UploadParams = {
         userId: TEST_USER_ID,
         fileBuffer: testBuffer,
         originalFilename: 'flutter.jpg',
@@ -403,7 +462,7 @@ describe('ImageService Performance Tests', () => {
       const invalidBuffer = Buffer.alloc(1024);
       mockImageProcessingService.validateImageBuffer.mockRejectedValue(new Error('Invalid image'));
 
-      const uploadParams = {
+      const uploadParams: UploadParams = {
         userId: TEST_USER_ID,
         fileBuffer: invalidBuffer,
         originalFilename: 'invalid.txt',
@@ -429,7 +488,7 @@ describe('ImageService Performance Tests', () => {
     it('should handle validation errors efficiently', async () => {
       const oversizedBuffer = Buffer.alloc(10 * 1024 * 1024); // 10MB (over limit)
       
-      const uploadParams = {
+      const uploadParams: UploadParams = {
         userId: TEST_USER_ID,
         fileBuffer: oversizedBuffer,
         originalFilename: 'oversized.jpg',
@@ -461,7 +520,7 @@ describe('ImageService Performance Tests', () => {
         status: 'new',
         upload_date: new Date().toISOString(),
         original_metadata: {}
-      });
+      } as ImageRecord);
       mockImageModel.findDependentGarments.mockResolvedValue([]);
       mockImageModel.findDependentPolygons.mockResolvedValue([]);
       mockStorageService.deleteFile.mockResolvedValue(undefined);
@@ -487,7 +546,7 @@ describe('ImageService Performance Tests', () => {
         status: 'new',
         upload_date: new Date().toISOString(),
         original_metadata: {}
-      });
+      } as ImageRecord);
 
       const durations: number[] = [];
       const batchSize = 100;
