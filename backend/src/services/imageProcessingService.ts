@@ -237,6 +237,40 @@ export const imageProcessingService = {
       console.error('Image optimization error:', error);
       throw new Error(`Failed to optimize image: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  },
+
+  /**
+   * Optimize image for mobile delivery - Flutter optimized
+   */
+  async optimizeForMobile(inputPath: string): Promise<string> {
+    try {
+      const absolutePath = storageService.getAbsolutePath(inputPath);
+      
+      // Get file info
+      const fileExtension = path.extname(inputPath);
+      const fileNameWithoutExt = path.basename(inputPath, fileExtension);
+      const dirName = path.dirname(inputPath);
+      
+      // Create mobile-optimized file name
+      const mobileFileName = `${fileNameWithoutExt}_mobile.webp`;
+      const mobilePath = path.join(dirName, mobileFileName);
+      const mobileAbsolutePath = storageService.getAbsolutePath(mobilePath);
+      
+      // Optimize for mobile: convert to WebP with mobile-friendly settings
+      await sharp(absolutePath)
+        .resize({ width: 800, withoutEnlargement: true })
+        .webp({
+          quality: 85,
+          effort: 4,
+          lossless: false
+        })
+        .toFile(mobileAbsolutePath);
+      
+      return mobilePath;
+    } catch (error) {
+      console.error('Mobile optimization error:', error);
+      throw new Error(`Failed to optimize for mobile: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 };
 

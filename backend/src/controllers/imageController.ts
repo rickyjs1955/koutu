@@ -370,5 +370,164 @@ export const imageController = {
       );
     },
     'batch updating'
+  ),
+
+  /**
+   * Get mobile thumbnails - Flutter optimized
+   */
+  getMobileThumbnails: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user!.id;
+      const { page = 1, limit = 20, size = 'medium' } = req.query;
+      
+      const result = await imageService.getMobileThumbnails(userId, {
+        page: Number(page),
+        limit: Number(limit),
+        size: size as 'small' | 'medium' | 'large'
+      });
+      
+      res.success(result, {
+        message: 'Mobile thumbnails retrieved successfully',
+        meta: {
+          page: Number(page),
+          limit: Number(limit),
+          size,
+          platform: 'mobile'
+        }
+      });
+    },
+    'retrieving mobile thumbnails'
+  ),
+
+  /**
+   * Get mobile optimized image - Flutter optimized
+   */
+  getMobileOptimizedImage: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user!.id;
+      const imageId = req.params.id;
+      
+      const result = await imageService.getMobileOptimizedImage(imageId, userId);
+      
+      res.success(result, {
+        message: 'Mobile optimized image retrieved successfully',
+        meta: {
+          imageId,
+          optimizedForMobile: true,
+          format: result.format || 'auto'
+        }
+      });
+    },
+    'retrieving mobile optimized image'
+  ),
+
+  /**
+   * Batch generate thumbnails - Flutter optimized
+   */
+  batchGenerateThumbnails: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user!.id;
+      const { imageIds, sizes = ['medium'] } = req.body;
+      
+      const result = await imageService.batchGenerateThumbnails(imageIds, userId, sizes);
+      
+      res.success(result, {
+        message: `Generated thumbnails for ${result.successCount} of ${imageIds.length} images`,
+        meta: {
+          operation: 'batch_generate_thumbnails',
+          requestedCount: imageIds.length,
+          successCount: result.successCount,
+          sizes
+        }
+      });
+    },
+    'batch generating thumbnails'
+  ),
+
+  /**
+   * Get sync data - Flutter offline support
+   */
+  getSyncData: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user!.id;
+      const { lastSync, includeDeleted = false, limit = 50 } = req.query;
+      
+      const result = await imageService.getSyncData(userId, {
+        lastSync: lastSync as string,
+        includeDeleted: includeDeleted === 'true',
+        limit: Number(limit)
+      });
+      
+      res.success(result, {
+        message: 'Sync data retrieved successfully',
+        meta: {
+          syncTimestamp: new Date().toISOString(),
+          includeDeleted,
+          itemCount: result.images?.length || 0
+        }
+      });
+    },
+    'retrieving sync data'
+  ),
+
+  /**
+   * Flutter upload - optimized for Flutter apps
+   */
+  flutterUploadImage: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      if (!req.file) {
+        throw EnhancedApiError.validation('No image file provided', 'file');
+      }
+
+      const userId = req.user!.id;
+      
+      const image = await imageService.flutterUploadImage({
+        userId,
+        fileBuffer: req.file.buffer,
+        originalFilename: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+      });
+      
+      const safeImage = sanitization.sanitizeImageForResponse(image);
+      
+      res.created(
+        { image: safeImage },
+        { 
+          message: 'Flutter upload successful',
+          meta: {
+            platform: 'flutter',
+            fileSize: req.file.size,
+            uploadId: image.id,
+            processingStatus: 'initiated'
+          }
+        }
+      );
+    },
+    'flutter uploading'
+  ),
+
+  /**
+   * Batch sync operations - Flutter offline/online sync
+   */
+  batchSyncOperations: sanitization.wrapImageController(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const userId = req.user!.id;
+      const { operations } = req.body;
+      
+      const result = await imageService.batchSyncOperations(userId, operations);
+      
+      res.success(result, {
+        message: `Processed ${result.successCount} of ${operations.length} sync operations`,
+        meta: {
+          operation: 'batch_sync',
+          totalOperations: operations.length,
+          successCount: result.successCount,
+          failedCount: result.failedCount,
+          conflicts: result.conflicts || []
+        }
+      });
+    },
+    'batch sync operations'
   )
 };

@@ -130,6 +130,74 @@ router.delete('/:id',
 );
 
 /**
+ * @route GET /api/v1/images/mobile/thumbnails
+ * @desc Get thumbnails optimized for mobile display
+ * @access Private
+ * @query page, limit, size
+ */
+router.get('/mobile/thumbnails',
+  validateQuery(z.object({
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+    size: z.enum(['small', 'medium', 'large']).default('medium')
+  })),
+  imageController.getMobileThumbnails
+);
+
+/**
+ * @route GET /api/v1/images/:id/mobile
+ * @desc Get mobile-optimized image with automatic format selection
+ * @access Private
+ * @middleware auth, ownership verification
+ */
+router.get('/:id/mobile',
+  validateParams(UUIDParamSchema),
+  authorizeImage,
+  imageController.getMobileOptimizedImage
+);
+
+/**
+ * @route POST /api/v1/images/batch/thumbnails
+ * @desc Generate thumbnails for multiple images (Flutter batch operation)
+ * @access Private
+ * @middleware auth, validation
+ */
+router.post('/batch/thumbnails',
+  validateBody(z.object({
+    imageIds: z.array(UUIDSchema).min(1).max(20),
+    sizes: z.array(z.enum(['small', 'medium', 'large'])).default(['medium'])
+  })),
+  imageController.batchGenerateThumbnails
+);
+
+/**
+ * @route GET /api/v1/images/sync
+ * @desc Get images with sync metadata for Flutter offline support
+ * @access Private
+ * @query lastSync, includeDeleted
+ */
+router.get('/sync',
+  validateQuery(z.object({
+    lastSync: z.string().datetime().optional(),
+    includeDeleted: z.coerce.boolean().default(false),
+    limit: z.coerce.number().int().min(1).max(100).default(50)
+  })),
+  imageController.getSyncData
+);
+
+/**
+ * @route POST /api/v1/images/flutter/upload
+ * @desc Flutter-optimized upload with progress support
+ * @access Private
+ * @middleware upload, validation, authentication
+ */
+router.post('/flutter/upload',
+  imageController.uploadMiddleware,
+  validateFile,
+  imageController.flutterUploadImage
+);
+
+/**
  * @route PUT /api/v1/images/batch/status
  * @desc Batch update image statuses
  * @access Private
@@ -141,6 +209,24 @@ router.put('/batch/status',
     status: ImageStatusSchema
   })),
   imageController.batchUpdateStatus
+);
+
+/**
+ * @route POST /api/v1/images/batch/sync
+ * @desc Batch sync operation for Flutter offline/online sync
+ * @access Private
+ * @middleware auth, validation
+ */
+router.post('/batch/sync',
+  validateBody(z.object({
+    operations: z.array(z.object({
+      id: UUIDSchema,
+      action: z.enum(['create', 'update', 'delete']),
+      data: z.record(z.any()).optional(),
+      clientTimestamp: z.string().datetime()
+    })).min(1).max(25)
+  })),
+  imageController.batchSyncOperations
 );
 
 export { router as imageRoutes };

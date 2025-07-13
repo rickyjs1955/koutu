@@ -462,5 +462,223 @@ export const imageService = {
       console.error('Error batch updating image status:', error);
       throw ApiError.internal('Failed to batch update image status');
     }
+  },
+
+  /**
+   * Get mobile thumbnails - Flutter optimized
+   */
+  async getMobileThumbnails(userId: string, options: { page: number; limit: number; size: 'small' | 'medium' | 'large' }) {
+    try {
+      const sizeMap = { small: 100, medium: 200, large: 400 };
+      const thumbnailSize = sizeMap[options.size];
+      
+      const offset = (options.page - 1) * options.limit;
+      const images = await imageModel.findByUserId(userId, { limit: options.limit, offset });
+      
+      const thumbnails = await Promise.all(
+        images.map(async (image) => {
+          try {
+            const thumbnailPath = await imageProcessingService.generateThumbnail(image.file_path, thumbnailSize);
+            return {
+              id: image.id,
+              thumbnailPath,
+              size: options.size,
+              originalWidth: image.original_metadata?.width,
+              originalHeight: image.original_metadata?.height
+            };
+          } catch {
+            return {
+              id: image.id,
+              thumbnailPath: null,
+              size: options.size,
+              error: 'Failed to generate thumbnail'
+            };
+          }
+        })
+      );
+
+      return { thumbnails, page: options.page, hasMore: images.length === options.limit };
+    } catch (error) {
+      console.error('Error getting mobile thumbnails:', error);
+      throw ApiError.internal('Failed to retrieve mobile thumbnails');
+    }
+  },
+
+  /**
+   * Get mobile optimized image - Flutter optimized
+   */
+  async getMobileOptimizedImage(imageId: string, userId: string) {
+    try {
+      const image = await this.getImageById(imageId, userId);
+      
+      // Generate mobile-optimized version
+      const optimizedPath = await imageProcessingService.optimizeForMobile(image.file_path);
+      
+      return {
+        id: image.id,
+        optimizedPath,
+        format: 'webp',
+        quality: 85,
+        originalSize: image.original_metadata?.size,
+        optimizedAt: new Date().toISOString()
+      };
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      console.error('Error getting mobile optimized image:', error);
+      throw ApiError.internal('Failed to get mobile optimized image');
+    }
+  },
+
+  /**
+   * Batch generate thumbnails - Flutter optimized
+   */
+  async batchGenerateThumbnails(imageIds: string[], userId: string, sizes: ('small' | 'medium' | 'large')[]) {
+    try {
+      // Verify ownership
+      const verificationPromises = imageIds.map(id => this.getImageById(id, userId));
+      const images = await Promise.all(verificationPromises);
+      
+      const sizeMap = { small: 100, medium: 200, large: 400 };
+      let successCount = 0;
+      const results = [];
+
+      for (const image of images) {
+        try {
+          const thumbnails = await Promise.all(
+            sizes.map(async (size) => {
+              const thumbnailPath = await imageProcessingService.generateThumbnail(image.file_path, sizeMap[size]);
+              return { size, thumbnailPath };
+            })
+          );
+          
+          results.push({ id: image.id, thumbnails, status: 'success' });
+          successCount++;
+        } catch (error) {
+          results.push({ id: image.id, status: 'failed', error: 'Thumbnail generation failed' });
+        }
+      }
+
+      return { results, successCount, totalCount: imageIds.length };
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      console.error('Error batch generating thumbnails:', error);
+      throw ApiError.internal('Failed to batch generate thumbnails');
+    }
+  },
+
+  /**
+   * Get sync data - Flutter offline support
+   */
+  async getSyncData(userId: string, options: { lastSync?: string; includeDeleted: boolean; limit: number }) {
+    try {
+      let query: ImageQueryOptions = { limit: options.limit };
+      
+      // For sync functionality, we'll use upload_date as a proxy for updated_at
+      if (options.lastSync) {
+        // We can extend the query later when we add updated_at to the schema
+        console.log('Sync timestamp provided:', options.lastSync);
+      }
+
+      const images = await imageModel.findByUserId(userId, query);
+      
+      const syncData = {
+        images: images.map(image => ({
+          id: image.id,
+          status: image.status,
+          metadata: image.original_metadata,
+          lastModified: image.upload_date,
+          syncStatus: 'synced'
+        })),
+        syncTimestamp: new Date().toISOString(),
+        hasMore: images.length === options.limit
+      };
+
+      return syncData;
+    } catch (error) {
+      console.error('Error getting sync data:', error);
+      throw ApiError.internal('Failed to get sync data');
+    }
+  },
+
+  /**
+   * Flutter upload - optimized for Flutter apps
+   */
+  async flutterUploadImage(params: ImageUploadParams) {
+    try {
+      // Use existing upload logic with Flutter optimizations
+      const image = await this.uploadImage(params);
+      
+      // Generate immediate thumbnail for Flutter preview
+      try {
+        await this.generateThumbnail(image.id, params.userId, 200);
+      } catch (thumbError) {
+        console.warn('Failed to generate immediate thumbnail:', thumbError);
+      }
+
+      return {
+        ...image,
+        platform: 'flutter',
+        uploadOptimized: true
+      };
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      console.error('Error in Flutter upload:', error);
+      throw ApiError.internal('Failed to process Flutter upload');
+    }
+  },
+
+  /**
+   * Batch sync operations - Flutter offline/online sync
+   */
+  async batchSyncOperations(userId: string, operations: Array<{
+    id: string;
+    action: 'create' | 'update' | 'delete';
+    data?: any;
+    clientTimestamp: string;
+  }>) {
+    try {
+      let successCount = 0;
+      let failedCount = 0;
+      const conflicts: any[] = [];
+      const results = [];
+
+      for (const operation of operations) {
+        try {
+          switch (operation.action) {
+            case 'update':
+              if (operation.data?.status) {
+                await this.updateImageStatus(operation.id, userId, operation.data.status);
+              }
+              break;
+            case 'delete':
+              await this.deleteImage(operation.id, userId);
+              break;
+            default:
+              throw new Error(`Unsupported sync operation: ${operation.action}`);
+          }
+          
+          results.push({ id: operation.id, status: 'success' });
+          successCount++;
+        } catch (error) {
+          results.push({ 
+            id: operation.id, 
+            status: 'failed', 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          });
+          failedCount++;
+        }
+      }
+
+      return {
+        results,
+        successCount,
+        failedCount,
+        conflicts,
+        syncCompleted: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Error in batch sync operations:', error);
+      throw ApiError.internal('Failed to process batch sync operations');
+    }
   }
 };
