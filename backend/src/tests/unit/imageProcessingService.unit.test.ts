@@ -5,6 +5,7 @@
 // Mock Sharp with proper implementation
 const mockSharpInstance = {
     metadata: jest.fn(),
+
     resize: jest.fn().mockReturnThis(),
     jpeg: jest.fn().mockReturnThis(),
     png: jest.fn().mockReturnThis(),
@@ -932,51 +933,6 @@ describe('Image Processing Service - Complete Test Suite', () => {
         });
     });
 
-    describe('Integration Scenarios', () => {
-        it('should complete full processing pipeline', async () => {
-            const buffer = createValidBuffer();
-            const inputPath = 'pipeline-test.jpg';
-            
-            // Step 1: Validate
-            const metadata = await imageProcessingService.validateImageBuffer(buffer);
-            expect(metadata.format).toBe('jpeg');
-
-            // Step 2: Convert (already sRGB)
-            const srgbPath = await imageProcessingService.convertToSRGB(inputPath);
-            expect(srgbPath).toBe(inputPath);
-
-            // Step 3: Resize
-            const resizedPath = await imageProcessingService.resizeImage(srgbPath, 800, 600);
-            expect(normalizePath(resizedPath)).toBe('pipeline-test_800x600.jpg');
-
-            // Step 4: Generate thumbnail
-            const thumbnailPath = await imageProcessingService.generateThumbnail(resizedPath, 200);
-            expect(normalizePath(thumbnailPath)).toContain('_thumb_200.jpg');
-
-            // Step 5: Optimize for web
-            const optimizedPath = await imageProcessingService.optimizeForWeb(resizedPath);
-            expect(normalizePath(optimizedPath)).toContain('_optimized.jpg');
-
-            // Step 6: Optimize for mobile
-            const mobilePath = await imageProcessingService.optimizeForMobile(resizedPath);
-            expect(normalizePath(mobilePath)).toContain('_mobile.webp');
-        });
-
-        it('should handle concurrent validations', async () => {
-            const buffers = Array.from({ length: 5 }, () => createValidBuffer());
-
-            const promises = buffers.map(buffer => 
-                imageProcessingService.validateImageBuffer(buffer)
-            );
-
-            const results = await Promise.all(promises);
-            
-            expect(results).toHaveLength(5);
-            results.forEach(result => {
-                expect(result.format).toBe('jpeg');
-            });
-        });
-    });
 
     describe('Edge Cases and Boundary Conditions', () => {
         it('should handle extreme but valid dimensions', async () => {

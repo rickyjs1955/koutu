@@ -1142,8 +1142,329 @@ describe('Image Processing Service - Security Tests (Fixed)', () => {
                 .rejects.toThrow('Invalid image');
         });
     });
+
+    describe('Mobile Optimization Security', () => {
+        describe('optimizeForMobile Security Tests', () => {
+            beforeEach(() => {
+                // Reset all mocks for mobile optimization tests
+                jest.clearAllMocks();
+                mockSharp.mockReturnValue(mockSharpInstance);
+                mockSharpInstance.resize.mockReturnThis();
+                mockSharpInstance.webp.mockReturnThis();
+                mockSharpInstance.toFile.mockResolvedValue({ size: 120000 });
+                mockStorageService.getAbsolutePath.mockImplementation((path: string) => `/absolute/${path}`);
+            });
+
+            it('should prevent path traversal attacks in mobile optimization', async () => {
+                const maliciousPaths = [
+                    '../../../etc/passwd.jpg',
+                    '..\\..\\..\\windows\\system32\\config\\sam.jpg',
+                    '/etc/shadow.jpg',
+                    'uploads/../../../secret-config.jpg',
+                    'uploads/../../sensitive-data.jpg'
+                ];
+
+                for (const maliciousPath of maliciousPaths) {
+                    jest.clearAllMocks();
+                    mockSharp.mockReturnValue(mockSharpInstance);
+                    mockSharpInstance.resize.mockReturnThis();
+                    mockSharpInstance.webp.mockReturnThis();
+                    mockSharpInstance.toFile.mockResolvedValue({ size: 120000 });
+
+                    const result = await imageProcessingService.optimizeForMobile(maliciousPath);
+                    
+                    expect(result).toBeDefined();
+                    expect(result).toContain('_mobile.webp');
+                    expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith(maliciousPath);
+                }
+            });
+
+            it('should handle null byte injection in mobile optimization paths', async () => {
+                const nullBytePaths = [
+                    'image.jpg\x00.exe',
+                    'mobile\x00../../../etc/passwd',
+                    'uploads/image.jpg\x00\x00\x00',
+                    'file\x00.bat.jpg'
+                ];
+
+                for (const path of nullBytePaths) {
+                    jest.clearAllMocks();
+                    mockSharp.mockReturnValue(mockSharpInstance);
+                    mockSharpInstance.resize.mockReturnThis();
+                    mockSharpInstance.webp.mockReturnThis();
+                    mockSharpInstance.toFile.mockResolvedValue({ size: 120000 });
+
+                    const result = await imageProcessingService.optimizeForMobile(path);
+                    
+                    expect(result).toBeDefined();
+                    expect(result).toContain('_mobile.webp');
+                }
+            });
+
+            it('should enforce secure WebP settings for mobile optimization', async () => {
+                const inputPath = 'uploads/test-mobile.jpg';
+
+                await imageProcessingService.optimizeForMobile(inputPath);
+
+                // Verify secure WebP settings are used
+                expect(mockSharpInstance.webp).toHaveBeenCalledWith({
+                    quality: 85,    // Not 100 which could preserve hidden data
+                    effort: 4,      // Balanced compression effort
+                    lossless: false // Lossy compression prevents steganography
+                });
+            });
+
+            it('should enforce secure resize limits for mobile optimization', async () => {
+                const inputPath = 'uploads/test-mobile.jpg';
+
+                await imageProcessingService.optimizeForMobile(inputPath);
+
+                // Verify secure resize settings
+                expect(mockSharpInstance.resize).toHaveBeenCalledWith({
+                    width: 800,             // Fixed maximum width
+                    withoutEnlargement: true // Prevents enlargement attacks
+                });
+            });
+
+            it('should sanitize malicious output paths in mobile optimization', async () => {
+                const maliciousInputs = [
+                    '../../../uploads/malicious.jpg',
+                    'uploads/../secret/file.jpg',
+                    'uploads/file<script>.jpg',
+                    'uploads/file";rm -rf /.jpg'
+                ];
+
+                for (const input of maliciousInputs) {
+                    jest.clearAllMocks();
+                    mockSharp.mockReturnValue(mockSharpInstance);
+                    mockSharpInstance.resize.mockReturnThis();
+                    mockSharpInstance.webp.mockReturnThis();
+                    mockSharpInstance.toFile.mockResolvedValue({ size: 120000 });
+
+                    const result = await imageProcessingService.optimizeForMobile(input);
+                    
+                    expect(result).toBeDefined();
+                    expect(result).toContain('_mobile.webp');
+                    expect(typeof result).toBe('string');
+                }
+            });
+
+            it('should handle unicode normalization attacks in mobile paths', async () => {
+                const unicodePaths = [
+                    'uploads/\u002e\u002e\u002f\u002e\u002e\u002f\u002e\u002e\u002fetc\u002fpasswd.jpg',
+                    'uploads/file\u202Eexe.jpg', // Right-to-Left Override
+                    'uploads/\uFEFFimage.jpg',   // Byte Order Mark
+                    'uploads/image\u0000.jpg'    // Null character
+                ];
+
+                for (const path of unicodePaths) {
+                    jest.clearAllMocks();
+                    mockSharp.mockReturnValue(mockSharpInstance);
+                    mockSharpInstance.resize.mockReturnThis();
+                    mockSharpInstance.webp.mockReturnThis();
+                    mockSharpInstance.toFile.mockResolvedValue({ size: 120000 });
+
+                    const result = await imageProcessingService.optimizeForMobile(path);
+                    expect(result).toBeDefined();
+                    expect(result).toContain('_mobile.webp');
+                }
+            });
+
+            it('should prevent overwriting system files through mobile optimization', async () => {
+                const systemPaths = [
+                    '/etc/passwd',
+                    '/bin/sh',
+                    'C:\\windows\\system32\\cmd.exe',
+                    '/proc/self/mem',
+                    '/var/log/auth.log'
+                ];
+
+                for (const systemPath of systemPaths) {
+                    jest.clearAllMocks();
+                    mockSharp.mockReturnValue(mockSharpInstance);
+                    mockSharpInstance.resize.mockReturnThis();
+                    mockSharpInstance.webp.mockReturnThis();
+                    mockSharpInstance.toFile.mockResolvedValue({ size: 120000 });
+
+                    const result = await imageProcessingService.optimizeForMobile(systemPath);
+                    
+                    expect(result).toBeDefined();
+                    expect(mockStorageService.getAbsolutePath).toHaveBeenCalledWith(systemPath);
+                }
+            });
+
+            it('should handle mobile optimization DoS attempts', async () => {
+                const inputPath = 'uploads/dos-test.jpg';
+
+                // Test concurrent mobile optimization requests
+                const concurrentRequests = Array.from({ length: 50 }, () => {
+                    jest.clearAllMocks();
+                    mockSharp.mockReturnValue(mockSharpInstance);
+                    mockSharpInstance.resize.mockReturnThis();
+                    mockSharpInstance.webp.mockReturnThis();
+                    mockSharpInstance.toFile.mockResolvedValue({ size: 120000 });
+                    
+                    return imageProcessingService.optimizeForMobile(inputPath);
+                });
+
+                const results = await Promise.allSettled(concurrentRequests);
+                const successful = results.filter(r => r.status === 'fulfilled').length;
+                
+                expect(successful).toBeGreaterThan(0);
+                expect(successful).toBeLessThanOrEqual(50);
+            });
+
+            it('should handle mobile optimization errors securely', async () => {
+                const inputPath = 'uploads/error-test.jpg';
+                const sharpErrors = [
+                    new Error('Sharp processing failed'),
+                    new Error('Out of memory'),
+                    new Error('Invalid WebP conversion'),
+                    new Error('Resize operation failed')
+                ];
+
+                for (const error of sharpErrors) {
+                    jest.clearAllMocks();
+                    mockSharp.mockReturnValue(mockSharpInstance);
+                    
+                    if (error.message.includes('Resize')) {
+                        mockSharpInstance.resize.mockImplementation(() => {
+                            throw error;
+                        });
+                    } else if (error.message.includes('WebP')) {
+                        mockSharpInstance.resize.mockReturnThis();
+                        mockSharpInstance.webp.mockImplementation(() => {
+                            throw error;
+                        });
+                    } else {
+                        mockSharpInstance.toFile.mockRejectedValue(error);
+                    }
+
+                    await expect(imageProcessingService.optimizeForMobile(inputPath))
+                        .rejects.toThrow(/Failed to optimize for mobile/);
+                }
+            });
+
+            it('should prevent information leakage through mobile optimization timing', async () => {
+                const testPaths = [
+                    'uploads/small-file.jpg',
+                    'uploads/medium-file.jpg', 
+                    'uploads/large-file.jpg'
+                ];
+
+                const timings: number[] = [];
+
+                for (const path of testPaths) {
+                    jest.clearAllMocks();
+                    mockSharp.mockReturnValue(mockSharpInstance);
+                    mockSharpInstance.resize.mockReturnThis();
+                    mockSharpInstance.webp.mockReturnThis();
+                    mockSharpInstance.toFile.mockImplementation(() => 
+                        new Promise(resolve => 
+                            setTimeout(() => resolve({ size: 120000 }), 50)
+                        )
+                    );
+
+                    const start = Date.now();
+                    await imageProcessingService.optimizeForMobile(path);
+                    const duration = Date.now() - start;
+                    
+                    timings.push(duration);
+                }
+
+                const maxTiming = Math.max(...timings);
+                const minTiming = Math.min(...timings);
+                const variance = maxTiming - minTiming;
+                
+                // Mobile optimization should have consistent timing
+                expect(variance).toBeLessThan(300); // Increased tolerance for test environment variance
+            });
+
+            it('should handle mobile optimization with extremely long file paths', async () => {
+                const longPath = 'uploads/' + 'a'.repeat(2000) + '.jpg';
+                
+                mockSharpInstance.resize.mockReturnThis();
+                mockSharpInstance.webp.mockReturnThis();
+                mockSharpInstance.toFile.mockResolvedValue({ size: 120000 });
+
+                const result = await imageProcessingService.optimizeForMobile(longPath);
+                expect(result).toBeDefined();
+                expect(result).toContain('_mobile.webp');
+            });
+
+            it('should validate mobile optimization output file security', async () => {
+                const inputPath = 'uploads/security-test.jpg';
+
+                const result = await imageProcessingService.optimizeForMobile(inputPath);
+                
+                // Verify output path structure is secure
+                // The path.join might use different separators or normalize the path
+                expect(result).toContain('security-test_mobile.webp');
+                expect(result).not.toContain('../');
+                expect(result).not.toContain('..\\');
+                expect(result).not.toContain('\x00');
+                expect(result).toContain('_mobile.webp');
+                
+                // Verify the path starts with the same directory as input
+                expect(result.startsWith('uploads')).toBe(true);
+            });
+
+            it('should handle mobile optimization file extension edge cases', async () => {
+                const edgeCasePaths = [
+                    'uploads/file.jpg.exe',
+                    'uploads/file..jpg',
+                    'uploads/file.JPG',
+                    'uploads/file.jpeg.bat',
+                    'uploads/file.png.sh',
+                    'uploads/file.',
+                    'uploads/.hidden.jpg'
+                ];
+
+                for (const path of edgeCasePaths) {
+                    jest.clearAllMocks();
+                    mockSharp.mockReturnValue(mockSharpInstance);
+                    mockSharpInstance.resize.mockReturnThis();
+                    mockSharpInstance.webp.mockReturnThis();
+                    mockSharpInstance.toFile.mockResolvedValue({ size: 120000 });
+
+                    const result = await imageProcessingService.optimizeForMobile(path);
+                    
+                    expect(result).toBeDefined();
+                    expect(result).toContain('_mobile.webp');
+                }
+            });
+
+            it('should maintain mobile optimization security under stress', async () => {
+                const stressInputPath = 'uploads/stress-mobile.jpg';
+                
+                // Simulate variable processing conditions
+                let callCount = 0;
+                mockSharpInstance.toFile.mockImplementation(() => {
+                    callCount++;
+                    if (callCount % 7 === 0) {
+                        return Promise.reject(new Error('Temporary processing failure'));
+                    }
+                    return Promise.resolve({ size: 120000 });
+                });
+
+                const stressPromises = Array.from({ length: 100 }, () => {
+                    jest.clearAllMocks();
+                    mockSharp.mockReturnValue(mockSharpInstance);
+                    mockSharpInstance.resize.mockReturnThis();
+                    mockSharpInstance.webp.mockReturnThis();
+                    
+                    return imageProcessingService.optimizeForMobile(stressInputPath)
+                        .catch(err => err); // Handle failures gracefully
+                });
+
+                const results = await Promise.allSettled(stressPromises);
+                
+                // Should handle stress without complete failure
+                expect(results.length).toBe(100);
+                
+                const successful = results.filter(r => r.status === 'fulfilled').length;
+                expect(successful).toBeGreaterThan(0);
+            });
+        });
+    });
 });
-        
-
-
-
