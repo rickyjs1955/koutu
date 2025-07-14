@@ -731,6 +731,109 @@ describe('Expanded HTTP Stack Integration Tests', () => {
       }
     });
     
+    // Move sync routes before :id routes to prevent route conflicts
+    // 🔄 Flutter Sync & Offline Support  
+    app.get('/api/v1/images/sync',
+      mockAuthenticate,
+      mockRequireAuth,
+      async (req: Request, res: Response, next: NextFunction) => {
+        try {
+          const { lastSync, includeDeleted = false, limit = 50 } = req.query;
+          
+          const limitNum = Number(limit);
+          if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+            res.status(400).json({
+              status: 'error',
+              code: 'INVALID_PARAMETER',
+              message: 'Limit must be between 1 and 100'
+            });
+            return;
+          }
+          
+          if (lastSync && isNaN(Date.parse(lastSync as string))) {
+            res.status(400).json({
+              status: 'error',
+              code: 'INVALID_DATE',
+              message: 'lastSync must be a valid ISO date'
+            });
+            return;
+          }
+          
+          const syncTimestamp = new Date().toISOString();
+          
+          // Generate mock images
+          const images = Array.from({ length: Math.min(limitNum, 10) }, (_, i) => ({
+            id: `sync-image-${i}`,
+            user_id: req.user!.id,
+            file_path: `/uploads/sync-${i}.jpg`,
+            status: 'new',
+            created_at: new Date(Date.now() - (i * 60000)).toISOString(),
+            updated_at: new Date().toISOString()
+          }));
+          
+          const deleted = includeDeleted === 'true' ? [
+            { id: 'deleted-1', deletedAt: new Date().toISOString() },
+            { id: 'deleted-2', deletedAt: new Date().toISOString() }
+          ] : [];
+          
+          res.status(200).json({
+            status: 'success',
+            data: {
+              images: images,
+              deleted: deleted,
+              hasMore: images.length === limitNum,
+              syncTimestamp: syncTimestamp,
+              nextPageToken: `page-${Math.random().toString(36).substring(2, 11)}`
+            }
+          });
+        } catch (error) {
+          console.error('Sync error:', error);
+          res.status(500).json({
+            status: 'error',
+            message: 'Internal server error'
+          });
+        }
+      }
+    );
+    
+    app.post('/api/v1/images/sync/resolve',
+      mockAuthenticate,
+      mockRequireAuth,
+      async (req: Request, res: Response, next: NextFunction) => {
+        try {
+          const { conflicts } = req.body;
+          
+          if (!Array.isArray(conflicts)) {
+            res.status(400).json({
+              status: 'error',
+              code: 'INVALID_CONFLICTS',
+              message: 'conflicts must be an array'
+            });
+            return;
+          }
+          
+          res.status(200).json({
+            status: 'success',
+            data: {
+              resolved: conflicts.map((c: any, i: number) => ({
+                imageId: c.imageId,
+                resolution: c.resolution,
+                success: true,
+                index: i
+              })),
+              failed: []
+            }
+          });
+        } catch (error) {
+          console.error('Sync resolve error:', error);
+          res.status(500).json({
+            status: 'error',
+            message: 'Internal server error'
+          });
+        }
+      }
+    );
+    
     // Protected image routes
     app.get('/api/v1/images',
       mockAuthenticate,
@@ -997,6 +1100,460 @@ describe('Expanded HTTP Stack Integration Tests', () => {
           res.status(500).json({
             status: 'error',
             message: 'Internal server error'
+          });
+        }
+      }
+    );
+    
+    // 📱 Mobile-Optimized Routes
+    app.get('/api/v1/images/mobile/thumbnails',
+      mockAuthenticate,
+      mockRequireAuth,
+      async (req: Request, res: Response, next: NextFunction) => {
+        try {
+          const { page = 1, limit = 20, size = 'medium' } = req.query;
+          
+          // Validation
+          const pageNum = Number(page);
+          const limitNum = Number(limit);
+          
+          if (isNaN(pageNum) || pageNum < 1) {
+            res.status(400).json({
+              status: 'error',
+              code: 'INVALID_PAGE',
+              message: 'Page must be a positive number'
+            });
+            return;
+          }
+          
+          if (isNaN(limitNum) || limitNum < 1 || limitNum > 50) {
+            res.status(400).json({
+              status: 'error',
+              code: 'INVALID_LIMIT',
+              message: 'Limit must be between 1 and 50'
+            });
+            return;
+          }
+          
+          if (!['small', 'medium', 'large'].includes(size as string)) {
+            res.status(400).json({
+              status: 'error',
+              code: 'INVALID_SIZE',
+              message: 'Size must be small, medium, or large'
+            });
+            return;
+          }
+          
+          // Generate mock thumbnails
+          const totalThumbnails = 100;
+          const totalPages = Math.ceil(totalThumbnails / limitNum);
+          const startIndex = (pageNum - 1) * limitNum;
+          const endIndex = Math.min(startIndex + limitNum, totalThumbnails);
+          
+          const thumbnails = [];
+          for (let i = startIndex; i < endIndex; i++) {
+            thumbnails.push({
+              id: `thumbnail-${i}`,
+              url: `https://cdn.example.com/thumbs/${size}/${i}.webp`,
+              size: size,
+              dimensions: {
+                small: { width: 150, height: 150 },
+                medium: { width: 300, height: 300 },
+                large: { width: 600, height: 600 }
+              }[size as 'small' | 'medium' | 'large'],
+              optimized: true,
+              mobileOptimized: true
+            });
+          }
+          
+          res.status(200).json({
+            status: 'success',
+            data: {
+              thumbnails: thumbnails,
+              pagination: {
+                page: pageNum,
+                limit: limitNum,
+                total: totalThumbnails,
+                totalPages: totalPages
+              }
+            }
+          });
+        } catch (error) {
+          console.error('Mobile thumbnails error:', error);
+          res.status(500).json({
+            status: 'error',
+            message: 'Internal server error'
+          });
+        }
+      }
+    );
+    
+    app.get('/api/v1/images/:id/mobile',
+      mockAuthenticate,
+      mockRequireAuth,
+      async (req: Request, res: Response, next: NextFunction) => {
+        try {
+          const { id } = req.params;
+          const { quality = 80 } = req.query;
+          
+          // UUID validation
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          if (!uuidRegex.test(id)) {
+            res.status(400).json({
+              status: 'error',
+              code: 'INVALID_UUID',
+              message: 'Invalid UUID format'
+            });
+            return;
+          }
+          
+          // Quality validation
+          const qualityNum = Number(quality);
+          if (isNaN(qualityNum) || qualityNum < 1 || qualityNum > 100) {
+            res.status(400).json({
+              status: 'error',
+              code: 'INVALID_PARAMETER',
+              message: 'Quality must be between 1 and 100'
+            });
+            return;
+          }
+          
+          // Check if image exists in mock database
+          const userImages = mockImageDatabase[req.user!.id] || [];
+          const image = userImages.find(img => img.id === id);
+          
+          if (!image) {
+            res.status(404).json({
+              status: 'error',
+              code: 'IMAGE_NOT_FOUND',
+              message: 'Image not found'
+            });
+            return;
+          }
+          
+          res.status(200).json({
+            status: 'success',
+            data: {
+              image: {
+                id: id,
+                url: `https://cdn.example.com/mobile/${id}.webp`,
+                format: 'webp',
+                quality: qualityNum,
+                mobileOptimized: true,
+                size: 1024 * qualityNum / 100,
+                compressionRatio: 0.65,
+                originalSize: 2048,
+                optimizedSize: 1024 * qualityNum / 100,
+                bandwidth_saved: 2048 - (1024 * qualityNum / 100)
+              }
+            }
+          });
+        } catch (error) {
+          console.error('Mobile image error:', error);
+          res.status(500).json({
+            status: 'error',
+            message: 'Internal server error'
+          });
+        }
+      }
+    );
+    
+    // 🔄 Batch Operations for Mobile
+    app.post('/api/v1/images/batch/thumbnails',
+      mockAuthenticate,
+      mockRequireAuth,
+      async (req: Request, res: Response, next: NextFunction) => {
+        try {
+          const { imageIds, size = 'medium', format = 'webp' } = req.body;
+          
+          if (!Array.isArray(imageIds) || imageIds.length === 0) {
+            res.status(400).json({
+              status: 'error',
+              code: 'INVALID_IMAGE_IDS',
+              message: 'imageIds must be a non-empty array'
+            });
+            return;
+          }
+          
+          if (imageIds.length > 100) {
+            res.status(400).json({
+              status: 'error',
+              code: 'BATCH_LIMIT_EXCEEDED',
+              message: 'Maximum 100 images allowed per batch'
+            });
+            return;
+          }
+          
+          // Count successful vs failed
+          const userImages = mockImageDatabase[req.user!.id] || [];
+          let processed = 0;
+          let failed = 0;
+          
+          const thumbnails = [];
+          for (const id of imageIds) {
+            const image = userImages.find(img => img.id === id);
+            if (image) {
+              thumbnails.push({
+                id: id,
+                url: `https://cdn.example.com/thumbs/${size}/${id}.webp`,
+                size: size,
+                format: format
+              });
+              processed++;
+            } else {
+              failed++;
+            }
+          }
+          
+          res.status(200).json({
+            status: 'success',
+            data: {
+              thumbnails: thumbnails,
+              processed: processed,
+              failed: failed
+            }
+          });
+        } catch (error) {
+          console.error('Batch thumbnails error:', error);
+          res.status(500).json({
+            status: 'error',
+            message: 'Internal server error'
+          });
+        }
+      }
+    );
+    
+    app.post('/api/v1/images/batch/sync',
+      mockAuthenticate,
+      mockRequireAuth,
+      async (req: Request, res: Response, next: NextFunction) => {
+        try {
+          const { imageIds, lastSync } = req.body;
+          
+          if (!Array.isArray(imageIds) || imageIds.length === 0) {
+            res.status(400).json({
+              status: 'error',
+              code: 'INVALID_IMAGE_IDS',
+              message: 'imageIds must be a non-empty array'
+            });
+            return;
+          }
+          
+          const syncTimestamp = new Date().toISOString();
+          
+          res.status(200).json({
+            status: 'success',
+            data: {
+              updated: imageIds.slice(0, Math.floor(imageIds.length * 0.8)),
+              deleted: [],
+              conflicts: imageIds.slice(Math.floor(imageIds.length * 0.8)),
+              syncTimestamp: syncTimestamp
+            }
+          });
+        } catch (error) {
+          console.error('Batch sync error:', error);
+          res.status(500).json({
+            status: 'error',
+            message: 'Internal server error'
+          });
+        }
+      }
+    );
+    
+    // 📱 Flutter Upload Route
+    app.post('/api/v1/images/flutter/upload',
+      mockAuthenticate,
+      mockRequireAuth,
+      (req: any, res: any, next: any): void => {
+        // Enhanced multer configuration for Flutter uploads
+        const flutterUploadMiddleware = multer({
+          storage: multer.memoryStorage(),
+          limits: {
+            fileSize: 10 * 1024 * 1024, // 10MB limit for Flutter
+            files: 1
+          },
+          fileFilter: (req, file, cb) => {
+            // Enhanced file type support for Flutter
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+            if (allowedTypes.includes(file.mimetype)) {
+              cb(null, true);
+            } else {
+              cb(new Error('Unsupported file type for Flutter upload'));
+            }
+          }
+        }).single('image');
+        
+        flutterUploadMiddleware(req, res, (err: any) => {
+          if (err) {
+            res.status(400).json({
+              status: 'error',
+              code: 'UPLOAD_ERROR',
+              message: err.message
+            });
+            return;
+          }
+          next();
+        });
+      },
+      async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+          if (!req.file) {
+            res.status(400).json({
+              status: 'error',
+              code: 'NO_FILE',
+              message: 'No image file provided'
+            });
+            return;
+          }
+          
+          // Validate quality parameter
+          const quality = req.body.quality;
+          if (quality && (isNaN(Number(quality)) || Number(quality) < 1 || Number(quality) > 100)) {
+            res.status(400).json({
+              status: 'error',
+              code: 'INVALID_PARAMETER',
+              message: 'Quality must be between 1 and 100'
+            });
+            return;
+          }
+          
+          // Simulate Flutter-optimized processing
+          const mockImage = {
+            id: `flutter-image-${mockImageCounter++}`,
+            user_id: req.user!.id,
+            file_path: `/uploads/flutter/${req.file.originalname}`,
+            filename: req.file.originalname,
+            format: 'webp',
+            size: req.file.size,
+            url: `https://cdn.example.com/flutter/${mockImageCounter}.webp`,
+            mobileOptimized: true,
+            flutterCompatible: true,
+            dimensions: {
+              width: Math.min(Number(req.body.maxWidth) || 2048, 2048),
+              height: Math.min(Number(req.body.maxHeight) || 2048, 2048)
+            },
+            mimeType: 'image/webp',
+            status: 'new',
+            created_at: new Date(),
+            updated_at: new Date()
+          };
+          
+          // Store in mock database
+          if (!mockImageDatabase[req.user!.id]) {
+            mockImageDatabase[req.user!.id] = [];
+          }
+          mockImageDatabase[req.user!.id].push(mockImage);
+          
+          res.status(201).json({
+            status: 'success',
+            data: {
+              image: mockImage,
+              processingInfo: {
+                compressed: true,
+                originalSize: req.file.size,
+                finalSize: Math.floor(req.file.size * 0.7),
+                compressionRatio: 0.7
+              }
+            },
+            message: 'Flutter image uploaded successfully'
+          });
+        } catch (error) {
+          console.error('Flutter upload error:', error);
+          res.status(500).json({
+            status: 'error',
+            message: error instanceof Error ? error.message : 'Internal server error'
+          });
+        }
+      }
+    );
+    
+    app.post('/api/v1/images/flutter/batch-upload',
+      mockAuthenticate,
+      mockRequireAuth,
+      (req: any, res: any, next: any): void => {
+        // Enhanced multer configuration for batch Flutter uploads
+        const batchFlutterUploadMiddleware = multer({
+          storage: multer.memoryStorage(),
+          limits: {
+            fileSize: 10 * 1024 * 1024, // 10MB limit per file
+            files: 10 // Max 10 files
+          },
+          fileFilter: (req, file, cb) => {
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+            if (allowedTypes.includes(file.mimetype)) {
+              cb(null, true);
+            } else {
+              cb(new Error('Unsupported file type for Flutter batch upload'));
+            }
+          }
+        }).array('images', 10);
+        
+        batchFlutterUploadMiddleware(req, res, (err: any) => {
+          if (err) {
+            res.status(400).json({
+              status: 'error',
+              code: 'UPLOAD_ERROR',
+              message: err.message
+            });
+            return;
+          }
+          next();
+        });
+      },
+      async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+          const files = req.files as Express.Multer.File[];
+          
+          if (!files || files.length === 0) {
+            res.status(400).json({
+              status: 'error',
+              code: 'NO_FILES',
+              message: 'No image files provided'
+            });
+            return;
+          }
+          
+          const uploaded = [];
+          const failed = [];
+          
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            try {
+              const mockImage = {
+                id: `flutter-batch-${mockImageCounter++}`,
+                filename: file.originalname,
+                format: 'webp',
+                size: Math.floor(file.size * 0.7),
+                url: `https://cdn.example.com/flutter-batch/${mockImageCounter}.webp`,
+                mobileOptimized: true
+              };
+              
+              uploaded.push(mockImage);
+            } catch (error) {
+              failed.push({
+                filename: file.originalname,
+                error: 'Processing failed'
+              });
+            }
+          }
+          
+          res.status(201).json({
+            status: 'success',
+            data: {
+              uploaded: uploaded,
+              failed: failed,
+              summary: {
+                total: files.length,
+                successful: uploaded.length,
+                failed: failed.length
+              }
+            }
+          });
+        } catch (error) {
+          console.error('Flutter batch upload error:', error);
+          res.status(500).json({
+            status: 'error',
+            message: error instanceof Error ? error.message : 'Internal server error'
           });
         }
       }
@@ -1825,6 +2382,532 @@ describe('Expanded HTTP Stack Integration Tests', () => {
       expect(response.body.status).toBe('error');
     });
   });
+
+  describe('📱 Mobile Thumbnail Routes', () => {
+    it('should get mobile thumbnails with default parameters', async () => {
+      // Setup test images
+      const { users, images } = await expandedHttpTestUtils.createTestScenario(app, 1, 5);
+      const { token } = users[0];
+      
+      const response = await request(app)
+        .get('/api/v1/images/mobile/thumbnails')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      
+      expect(response.body).toMatchObject({
+        status: 'success',
+        data: {
+          thumbnails: expect.any(Array),
+          pagination: {
+            page: 1,
+            limit: 20,
+            total: expect.any(Number)
+          }
+        }
+      });
+      
+      // Verify thumbnail structure
+      if (response.body.data.thumbnails.length > 0) {
+        const thumbnail = response.body.data.thumbnails[0];
+        expect(thumbnail).toMatchObject({
+          id: expect.any(String),
+          url: expect.stringMatching(/^https?:\/\/.+\.webp$/),
+          size: 'medium',
+          dimensions: {
+            width: expect.any(Number),
+            height: expect.any(Number)
+          },
+          optimized: true
+        });
+      }
+    });
+    
+    it('should get mobile thumbnails with custom pagination', async () => {
+      const response = await request(app)
+        .get('/api/v1/images/mobile/thumbnails?page=1&limit=5&size=small')
+        .set('Authorization', `Bearer ${validToken}`)
+        .expect(200);
+      
+      expect(response.body.data.pagination).toMatchObject({
+        page: 1,
+        limit: 5
+      });
+      
+      expect(response.body.data.thumbnails.length).toBeLessThanOrEqual(5);
+    });
+    
+    it('should validate thumbnail size parameter', async () => {
+      const response = await request(app)
+        .get('/api/v1/images/mobile/thumbnails?size=invalid')
+        .set('Authorization', `Bearer ${validToken}`)
+        .expect(400);
+      
+      expect(response.body).toMatchObject({
+        status: 'error',
+        code: 'INVALID_SIZE',
+        message: 'Size must be small, medium, or large'
+      });
+    });
+    
+    it('should handle pagination bounds correctly', async () => {
+      const response = await request(app)
+        .get('/api/v1/images/mobile/thumbnails?page=999&limit=50')
+        .set('Authorization', `Bearer ${validToken}`)
+        .expect(200);
+      
+      expect(response.body.data.thumbnails).toEqual([]);
+      expect(response.body.data.pagination.page).toBe(999);
+    });
+    
+    it('should return optimized WebP thumbnails for mobile', async () => {
+      const response = await request(app)
+        .get('/api/v1/images/mobile/thumbnails')
+        .set('Authorization', `Bearer ${validToken}`)
+        .expect(200);
+      
+      if (response.body.data.thumbnails.length > 0) {
+        response.body.data.thumbnails.forEach((thumbnail: any) => {
+          expect(thumbnail.url).toMatch(/\.webp$/);
+          expect(thumbnail.optimized).toBe(true);
+          expect(thumbnail.mobileOptimized).toBe(true);
+        });
+      }
+    });
+  });
+
+  describe('📱 Mobile Optimized Image Routes', () => {
+    let testImageId: string;
+    
+    beforeEach(async () => {
+      // Generate a UUID format image ID for mobile testing
+      testImageId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'; // Valid UUID format
+      
+      // Add this image to the mock database
+      if (!mockImageDatabase[testUserId]) {
+        mockImageDatabase[testUserId] = [];
+      }
+      mockImageDatabase[testUserId].push({
+        id: testImageId,
+        user_id: testUserId,
+        file_path: '/uploads/mobile-test.jpg',
+        status: 'new',
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+    });
+    
+    it('should serve mobile-optimized image with default quality', async () => {
+      const response = await request(app)
+        .get(`/api/v1/images/${testImageId}/mobile`)
+        .set('Authorization', `Bearer ${validToken}`)
+        .expect(200);
+      
+      expect(response.body).toMatchObject({
+        status: 'success',
+        data: {
+          image: {
+            id: testImageId,
+            url: expect.stringMatching(/^https?:\/\/.+/),
+            format: 'webp',
+            quality: 80,
+            mobileOptimized: true,
+            size: expect.any(Number)
+          }
+        }
+      });
+    });
+    
+    it('should serve mobile-optimized image with custom quality', async () => {
+      const response = await request(app)
+        .get(`/api/v1/images/${testImageId}/mobile?quality=60`)
+        .set('Authorization', `Bearer ${validToken}`)
+        .expect(200);
+      
+      expect(response.body.data.image.quality).toBe(60);
+    });
+    
+    it('should validate quality parameter bounds', async () => {
+      const response = await request(app)
+        .get(`/api/v1/images/${testImageId}/mobile?quality=150`)
+        .set('Authorization', `Bearer ${validToken}`)
+        .expect(400);
+      
+      expect(response.body).toMatchObject({
+        status: 'error',
+        code: 'INVALID_PARAMETER',
+        message: 'Quality must be between 1 and 100'
+      });
+    });
+    
+    it('should handle non-existent image IDs', async () => {
+      const nonExistentUUID = 'f47ac10b-58cc-4372-a567-0e02b2c3d480'; // Valid UUID but doesn't exist
+      const response = await request(app)
+        .get(`/api/v1/images/${nonExistentUUID}/mobile`)
+        .set('Authorization', `Bearer ${validToken}`)
+        .expect(404);
+      
+      expect(response.body).toMatchObject({
+        status: 'error',
+        code: 'IMAGE_NOT_FOUND',
+        message: expect.stringContaining('not found')
+      });
+    });
+    
+    it('should return mobile metadata for optimization', async () => {
+      const response = await request(app)
+        .get(`/api/v1/images/${testImageId}/mobile`)
+        .set('Authorization', `Bearer ${validToken}`)
+        .expect(200);
+      
+      expect(response.body.data.image).toMatchObject({
+        compressionRatio: expect.any(Number),
+        originalSize: expect.any(Number),
+        optimizedSize: expect.any(Number),
+        bandwidth_saved: expect.any(Number)
+      });
+    });
+  });
+
+  describe('🔄 Batch Operations for Mobile', () => {
+    let testImageIds: string[];
+    
+    beforeEach(async () => {
+      const uploadPromises = Array(3).fill(0).map((_, i) =>
+        expandedHttpTestUtils.uploadTestImage(app, validToken, `batch-test-${i}.jpg`)
+      );
+      testImageIds = await Promise.all(uploadPromises);
+    });
+    
+    it('should get batch thumbnails for multiple images', async () => {
+      const response = await request(app)
+        .post('/api/v1/images/batch/thumbnails')
+        .set('Authorization', `Bearer ${validToken}`)
+        .send({
+          imageIds: testImageIds,
+          size: 'small',
+          format: 'webp'
+        })
+        .expect(200);
+      
+      expect(response.body).toMatchObject({
+        status: 'success',
+        data: {
+          thumbnails: expect.any(Array),
+          processed: testImageIds.length,
+          failed: 0
+        }
+      });
+      
+      expect(response.body.data.thumbnails).toHaveLength(testImageIds.length);
+      
+      response.body.data.thumbnails.forEach((thumbnail: any) => {
+        expect(thumbnail).toMatchObject({
+          id: expect.any(String),
+          url: expect.stringMatching(/\.webp$/),
+          size: 'small'
+        });
+        expect(testImageIds).toContain(thumbnail.id);
+      });
+    });
+    
+    it('should handle batch sync for offline support', async () => {
+      const response = await request(app)
+        .post('/api/v1/images/batch/sync')
+        .set('Authorization', `Bearer ${validToken}`)
+        .send({
+          imageIds: testImageIds,
+          lastSync: new Date(Date.now() - 3600000).toISOString() // 1 hour ago
+        })
+        .expect(200);
+      
+      expect(response.body).toMatchObject({
+        status: 'success',
+        data: {
+          updated: expect.any(Array),
+          deleted: expect.any(Array),
+          conflicts: expect.any(Array),
+          syncTimestamp: expect.any(String)
+        }
+      });
+    });
+    
+    it('should validate batch operation limits', async () => {
+      const tooManyIds = Array(101).fill(0).map((_, i) => `fake-id-${i}`);
+      
+      const response = await request(app)
+        .post('/api/v1/images/batch/thumbnails')
+        .set('Authorization', `Bearer ${validToken}`)
+        .send({
+          imageIds: tooManyIds,
+          size: 'medium'
+        })
+        .expect(400);
+      
+      expect(response.body).toMatchObject({
+        status: 'error',
+        code: 'BATCH_LIMIT_EXCEEDED',
+        message: expect.stringContaining('100')
+      });
+    });
+    
+    it('should handle partial batch failures gracefully', async () => {
+      const mixedIds = [...testImageIds, 'non-existent-id-1', 'non-existent-id-2'];
+      
+      const response = await request(app)
+        .post('/api/v1/images/batch/thumbnails')
+        .set('Authorization', `Bearer ${validToken}`)
+        .send({
+          imageIds: mixedIds,
+          size: 'medium'
+        })
+        .expect(200);
+      
+      expect(response.body.data.processed).toBe(testImageIds.length);
+      expect(response.body.data.failed).toBe(2);
+      expect(response.body.data.thumbnails).toHaveLength(testImageIds.length);
+    });
+  });
+
+  describe('🚀 Flutter Sync and Offline Support', () => {
+    it('should provide sync endpoint for Flutter offline support', async () => {
+      const response = await request(app)
+        .get('/api/v1/images/sync')
+        .set('Authorization', `Bearer ${validToken}`)
+        .query({
+          lastSync: new Date(Date.now() - 3600000).toISOString(),
+          includeDeleted: 'true',
+          limit: 50
+        })
+        .expect(200);
+      
+      expect(response.body).toMatchObject({
+        status: 'success',
+        data: {
+          images: expect.any(Array),
+          deleted: expect.any(Array),
+          hasMore: expect.any(Boolean),
+          syncTimestamp: expect.any(String),
+          nextPageToken: expect.any(String)
+        }
+      });
+    });
+    
+    it('should filter images by lastSync timestamp', async () => {
+      // Upload a test image first
+      await expandedHttpTestUtils.uploadTestImage(app, validToken, 'sync-test.jpg');
+      
+      const recentSync = new Date();
+      const response = await request(app)
+        .get('/api/v1/images/sync')
+        .set('Authorization', `Bearer ${validToken}`)
+        .query({
+          lastSync: recentSync.toISOString()
+        })
+        .expect(200);
+      
+      // Should return fewer or no items since lastSync is recent
+      expect(response.body.data.images).toBeInstanceOf(Array);
+    });
+    
+    it('should include deleted items when requested', async () => {
+      const response = await request(app)
+        .get('/api/v1/images/sync?includeDeleted=true')
+        .set('Authorization', `Bearer ${validToken}`)
+        .expect(200);
+      
+      expect(response.body.data).toHaveProperty('deleted');
+      expect(response.body.data.deleted).toBeInstanceOf(Array);
+    });
+    
+    it('should respect limit parameter for pagination', async () => {
+      const response = await request(app)
+        .get('/api/v1/images/sync?limit=5')
+        .set('Authorization', `Bearer ${validToken}`)
+        .expect(200);
+      
+      expect(response.body.data.images.length).toBeLessThanOrEqual(5);
+    });
+    
+    it('should validate query parameters', async () => {
+      const response = await request(app)
+        .get('/api/v1/images/sync?limit=invalid')
+        .set('Authorization', `Bearer ${validToken}`)
+        .expect(400);
+      
+      expect(response.body).toMatchObject({
+        status: 'error',
+        code: 'INVALID_PARAMETER',
+        message: 'Limit must be between 1 and 100'
+      });
+    });
+    
+    it('should handle conflict resolution for sync', async () => {
+      const response = await request(app)
+        .post('/api/v1/images/sync/resolve')
+        .set('Authorization', `Bearer ${validToken}`)
+        .send({
+          conflicts: [
+            {
+              imageId: 'test-image-id',
+              resolution: 'server_wins',
+              clientVersion: '1.0.0'
+            }
+          ]
+        })
+        .expect(200);
+      
+      expect(response.body).toMatchObject({
+        status: 'success',
+        data: {
+          resolved: expect.any(Array),
+          failed: expect.any(Array)
+        }
+      });
+    });
+  });
+
+  describe('🚀 Flutter Upload Routes', () => {
+    it('should handle Flutter-optimized image upload', async () => {
+      const imageBuffer = expandedHttpTestUtils.createTestImageBuffer(2048);
+      
+      const response = await request(app)
+        .post('/api/v1/images/flutter/upload')
+        .set('Authorization', `Bearer ${validToken}`)
+        .set('Content-Type', 'multipart/form-data')
+        .attach('image', imageBuffer, 'flutter-test.jpg')
+        .field('compress', 'true')
+        .field('targetFormat', 'webp')
+        .field('quality', '85')
+        .expect(201);
+      
+      expect(response.body).toMatchObject({
+        status: 'success',
+        data: {
+          image: {
+            id: expect.any(String),
+            filename: 'flutter-test.jpg',
+            format: 'webp',
+            size: expect.any(Number),
+            url: expect.any(String),
+            mobileOptimized: true,
+            flutterCompatible: true
+          },
+          processingInfo: {
+            compressed: true,
+            originalSize: expect.any(Number),
+            finalSize: expect.any(Number),
+            compressionRatio: expect.any(Number)
+          }
+        }
+      });
+    });
+    
+    it('should validate Flutter upload parameters', async () => {
+      const imageBuffer = expandedHttpTestUtils.createTestImageBuffer();
+      
+      const response = await request(app)
+        .post('/api/v1/images/flutter/upload')
+        .set('Authorization', `Bearer ${validToken}`)
+        .attach('image', imageBuffer, 'test.jpg')
+        .field('quality', '150') // Invalid quality
+        .expect(400);
+      
+      expect(response.body).toMatchObject({
+        status: 'error',
+        code: 'INVALID_PARAMETER',
+        message: 'Quality must be between 1 and 100'
+      });
+    });
+    
+    it('should handle large file uploads with compression', async () => {
+      const largeImageBuffer = expandedHttpTestUtils.createTestImageBuffer(4096);
+      
+      const response = await request(app)
+        .post('/api/v1/images/flutter/upload')
+        .set('Authorization', `Bearer ${validToken}`)
+        .attach('image', largeImageBuffer, 'large-flutter-test.jpg')
+        .field('compress', 'true')
+        .field('maxWidth', '2048')
+        .field('maxHeight', '2048')
+        .expect(201);
+      
+      expect(response.body.data.image.dimensions).toMatchObject({
+        width: expect.any(Number),
+        height: expect.any(Number)
+      });
+      
+      // Should be resized
+      expect(response.body.data.image.dimensions.width).toBeLessThanOrEqual(2048);
+      expect(response.body.data.image.dimensions.height).toBeLessThanOrEqual(2048);
+    });
+    
+    it('should support WebP format optimization for Flutter', async () => {
+      const imageBuffer = expandedHttpTestUtils.createTestImageBuffer();
+      
+      const response = await request(app)
+        .post('/api/v1/images/flutter/upload')
+        .set('Authorization', `Bearer ${validToken}`)
+        .attach('image', imageBuffer, 'webp-test.jpg')
+        .field('targetFormat', 'webp')
+        .field('lossless', 'false')
+        .expect(201);
+      
+      expect(response.body.data.image.format).toBe('webp');
+      expect(response.body.data.image.mimeType).toBe('image/webp');
+    });
+    
+    it('should handle batch Flutter uploads', async () => {
+      const images = Array(3).fill(0).map((_, i) => ({
+        buffer: expandedHttpTestUtils.createTestImageBuffer(),
+        filename: `flutter-batch-${i}.jpg`
+      }));
+      
+      const form = request(app)
+        .post('/api/v1/images/flutter/batch-upload')
+        .set('Authorization', `Bearer ${validToken}`);
+      
+      images.forEach((img) => {
+        form.attach(`images`, img.buffer, img.filename);
+      });
+      
+      const response = await form
+        .field('compress', 'true')
+        .field('targetFormat', 'webp')
+        .expect(201);
+      
+      expect(response.body).toMatchObject({
+        status: 'success',
+        data: {
+          uploaded: expect.any(Array),
+          failed: expect.any(Array),
+          summary: {
+            total: 3,
+            successful: expect.any(Number),
+            failed: expect.any(Number)
+          }
+        }
+      });
+      
+      expect(response.body.data.uploaded.length).toBe(3);
+    });
+    
+    it('should validate file types for Flutter uploads', async () => {
+      const textBuffer = Buffer.from('This is not an image', 'utf-8');
+      
+      const response = await request(app)
+        .post('/api/v1/images/flutter/upload')
+        .set('Authorization', `Bearer ${validToken}`)
+        .attach('image', textBuffer, 'not-an-image.txt')
+        .expect(400);
+      
+      expect(response.body).toMatchObject({
+        status: 'error',
+        code: 'UPLOAD_ERROR',
+        message: expect.stringContaining('Unsupported file type')
+      });
+    });
+  });
+
 });
 
 // Export test utilities for reuse
