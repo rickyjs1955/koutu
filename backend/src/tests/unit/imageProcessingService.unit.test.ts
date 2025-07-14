@@ -547,6 +547,276 @@ describe('Image Processing Service - Complete Test Suite', () => {
         });
     });
 
+    describe('optimizeForMobile', () => {
+        const inputPath = 'uploads/test-image.jpg';
+
+        beforeEach(() => {
+            mockStorageService.getAbsolutePath.mockReturnValue(`/absolute/path/${inputPath}`);
+            mockSharpInstance.toFile.mockResolvedValue({ size: 120000 });
+        });
+
+        it('should optimize image for mobile with default settings', async () => {
+            const result = await imageProcessingService.optimizeForMobile(inputPath);
+
+            expect(normalizePath(result)).toBe('uploads/test-image_mobile.webp');
+            expect(mockSharpInstance.resize).toHaveBeenCalledWith({
+                width: 800,
+                withoutEnlargement: true
+            });
+            expect(mockSharpInstance.webp).toHaveBeenCalledWith({
+                quality: 85,
+                effort: 4,
+                lossless: false
+            });
+            expect(mockSharpInstance.toFile).toHaveBeenCalled();
+        });
+
+        it('should convert JPEG to WebP for mobile optimization', async () => {
+            const jpegPath = 'uploads/test-image.jpg';
+            
+            const result = await imageProcessingService.optimizeForMobile(jpegPath);
+
+            expect(normalizePath(result)).toBe('uploads/test-image_mobile.webp');
+            expect(mockSharpInstance.webp).toHaveBeenCalledWith({
+                quality: 85,
+                effort: 4,
+                lossless: false
+            });
+        });
+
+        it('should convert PNG to WebP for mobile optimization', async () => {
+            const pngPath = 'uploads/test-image.png';
+            
+            const result = await imageProcessingService.optimizeForMobile(pngPath);
+
+            expect(normalizePath(result)).toBe('uploads/test-image_mobile.webp');
+            expect(mockSharpInstance.webp).toHaveBeenCalledWith({
+                quality: 85,
+                effort: 4,
+                lossless: false
+            });
+        });
+
+        it('should convert BMP to WebP for mobile optimization', async () => {
+            const bmpPath = 'uploads/test-image.bmp';
+            
+            const result = await imageProcessingService.optimizeForMobile(bmpPath);
+
+            expect(normalizePath(result)).toBe('uploads/test-image_mobile.webp');
+            expect(mockSharpInstance.webp).toHaveBeenCalledWith({
+                quality: 85,
+                effort: 4,
+                lossless: false
+            });
+        });
+
+        it('should resize large images to 800px width max while maintaining aspect ratio', async () => {
+            await imageProcessingService.optimizeForMobile(inputPath);
+
+            expect(mockSharpInstance.resize).toHaveBeenCalledWith({
+                width: 800,
+                withoutEnlargement: true
+            });
+        });
+
+        it('should preserve small images without enlargement', async () => {
+            await imageProcessingService.optimizeForMobile(inputPath);
+
+            expect(mockSharpInstance.resize).toHaveBeenCalledWith({
+                width: 800,
+                withoutEnlargement: true
+            });
+        });
+
+        it('should handle files with no extension', async () => {
+            const noExtensionPath = 'uploads/image-without-extension';
+            
+            const result = await imageProcessingService.optimizeForMobile(noExtensionPath);
+
+            expect(normalizePath(result)).toBe('uploads/image-without-extension_mobile.webp');
+            expect(mockSharpInstance.webp).toHaveBeenCalledWith({
+                quality: 85,
+                effort: 4,
+                lossless: false
+            });
+        });
+
+        it('should handle nested directory structures', async () => {
+            const nestedPath = 'uploads/users/123/garments/456/mobile-image.jpg';
+            
+            const result = await imageProcessingService.optimizeForMobile(nestedPath);
+
+            expect(normalizePath(result)).toBe('uploads/users/123/garments/456/mobile-image_mobile.webp');
+        });
+
+        it('should handle special characters in file names', async () => {
+            const specialCharPath = 'uploads/mobile image (1) - copy [final].jpg';
+            
+            const result = await imageProcessingService.optimizeForMobile(specialCharPath);
+
+            expect(normalizePath(result)).toBe('uploads/mobile image (1) - copy [final]_mobile.webp');
+        });
+
+        it('should handle Unicode characters in file names', async () => {
+            const unicodePath = 'uploads/移动端_图片.jpg';
+            
+            const result = await imageProcessingService.optimizeForMobile(unicodePath);
+
+            expect(result).toContain('移动端_图片_mobile.webp');
+        });
+
+        it('should handle multiple file extensions correctly', async () => {
+            const testCases = [
+                { input: 'test.jpg', expected: 'test_mobile.webp' },
+                { input: 'test.jpeg', expected: 'test_mobile.webp' },
+                { input: 'test.png', expected: 'test_mobile.webp' },
+                { input: 'test.bmp', expected: 'test_mobile.webp' },
+                { input: 'test.webp', expected: 'test_mobile.webp' },
+                { input: 'test.JPEG', expected: 'test_mobile.webp' },
+                { input: 'test.PNG', expected: 'test_mobile.webp' }
+            ];
+
+            for (const { input, expected } of testCases) {
+                jest.clearAllMocks();
+                mockSharp.mockReturnValue(mockSharpInstance);
+                mockStorageService.getAbsolutePath.mockReturnValue(`/absolute/path/uploads/${input}`);
+                mockSharpInstance.toFile.mockResolvedValue({ size: 120000 });
+
+                const result = await imageProcessingService.optimizeForMobile(`uploads/${input}`);
+                expect(normalizePath(result)).toBe(`uploads/${expected}`);
+            }
+        });
+
+        it('should handle processing errors with specific error message', async () => {
+            const processingError = new Error('Mobile optimization failed');
+            mockSharpInstance.toFile.mockRejectedValue(processingError);
+
+            await expect(imageProcessingService.optimizeForMobile(inputPath))
+                .rejects.toThrow(/Failed to optimize for mobile/);
+        });
+
+        it('should handle Sharp resize errors gracefully', async () => {
+            const resizeError = new Error('Resize operation failed');
+            mockSharpInstance.resize.mockImplementation(() => {
+                throw resizeError;
+            });
+
+            await expect(imageProcessingService.optimizeForMobile(inputPath))
+                .rejects.toThrow(/Failed to optimize for mobile.*Resize operation failed/);
+        });
+
+        it('should handle Sharp WebP conversion errors gracefully', async () => {
+            // Reset resize to work properly first
+            mockSharpInstance.resize.mockReturnThis();
+            
+            const webpError = new Error('WebP conversion failed');
+            mockSharpInstance.webp.mockImplementation(() => {
+                throw webpError;
+            });
+
+            await expect(imageProcessingService.optimizeForMobile(inputPath))
+                .rejects.toThrow(/Failed to optimize for mobile.*WebP conversion failed/);
+        });
+
+        it('should handle storage service errors gracefully', async () => {
+            const storageError = new Error('Storage path resolution failed');
+            mockStorageService.getAbsolutePath.mockImplementation(() => {
+                throw storageError;
+            });
+
+            await expect(imageProcessingService.optimizeForMobile(inputPath))
+                .rejects.toThrow(/Failed to optimize for mobile.*Storage path resolution failed/);
+        });
+
+        it('should optimize images of various sizes correctly', async () => {
+            const testSizes = [
+                { name: 'small', size: { width: 400, height: 300 } },
+                { name: 'medium', size: { width: 800, height: 600 } },
+                { name: 'large', size: { width: 1200, height: 900 } },
+                { name: 'extra-large', size: { width: 2000, height: 1500 } }
+            ];
+
+            for (const { name, size } of testSizes) {
+                jest.clearAllMocks();
+                mockSharp.mockReturnValue(mockSharpInstance);
+                
+                // Reset all mocks to default behavior
+                mockSharpInstance.resize.mockReturnThis();
+                mockSharpInstance.webp.mockReturnThis();
+                mockStorageService.getAbsolutePath.mockReturnValue(`/absolute/path/uploads/${name}-image.jpg`);
+                mockSharpInstance.toFile.mockResolvedValue({ size: size.width * size.height * 3 });
+
+                const result = await imageProcessingService.optimizeForMobile(`uploads/${name}-image.jpg`);
+
+                expect(normalizePath(result)).toBe(`uploads/${name}-image_mobile.webp`);
+                expect(mockSharpInstance.resize).toHaveBeenCalledWith({
+                    width: 800,
+                    withoutEnlargement: true
+                });
+            }
+        });
+
+        it('should maintain aspect ratio during mobile optimization', async () => {
+            // Reset mocks to ensure clean state
+            mockSharpInstance.resize.mockReturnThis();
+            mockSharpInstance.webp.mockReturnThis();
+            
+            // The resize call should only specify width, allowing Sharp to maintain aspect ratio
+            await imageProcessingService.optimizeForMobile(inputPath);
+
+            expect(mockSharpInstance.resize).toHaveBeenCalledWith({
+                width: 800,
+                withoutEnlargement: true
+            });
+            // Height should not be specified to maintain aspect ratio
+            expect(mockSharpInstance.resize).not.toHaveBeenCalledWith(
+                expect.objectContaining({ height: expect.any(Number) })
+            );
+        });
+
+        it('should use Flutter-optimized WebP settings', async () => {
+            // Reset mocks to ensure clean state
+            mockSharpInstance.resize.mockReturnThis();
+            mockSharpInstance.webp.mockReturnThis();
+            
+            await imageProcessingService.optimizeForMobile(inputPath);
+
+            // Verify WebP settings are optimized for Flutter/mobile
+            expect(mockSharpInstance.webp).toHaveBeenCalledWith({
+                quality: 85,    // Good quality for mobile
+                effort: 4,      // Balanced compression effort
+                lossless: false // Lossy for smaller file sizes
+            });
+        });
+
+        it('should create appropriate file naming for mobile variants', async () => {
+            const testPaths = [
+                'simple.jpg',
+                'uploads/nested/file.png', 
+                'complex-file-name_123.bmp',
+                'file.with.dots.jpeg'
+            ];
+
+            for (const inputPath of testPaths) {
+                jest.clearAllMocks();
+                mockSharp.mockReturnValue(mockSharpInstance);
+                
+                // Reset all mocks to default behavior
+                mockSharpInstance.resize.mockReturnThis();
+                mockSharpInstance.webp.mockReturnThis();
+                mockStorageService.getAbsolutePath.mockReturnValue(`/absolute/path/${inputPath}`);
+                mockSharpInstance.toFile.mockResolvedValue({ size: 120000 });
+
+                const result = await imageProcessingService.optimizeForMobile(inputPath);
+                
+                // Should always end with _mobile.webp
+                expect(result).toMatch(/_mobile\.webp$/);
+                // Should not contain the original extension before _mobile
+                expect(result).not.toMatch(/\.(jpg|jpeg|png|bmp)_mobile\.webp$/);
+            }
+        });
+    });
+
     describe('processImage and removeBackground', () => {
         it('should process image and return expected structure', async () => {
             const mockFile = {
@@ -644,6 +914,11 @@ describe('Image Processing Service - Complete Test Suite', () => {
                 method: 'optimizeForWeb',
                 args: ['nonexistent.jpg'],
                 expectedPattern: /Failed to optimize image:/
+                },
+                {
+                method: 'optimizeForMobile',
+                args: ['nonexistent.jpg'],
+                expectedPattern: /Failed to optimize for mobile:/
                 }
             ];
 
@@ -678,9 +953,13 @@ describe('Image Processing Service - Complete Test Suite', () => {
             const thumbnailPath = await imageProcessingService.generateThumbnail(resizedPath, 200);
             expect(normalizePath(thumbnailPath)).toContain('_thumb_200.jpg');
 
-            // Step 5: Optimize
+            // Step 5: Optimize for web
             const optimizedPath = await imageProcessingService.optimizeForWeb(resizedPath);
             expect(normalizePath(optimizedPath)).toContain('_optimized.jpg');
+
+            // Step 6: Optimize for mobile
+            const mobilePath = await imageProcessingService.optimizeForMobile(resizedPath);
+            expect(normalizePath(mobilePath)).toContain('_mobile.webp');
         });
 
         it('should handle concurrent validations', async () => {
