@@ -435,6 +435,179 @@ const createTestController = () => {
       } catch (error) {
         next(error);
       }
+    },
+
+    getMobileThumbnails: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        if (!validateUserContext(req.user)) {
+          throw new Error('User not authenticated');
+        }
+
+        const userId = req.user.id;
+        const { page = 1, limit = 20, size = 'medium' } = req.query;
+        
+        const result = await imageService.getMobileThumbnails(userId, {
+          page: Number(page),
+          limit: Number(limit),
+          size: size as 'small' | 'medium' | 'large'
+        });
+        
+        (res as any).success(result, {
+          message: 'Mobile thumbnails retrieved successfully',
+          meta: {
+            page: Number(page),
+            limit: Number(limit),
+            size,
+            platform: 'mobile'
+          }
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    getMobileOptimizedImage: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        if (!validateUserContext(req.user)) {
+          throw new Error('User not authenticated');
+        }
+
+        const userId = req.user.id;
+        const imageId = req.params.id;
+        
+        const result = await imageService.getMobileOptimizedImage(imageId, userId);
+        
+        (res as any).success(result, {
+          message: 'Mobile optimized image retrieved successfully',
+          meta: {
+            imageId,
+            optimizedForMobile: true,
+            format: result.format || 'auto'
+          }
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    batchGenerateThumbnails: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        if (!validateUserContext(req.user)) {
+          throw new Error('User not authenticated');
+        }
+
+        const userId = req.user.id;
+        const { imageIds, sizes = ['medium'] } = req.body;
+        
+        const result = await imageService.batchGenerateThumbnails(imageIds, userId, sizes);
+        
+        (res as any).success(result, {
+          message: `Generated thumbnails for ${result.successCount} of ${imageIds.length} images`,
+          meta: {
+            operation: 'batch_generate_thumbnails',
+            requestedCount: imageIds.length,
+            successCount: result.successCount,
+            sizes
+          }
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    getSyncData: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        if (!validateUserContext(req.user)) {
+          throw new Error('User not authenticated');
+        }
+
+        const userId = req.user.id;
+        const { lastSync, includeDeleted = false, limit = 50 } = req.query;
+        
+        const includeDeletedBool = includeDeleted === 'true';
+        
+        const result = await imageService.getSyncData(userId, {
+          lastSync: lastSync as string,
+          includeDeleted: includeDeletedBool,
+          limit: Number(limit)
+        });
+        
+        (res as any).success(result, {
+          message: 'Sync data retrieved successfully',
+          meta: {
+            syncTimestamp: new Date().toISOString(),
+            includeDeleted: includeDeletedBool,
+            itemCount: result.images?.length || 0
+          }
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    flutterUploadImage: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        if (!req.file) {
+          throw EnhancedApiError.validation('No image file provided', 'file');
+        }
+
+        if (!validateUserContext(req.user)) {
+          throw new Error('User not authenticated');
+        }
+
+        const userId = req.user.id;
+        
+        const image = await imageService.flutterUploadImage({
+          userId,
+          fileBuffer: req.file.buffer,
+          originalFilename: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size
+        });
+        
+        const safeImage = sanitization.sanitizeImageForResponse(image);
+        
+        (res as any).created(
+          { image: safeImage },
+          { 
+            message: 'Flutter upload successful',
+            meta: {
+              platform: 'flutter',
+              fileSize: req.file.size,
+              uploadId: image.id,
+              processingStatus: 'initiated'
+            }
+          }
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    batchSyncOperations: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        if (!validateUserContext(req.user)) {
+          throw new Error('User not authenticated');
+        }
+
+        const userId = req.user.id;
+        const { operations } = req.body;
+        
+        const result = await imageService.batchSyncOperations(userId, operations);
+        
+        (res as any).success(result, {
+          message: `Processed ${result.successCount} of ${operations.length} sync operations`,
+          meta: {
+            operation: 'batch_sync',
+            totalOperations: operations.length,
+            successCount: result.successCount,
+            failedCount: result.failedCount,
+            conflicts: result.conflicts || []
+          }
+        });
+      } catch (error) {
+        next(error);
+      }
     }
   };
 };
@@ -524,6 +697,14 @@ describe('Image Controller - Flutter-Compatible Unit Tests', () => {
 
     // Setup default mock implementations
     mockSanitization.sanitizeImageForResponse.mockImplementation((image: any) => image);
+    
+    // Setup mock implementations for new methods
+    mockImageService.getMobileThumbnails = jest.fn();
+    mockImageService.getMobileOptimizedImage = jest.fn();
+    mockImageService.batchGenerateThumbnails = jest.fn();
+    mockImageService.getSyncData = jest.fn();
+    mockImageService.flutterUploadImage = jest.fn();
+    mockImageService.batchSyncOperations = jest.fn();
   });
 
   describe('uploadImage', () => {
@@ -1970,6 +2151,1068 @@ describe('Image Controller - Flutter-Compatible Unit Tests', () => {
 
       // This test validates that the response format expectations are correct
       expect(requiredResponseStructure).toBeDefined();
+    });
+  });
+
+  describe('getMobileThumbnails', () => {
+    describe('Success Scenarios', () => {
+      it('should get mobile thumbnails with default parameters', async () => {
+        const mobileThumbnailsResult = {
+          thumbnails: [
+            { id: 'thumb-1', thumbnailPath: '/thumbs/image-123-medium.jpg', size: 'medium' as const, originalWidth: 1920, originalHeight: 1080 },
+            { id: 'thumb-2', thumbnailPath: '/thumbs/image-456-medium.jpg', size: 'medium' as const, originalWidth: 1920, originalHeight: 1080 }
+          ],
+          page: 1,
+          hasMore: false
+        };
+        
+        mockImageService.getMobileThumbnails.mockResolvedValue(mobileThumbnailsResult);
+
+        await testController.getMobileThumbnails(req as Request, res as Response, next);
+
+        expect(mockImageService.getMobileThumbnails).toHaveBeenCalledWith(mockUser.id, {
+          page: 1,
+          limit: 20,
+          size: 'medium'
+        });
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          mobileThumbnailsResult,
+          {
+            message: 'Mobile thumbnails retrieved successfully',
+            meta: {
+              page: 1,
+              limit: 20,
+              size: 'medium',
+              platform: 'mobile'
+            }
+          }
+        );
+      });
+
+      it('should handle custom pagination and size parameters', async () => {
+        req.query = { page: '2', limit: '10', size: 'large' };
+        const mobileThumbnailsResult = {
+          thumbnails: [{ id: 'thumb-3', thumbnailPath: '/thumbs/image-789-large.jpg', size: 'large' as const, originalWidth: 1920, originalHeight: 1080 }],
+          page: 2,
+          hasMore: true
+        };
+        
+        mockImageService.getMobileThumbnails.mockResolvedValue(mobileThumbnailsResult);
+
+        await testController.getMobileThumbnails(req as Request, res as Response, next);
+
+        expect(mockImageService.getMobileThumbnails).toHaveBeenCalledWith(mockUser.id, {
+          page: 2,
+          limit: 10,
+          size: 'large'
+        });
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          mobileThumbnailsResult,
+          expect.objectContaining({
+            meta: expect.objectContaining({
+              page: 2,
+              limit: 10,
+              size: 'large',
+              platform: 'mobile'
+            })
+          })
+        );
+      });
+
+      it('should handle small size thumbnails', async () => {
+        req.query = { size: 'small' };
+        const mobileThumbnailsResult = {
+          thumbnails: [{ id: 'thumb-4', thumbnailPath: '/thumbs/image-111-small.jpg', size: 'small' as const, originalWidth: 1920, originalHeight: 1080 }],
+          page: 1,
+          hasMore: false
+        };
+        
+        mockImageService.getMobileThumbnails.mockResolvedValue(mobileThumbnailsResult);
+
+        await testController.getMobileThumbnails(req as Request, res as Response, next);
+
+        expect(mockImageService.getMobileThumbnails).toHaveBeenCalledWith(mockUser.id, {
+          page: 1,
+          limit: 20,
+          size: 'small'
+        });
+      });
+    });
+
+    describe('Service Error Handling', () => {
+      it('should handle service errors', async () => {
+        req.user = { ...mockUser };
+        const serviceError = new Error('Mobile thumbnails service error');
+        mockImageService.getMobileThumbnails.mockRejectedValue(serviceError);
+
+        await testController.getMobileThumbnails(req as Request, res as Response, next);
+
+        expect(next).toHaveBeenCalledWith(serviceError);
+      });
+    });
+  });
+
+  describe('getMobileOptimizedImage', () => {
+    describe('Success Scenarios', () => {
+      it('should get mobile optimized image successfully', async () => {
+        req.params = { id: 'image-123' };
+        const optimizedResult = {
+          id: 'opt-image-123',
+          optimizedPath: '/optimized/image-123-mobile.webp',
+          format: 'webp',
+          quality: 85,
+          originalSize: 204800,
+          optimizedAt: new Date().toISOString()
+        };
+        
+        mockImageService.getMobileOptimizedImage.mockResolvedValue(optimizedResult);
+
+        await testController.getMobileOptimizedImage(req as Request, res as Response, next);
+
+        expect(mockImageService.getMobileOptimizedImage).toHaveBeenCalledWith('image-123', mockUser.id);
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          optimizedResult,
+          {
+            message: 'Mobile optimized image retrieved successfully',
+            meta: {
+              imageId: 'image-123',
+              optimizedForMobile: true,
+              format: 'webp'
+            }
+          }
+        );
+      });
+
+      it('should handle auto format optimization', async () => {
+        req.params = { id: 'image-456' };
+        const optimizedResult = {
+          id: 'opt-image-456',
+          optimizedPath: '/optimized/image-456-mobile.jpg',
+          format: 'auto',
+          quality: 80,
+          originalSize: 300000,
+          optimizedAt: new Date().toISOString()
+        };
+        
+        mockImageService.getMobileOptimizedImage.mockResolvedValue(optimizedResult);
+
+        await testController.getMobileOptimizedImage(req as Request, res as Response, next);
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          optimizedResult,
+          expect.objectContaining({
+            meta: expect.objectContaining({
+              imageId: 'image-456',
+              optimizedForMobile: true,
+              format: 'auto'
+            })
+          })
+        );
+      });
+    });
+
+    describe('Service Error Handling', () => {
+      it('should handle image not found', async () => {
+        req.params = { id: 'nonexistent-image' };
+        req.user = { ...mockUser };
+        const notFoundError = new Error('Image not found');
+        mockImageService.getMobileOptimizedImage.mockRejectedValue(notFoundError);
+
+        await testController.getMobileOptimizedImage(req as Request, res as Response, next);
+
+        expect(next).toHaveBeenCalledWith(notFoundError);
+      });
+    });
+  });
+
+  describe('batchGenerateThumbnails', () => {
+    describe('Success Scenarios', () => {
+      it('should batch generate thumbnails with default sizes', async () => {
+        req.body = {
+          imageIds: ['image-123', 'image-456', 'image-789']
+        };
+        
+        const batchResult = {
+          results: [
+            { id: 'image-123', thumbnails: [{ size: 'medium' as const, thumbnailPath: '/thumbs/image-123-medium.jpg' }], status: 'success' },
+            { id: 'image-456', thumbnails: [{ size: 'medium' as const, thumbnailPath: '/thumbs/image-456-medium.jpg' }], status: 'success' },
+            { id: 'image-789', thumbnails: [{ size: 'medium' as const, thumbnailPath: '/thumbs/image-789-medium.jpg' }], status: 'success' }
+          ],
+          successCount: 3,
+          totalCount: 3
+        };
+        
+        mockImageService.batchGenerateThumbnails.mockResolvedValue(batchResult);
+
+        await testController.batchGenerateThumbnails(req as Request, res as Response, next);
+
+        expect(mockImageService.batchGenerateThumbnails).toHaveBeenCalledWith(
+          ['image-123', 'image-456', 'image-789'],
+          mockUser.id,
+          ['medium']
+        );
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          batchResult,
+          {
+            message: 'Generated thumbnails for 3 of 3 images',
+            meta: {
+              operation: 'batch_generate_thumbnails',
+              requestedCount: 3,
+              successCount: 3,
+              sizes: ['medium']
+            }
+          }
+        );
+      });
+
+      it('should handle custom sizes for batch thumbnail generation', async () => {
+        req.body = {
+          imageIds: ['image-111', 'image-222'],
+          sizes: ['small', 'medium', 'large']
+        };
+        
+        const batchResult = {
+          results: [
+            { 
+              id: 'image-111', 
+              thumbnails: [
+                { size: 'small' as const, thumbnailPath: '/thumbs/image-111-small.jpg' },
+                { size: 'medium' as const, thumbnailPath: '/thumbs/image-111-medium.jpg' },
+                { size: 'large' as const, thumbnailPath: '/thumbs/image-111-large.jpg' }
+              ],
+              status: 'success'
+            },
+            { 
+              id: 'image-222', 
+              thumbnails: [
+                { size: 'small' as const, thumbnailPath: '/thumbs/image-222-small.jpg' },
+                { size: 'medium' as const, thumbnailPath: '/thumbs/image-222-medium.jpg' },
+                { size: 'large' as const, thumbnailPath: '/thumbs/image-222-large.jpg' }
+              ],
+              status: 'success'
+            }
+          ],
+          successCount: 2,
+          totalCount: 2
+        };
+        
+        mockImageService.batchGenerateThumbnails.mockResolvedValue(batchResult);
+
+        await testController.batchGenerateThumbnails(req as Request, res as Response, next);
+
+        expect(mockImageService.batchGenerateThumbnails).toHaveBeenCalledWith(
+          ['image-111', 'image-222'],
+          mockUser.id,
+          ['small', 'medium', 'large']
+        );
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          batchResult,
+          expect.objectContaining({
+            meta: expect.objectContaining({
+              sizes: ['small', 'medium', 'large']
+            })
+          })
+        );
+      });
+
+      it('should handle partial success in batch generation', async () => {
+        req.body = {
+          imageIds: ['image-good', 'image-bad', 'image-missing'],
+          sizes: ['medium']
+        };
+        
+        const batchResult = {
+          results: [
+            { id: 'image-good', thumbnails: [{ size: 'medium' as const, thumbnailPath: '/thumbs/image-good-medium.jpg' }], status: 'success' },
+            { id: 'image-bad', status: 'failed', error: 'Processing failed' },
+            { id: 'image-missing', status: 'failed', error: 'Image not found' }
+          ],
+          successCount: 1,
+          totalCount: 3
+        };
+        
+        mockImageService.batchGenerateThumbnails.mockResolvedValue(batchResult);
+
+        await testController.batchGenerateThumbnails(req as Request, res as Response, next);
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          batchResult,
+          {
+            message: 'Generated thumbnails for 1 of 3 images',
+            meta: {
+              operation: 'batch_generate_thumbnails',
+              requestedCount: 3,
+              successCount: 1,
+              sizes: ['medium']
+            }
+          }
+        );
+      });
+    });
+
+    describe('Service Error Handling', () => {
+      it('should handle service errors during batch generation', async () => {
+        req.body = {
+          imageIds: ['image-123']
+        };
+        req.user = { ...mockUser };
+        const serviceError = new Error('Batch generation service error');
+        mockImageService.batchGenerateThumbnails.mockRejectedValue(serviceError);
+
+        await testController.batchGenerateThumbnails(req as Request, res as Response, next);
+
+        expect(next).toHaveBeenCalledWith(serviceError);
+      });
+    });
+  });
+
+  describe('getSyncData', () => {
+    describe('Success Scenarios', () => {
+      it('should get sync data with default parameters', async () => {
+        const syncResult = {
+          images: [
+            { 
+              id: 'image-123', 
+              status: 'processed' as const, 
+              metadata: { width: 800, height: 600 }, 
+              lastModified: new Date('2024-01-15T10:00:00Z'), 
+              syncStatus: 'updated' 
+            },
+            { 
+              id: 'image-456', 
+              status: 'new' as const, 
+              metadata: { width: 1200, height: 900 }, 
+              lastModified: new Date('2024-01-15T11:00:00Z'), 
+              syncStatus: 'created' 
+            }
+          ],
+          syncTimestamp: '2024-01-15T12:00:00Z',
+          hasMore: false
+        };
+        
+        mockImageService.getSyncData.mockResolvedValue(syncResult);
+
+        await testController.getSyncData(req as Request, res as Response, next);
+
+        expect(mockImageService.getSyncData).toHaveBeenCalledWith(mockUser.id, {
+          lastSync: undefined,
+          includeDeleted: false,
+          limit: 50
+        });
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          syncResult,
+          {
+            message: 'Sync data retrieved successfully',
+            meta: {
+              syncTimestamp: expect.any(String),
+              includeDeleted: false,
+              itemCount: 2
+            }
+          }
+        );
+      });
+
+      it('should handle sync data with custom parameters', async () => {
+        req.query = { 
+          lastSync: '2024-01-14T10:00:00Z', 
+          includeDeleted: 'true', 
+          limit: '25' 
+        };
+        
+        const syncResult = {
+          images: [
+            { 
+              id: 'image-789', 
+              status: 'labeled' as const, 
+              metadata: { width: 600, height: 400 }, 
+              lastModified: new Date('2024-01-15T09:00:00Z'), 
+              syncStatus: 'deleted' 
+            }
+          ],
+          syncTimestamp: '2024-01-15T12:00:00Z',
+          hasMore: false
+        };
+        
+        mockImageService.getSyncData.mockResolvedValue(syncResult);
+
+        await testController.getSyncData(req as Request, res as Response, next);
+
+        expect(mockImageService.getSyncData).toHaveBeenCalledWith(mockUser.id, {
+          lastSync: '2024-01-14T10:00:00Z',
+          includeDeleted: true,
+          limit: 25
+        });
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          syncResult,
+          expect.objectContaining({
+            meta: expect.objectContaining({
+              includeDeleted: true,
+              itemCount: 1
+            })
+          })
+        );
+      });
+
+      it('should handle empty sync data', async () => {
+        const syncResult = {
+          images: [],
+          syncTimestamp: '2024-01-15T12:00:00Z',
+          hasMore: false
+        };
+        
+        mockImageService.getSyncData.mockResolvedValue(syncResult);
+
+        await testController.getSyncData(req as Request, res as Response, next);
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          syncResult,
+          expect.objectContaining({
+            meta: expect.objectContaining({
+              itemCount: 0
+            })
+          })
+        );
+      });
+    });
+
+    describe('Service Error Handling', () => {
+      it('should handle service errors', async () => {
+        req.user = { ...mockUser };
+        const serviceError = new Error('Sync data service error');
+        mockImageService.getSyncData.mockRejectedValue(serviceError);
+
+        await testController.getSyncData(req as Request, res as Response, next);
+
+        expect(next).toHaveBeenCalledWith(serviceError);
+      });
+    });
+  });
+
+  describe('flutterUploadImage', () => {
+    const mockFlutterFile: Express.Multer.File = {
+      buffer: Buffer.from('flutter image data'),
+      originalname: 'flutter-image.jpg',
+      mimetype: 'image/jpeg',
+      size: 2048000,
+      fieldname: 'image',
+      encoding: '7bit',
+      filename: 'flutter-image.jpg',
+      destination: '',
+      path: '',
+      stream: {} as any
+    };
+
+    describe('Success Scenarios', () => {
+      it('should handle Flutter upload successfully', async () => {
+        req.file = mockFlutterFile;
+        const flutterImage = { 
+          ...mockImage, 
+          id: 'flutter-image-123', 
+          platform: 'flutter', 
+          uploadOptimized: true 
+        };
+        mockImageService.flutterUploadImage.mockResolvedValue(flutterImage);
+
+        await testController.flutterUploadImage(req as Request, res as Response, next);
+
+        expect(mockImageService.flutterUploadImage).toHaveBeenCalledWith({
+          userId: mockUser.id,
+          fileBuffer: mockFlutterFile.buffer,
+          originalFilename: mockFlutterFile.originalname,
+          mimetype: mockFlutterFile.mimetype,
+          size: mockFlutterFile.size
+        });
+
+        expect(mockResponseMethods.created).toHaveBeenCalledWith(
+          { image: flutterImage },
+          {
+            message: 'Flutter upload successful',
+            meta: {
+              platform: 'flutter',
+              fileSize: mockFlutterFile.size,
+              uploadId: flutterImage.id,
+              processingStatus: 'initiated'
+            }
+          }
+        );
+      });
+
+      it('should sanitize Flutter upload response', async () => {
+        req.file = mockFlutterFile;
+        const flutterImage = { 
+          ...mockImage, 
+          id: 'flutter-image-456', 
+          platform: 'flutter', 
+          uploadOptimized: true 
+        };
+        const sanitizedImage = { ...flutterImage, sanitized: true };
+        
+        mockImageService.flutterUploadImage.mockResolvedValue(flutterImage);
+        mockSanitization.sanitizeImageForResponse.mockReturnValue(sanitizedImage);
+
+        await testController.flutterUploadImage(req as Request, res as Response, next);
+
+        expect(mockSanitization.sanitizeImageForResponse).toHaveBeenCalledWith(flutterImage);
+          expect(mockResponseMethods.created).toHaveBeenCalledWith(
+          { image: sanitizedImage },
+          expect.anything()
+        );
+      });
+
+      it('should handle large Flutter uploads', async () => {
+        const largeFlutterFile = { 
+          ...mockFlutterFile, 
+          size: 7 * 1024 * 1024, // 7MB
+          buffer: Buffer.alloc(7 * 1024 * 1024)
+        };
+        req.file = largeFlutterFile;
+        
+        const flutterImage = { 
+          ...mockImage, 
+          id: 'large-flutter-image', 
+          platform: 'flutter', 
+          uploadOptimized: true 
+        };
+        mockImageService.flutterUploadImage.mockResolvedValue(flutterImage);
+
+        await testController.flutterUploadImage(req as Request, res as Response, next);
+
+        expect(mockImageService.flutterUploadImage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            size: 7 * 1024 * 1024
+          })
+        );
+
+        expect(mockResponseMethods.created).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            meta: expect.objectContaining({
+              platform: 'flutter',
+              fileSize: 7 * 1024 * 1024
+            })
+          })
+        );
+      });
+    });
+
+    describe('Validation Failures', () => {
+      it('should reject missing file in Flutter upload', async () => {
+        req.file = undefined;
+
+        await testController.flutterUploadImage(req as Request, res as Response, next);
+
+        expect(next).toHaveBeenCalledWith(expect.any(EnhancedApiError));
+        expect(mockImageService.flutterUploadImage).not.toHaveBeenCalled();
+      });
+
+      it('should handle missing user in Flutter upload', async () => {
+        req.user = undefined;
+        req.file = mockFlutterFile;
+
+        await testController.flutterUploadImage(req as Request, res as Response, next);
+
+        expect(next).toHaveBeenCalledWith(expect.any(Error));
+      });
+    });
+
+    describe('Service Error Handling', () => {
+      it('should handle Flutter upload service errors', async () => {
+        req.file = mockFlutterFile;
+        req.user = { ...mockUser };
+        const serviceError = new Error('Flutter upload failed');
+        mockImageService.flutterUploadImage.mockRejectedValue(serviceError);
+
+        await testController.flutterUploadImage(req as Request, res as Response, next);
+
+        expect(next).toHaveBeenCalledWith(serviceError);
+      });
+    });
+  });
+
+  describe('batchSyncOperations', () => {
+    describe('Success Scenarios', () => {
+      it('should handle batch sync operations successfully', async () => {
+        req.body = {
+          operations: [
+            { type: 'upload', imageId: 'temp-1', data: { filename: 'image1.jpg' } },
+            { type: 'update', imageId: 'image-123', data: { status: 'processed' } },
+            { type: 'delete', imageId: 'image-456' }
+          ]
+        };
+        
+        const batchSyncResult = {
+          successCount: 2,
+          failedCount: 1,
+          conflicts: [],
+          syncCompleted: new Date().toISOString(),
+          results: [
+            { id: 'temp-1', status: 'success' },
+            { id: 'image-123', status: 'success' },
+            { id: 'image-456', status: 'failed', error: 'Image not found' }
+          ]
+        };
+        
+        mockImageService.batchSyncOperations.mockResolvedValue(batchSyncResult);
+
+        await testController.batchSyncOperations(req as Request, res as Response, next);
+
+        expect(mockImageService.batchSyncOperations).toHaveBeenCalledWith(
+          mockUser.id,
+          [
+            { type: 'upload', imageId: 'temp-1', data: { filename: 'image1.jpg' } },
+            { type: 'update', imageId: 'image-123', data: { status: 'processed' } },
+            { type: 'delete', imageId: 'image-456' }
+          ]
+        );
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          batchSyncResult,
+          {
+            message: 'Processed 2 of 3 sync operations',
+            meta: {
+              operation: 'batch_sync',
+              totalOperations: 3,
+              successCount: 2,
+              failedCount: 1,
+              conflicts: []
+            }
+          }
+        );
+      });
+
+      it('should handle batch sync with conflicts', async () => {
+        req.body = {
+          operations: [
+            { type: 'update', imageId: 'image-conflict', data: { status: 'labeled' } }
+          ]
+        };
+        
+        const batchSyncResult = {
+          successCount: 0,
+          failedCount: 0,
+          conflicts: [
+            { 
+              imageId: 'image-conflict', 
+              type: 'version_mismatch', 
+              serverVersion: '2024-01-15T10:00:00Z',
+              clientVersion: '2024-01-14T10:00:00Z'
+            }
+          ],
+          syncCompleted: new Date().toISOString(),
+          results: [
+            { id: 'image-conflict', status: 'conflict', error: 'version_mismatch' }
+          ]
+        };
+        
+        mockImageService.batchSyncOperations.mockResolvedValue(batchSyncResult);
+
+        await testController.batchSyncOperations(req as Request, res as Response, next);
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          batchSyncResult,
+          expect.objectContaining({
+            meta: expect.objectContaining({
+              conflicts: [
+                { 
+                  imageId: 'image-conflict', 
+                  type: 'version_mismatch', 
+                  serverVersion: '2024-01-15T10:00:00Z',
+                  clientVersion: '2024-01-14T10:00:00Z'
+                }
+              ]
+            })
+          })
+        );
+      });
+
+      it('should handle empty batch sync operations', async () => {
+        req.body = {
+          operations: []
+        };
+        
+        const batchSyncResult = {
+          successCount: 0,
+          failedCount: 0,
+          conflicts: [],
+          syncCompleted: new Date().toISOString(),
+          results: []
+        };
+        
+        mockImageService.batchSyncOperations.mockResolvedValue(batchSyncResult);
+
+        await testController.batchSyncOperations(req as Request, res as Response, next);
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          batchSyncResult,
+          {
+            message: 'Processed 0 of 0 sync operations',
+            meta: {
+              operation: 'batch_sync',
+              totalOperations: 0,
+              successCount: 0,
+              failedCount: 0,
+              conflicts: []
+            }
+          }
+        );
+      });
+
+      it('should handle complex batch sync with mixed results', async () => {
+        req.body = {
+          operations: [
+            { type: 'upload', imageId: 'temp-1', data: { filename: 'new1.jpg' } },
+            { type: 'upload', imageId: 'temp-2', data: { filename: 'new2.jpg' } },
+            { type: 'update', imageId: 'existing-1', data: { status: 'processed' } },
+            { type: 'delete', imageId: 'to-delete' },
+            { type: 'update', imageId: 'conflict-image', data: { status: 'labeled' } }
+          ]
+        };
+        
+        const batchSyncResult = {
+          successCount: 3,
+          failedCount: 1,
+          conflicts: [
+            { imageId: 'conflict-image', type: 'concurrent_edit' }
+          ],
+          syncCompleted: new Date().toISOString(),
+          results: [
+            { id: 'temp-1', status: 'success' },
+            { id: 'temp-2', status: 'success' },
+            { id: 'existing-1', status: 'success' },
+            { id: 'to-delete', status: 'failed', error: 'Image not found' },
+            { id: 'conflict-image', status: 'conflict', error: 'concurrent_edit' }
+          ]
+        };
+        
+        mockImageService.batchSyncOperations.mockResolvedValue(batchSyncResult);
+
+        await testController.batchSyncOperations(req as Request, res as Response, next);
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          batchSyncResult,
+          {
+            message: 'Processed 3 of 5 sync operations',
+            meta: {
+              operation: 'batch_sync',
+              totalOperations: 5,
+              successCount: 3,
+              failedCount: 1,
+              conflicts: [
+                { imageId: 'conflict-image', type: 'concurrent_edit' }
+              ]
+            }
+          }
+        );
+      });
+    });
+
+    describe('Service Error Handling', () => {
+      it('should handle service errors during batch sync', async () => {
+        req.body = {
+          operations: [
+            { type: 'upload', imageId: 'temp-1', data: { filename: 'test.jpg' } }
+          ]
+        };
+        req.user = { ...mockUser };
+        const serviceError = new Error('Batch sync service error');
+        mockImageService.batchSyncOperations.mockRejectedValue(serviceError);
+
+        await testController.batchSyncOperations(req as Request, res as Response, next);
+
+        expect(next).toHaveBeenCalledWith(serviceError);
+      });
+    });
+  });
+
+  describe('New Flutter Methods Integration Tests', () => {
+    describe('Cross-Method Workflow Tests', () => {
+      it('should handle complete Flutter mobile workflow', async () => {
+        // 1. Flutter upload
+        req.file = {
+          buffer: Buffer.from('flutter workflow image'),
+          originalname: 'workflow-test.jpg',
+          mimetype: 'image/jpeg',
+          size: 1024000,
+          fieldname: 'image',
+          encoding: '7bit',
+          filename: 'workflow-test.jpg',
+          destination: '',
+          path: '',
+          stream: {} as any
+        };
+        
+        const uploadedImage = { 
+          ...mockImage, 
+          id: 'workflow-image-123', 
+          platform: 'flutter', 
+          uploadOptimized: true 
+        };
+        mockImageService.flutterUploadImage.mockResolvedValue(uploadedImage);
+        await testController.flutterUploadImage(req as Request, res as Response, next);
+
+        // 2. Get mobile optimized version
+        req.params = { id: 'workflow-image-123' };
+        delete req.file;
+        const optimizedResult = { id: 'opt-workflow-123', optimizedPath: '/mobile/workflow-image-123.webp', format: 'webp', quality: 85, originalSize: 204800, optimizedAt: new Date().toISOString() };
+        mockImageService.getMobileOptimizedImage.mockResolvedValue(optimizedResult);
+        await testController.getMobileOptimizedImage(req as Request, res as Response, next);
+
+        // 3. Generate mobile thumbnails
+        req.query = { page: '1', limit: '10', size: 'medium' };
+        const thumbnailsResult = { 
+          thumbnails: [{ 
+            id: 'thumb-1', 
+            thumbnailPath: '/thumbs/workflow-image-123-medium.jpg', 
+            size: 'medium' as const, 
+            originalWidth: 800, 
+            originalHeight: 600 
+          }],
+          page: 1,
+          hasMore: false
+        };
+        mockImageService.getMobileThumbnails.mockResolvedValue(thumbnailsResult);
+        await testController.getMobileThumbnails(req as Request, res as Response, next);
+
+        expect(mockImageService.flutterUploadImage).toHaveBeenCalledTimes(1);
+        expect(mockImageService.getMobileOptimizedImage).toHaveBeenCalledTimes(1);
+        expect(mockImageService.getMobileThumbnails).toHaveBeenCalledTimes(1);
+      });
+
+      it('should handle batch operations with sync workflow', async () => {
+        // 1. Batch generate thumbnails
+        req.body = {
+          imageIds: ['sync-image-1', 'sync-image-2'],
+          sizes: ['small', 'medium']
+        };
+        delete req.query;
+        delete req.params;
+        
+        const batchThumbnailResult = {
+          successCount: 2,
+          totalCount: 2,
+          results: [
+            { 
+              id: 'sync-image-1', 
+              status: 'success', 
+              thumbnails: [
+                { size: 'small' as const, thumbnailPath: '/thumbs/sync-image-1-small.jpg' }, 
+                { size: 'medium' as const, thumbnailPath: '/thumbs/sync-image-1-medium.jpg' }
+              ] 
+            },
+            { 
+              id: 'sync-image-2', 
+              status: 'success', 
+              thumbnails: [
+                { size: 'small' as const, thumbnailPath: '/thumbs/sync-image-2-small.jpg' }, 
+                { size: 'medium' as const, thumbnailPath: '/thumbs/sync-image-2-medium.jpg' }
+              ] 
+            }
+          ]
+        };
+        mockImageService.batchGenerateThumbnails.mockResolvedValue(batchThumbnailResult);
+        await testController.batchGenerateThumbnails(req as Request, res as Response, next);
+
+        // 2. Get sync data
+        req.query = { lastSync: '2024-01-14T10:00:00Z', includeDeleted: 'false', limit: '20' };
+        delete req.body;
+        const syncDataResult = {
+          images: [
+            { 
+              id: 'sync-image-1', 
+              status: 'processed' as const, 
+              metadata: { width: 800, height: 600 }, 
+              lastModified: new Date('2024-01-15T10:00:00Z'), 
+              syncStatus: 'updated' 
+            },
+            { 
+              id: 'sync-image-2', 
+              status: 'labeled' as const, 
+              metadata: { width: 1200, height: 900 }, 
+              lastModified: new Date('2024-01-15T10:30:00Z'), 
+              syncStatus: 'updated' 
+            }
+          ],
+          syncTimestamp: '2024-01-15T11:00:00Z',
+          hasMore: false
+        };
+        mockImageService.getSyncData.mockResolvedValue(syncDataResult);
+        await testController.getSyncData(req as Request, res as Response, next);
+
+        // 3. Batch sync operations
+        req.body = {
+          operations: [
+            { type: 'update', imageId: 'sync-image-1', data: { status: 'processed' } },
+            { type: 'update', imageId: 'sync-image-2', data: { status: 'labeled' } }
+          ]
+        };
+        delete req.query;
+        const batchSyncResult = {
+          successCount: 2,
+          failedCount: 0,
+          conflicts: [],
+          syncCompleted: new Date().toISOString(),
+          results: [
+            { id: 'sync-image-1', status: 'success' },
+            { id: 'sync-image-2', status: 'success' }
+          ]
+        };
+        mockImageService.batchSyncOperations.mockResolvedValue(batchSyncResult);
+        await testController.batchSyncOperations(req as Request, res as Response, next);
+
+        expect(mockImageService.batchGenerateThumbnails).toHaveBeenCalledTimes(1);
+        expect(mockImageService.getSyncData).toHaveBeenCalledTimes(1);
+        expect(mockImageService.batchSyncOperations).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('Flutter Response Format Validation for New Methods', () => {
+      it('should validate Flutter response format for getMobileThumbnails', async () => {
+        const result = { 
+          thumbnails: [], 
+          page: 1, 
+          hasMore: false 
+        };
+        mockImageService.getMobileThumbnails.mockResolvedValue(result);
+
+        await testController.getMobileThumbnails(req as Request, res as Response, next);
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          result,
+          expect.objectContaining({
+            message: expect.any(String),
+            meta: expect.objectContaining({
+              platform: 'mobile'
+            })
+          })
+        );
+      });
+
+      it('should validate Flutter response format for flutterUploadImage', async () => {
+        req.file = {
+          buffer: Buffer.from('test'),
+          originalname: 'test.jpg',
+          mimetype: 'image/jpeg',
+          size: 1024,
+          fieldname: 'image',
+          encoding: '7bit',
+          filename: 'test.jpg',
+          destination: '',
+          path: '',
+          stream: {} as any
+        };
+        
+        const flutterMockImage = {
+          ...mockImage,
+          platform: 'flutter',
+          uploadOptimized: true
+        };
+        mockImageService.flutterUploadImage.mockResolvedValue(flutterMockImage);
+
+        await testController.flutterUploadImage(req as Request, res as Response, next);
+
+        expect(mockResponseMethods.created).toHaveBeenCalledWith(
+          expect.objectContaining({
+            image: expect.any(Object)
+          }),
+          expect.objectContaining({
+            message: expect.any(String),
+            meta: expect.objectContaining({
+              platform: 'flutter'
+            })
+          })
+        );
+      });
+
+      it('should validate sync operation response format', async () => {
+        req.body = { operations: [] };
+        const result = { 
+          successCount: 0, 
+          failedCount: 0, 
+          conflicts: [], 
+          syncCompleted: new Date().toISOString(), 
+          results: [] 
+        };
+        mockImageService.batchSyncOperations.mockResolvedValue(result);
+
+        await testController.batchSyncOperations(req as Request, res as Response, next);
+
+        expect(mockResponseMethods.success).toHaveBeenCalledWith(
+          result,
+          expect.objectContaining({
+            message: expect.any(String),
+            meta: expect.objectContaining({
+              operation: 'batch_sync',
+              totalOperations: expect.any(Number),
+              successCount: expect.any(Number),
+              failedCount: expect.any(Number)
+            })
+          })
+        );
+      });
+    });
+
+    describe('Error Handling for New Methods', () => {
+      it('should handle authentication errors across all new methods', async () => {
+        const testCases = [
+          { method: 'getMobileThumbnails', setup: () => {} },
+          { method: 'getMobileOptimizedImage', setup: () => { req.params = { id: 'test' }; } },
+          { method: 'batchGenerateThumbnails', setup: () => { req.body = { imageIds: ['test'] }; } },
+          { method: 'getSyncData', setup: () => {} },
+          { method: 'flutterUploadImage', setup: () => { req.file = {} as Express.Multer.File; } },
+          { method: 'batchSyncOperations', setup: () => { req.body = { operations: [] }; } }
+        ];
+
+        for (const testCase of testCases) {
+          req.user = undefined;
+          testCase.setup();
+
+          await (testController as any)[testCase.method](req as Request, res as Response, next);
+          
+          expect(next).toHaveBeenCalledWith(expect.any(Error));
+          jest.clearAllMocks();
+        }
+      });
+    });
+
+    describe('Test Coverage Summary for New Methods', () => {
+      it('should validate all new methods are properly tested', () => {
+        const newMethods = [
+          'getMobileThumbnails',
+          'getMobileOptimizedImage', 
+          'batchGenerateThumbnails',
+          'getSyncData',
+          'flutterUploadImage',
+          'batchSyncOperations'
+        ];
+
+        const testControllerMethods = Object.keys(testController);
+        
+        newMethods.forEach(method => {
+          expect(testControllerMethods).toContain(method);
+        });
+      });
+
+      it('should validate new service methods are mocked', () => {
+        const newServiceMethods: (keyof typeof mockImageService)[] = [
+          'getMobileThumbnails',
+          'getMobileOptimizedImage',
+          'batchGenerateThumbnails', 
+          'getSyncData',
+          'flutterUploadImage',
+          'batchSyncOperations'
+        ];
+
+        newServiceMethods.forEach(method => {
+          expect(mockImageService[method]).toBeDefined();
+          expect(jest.isMockFunction(mockImageService[method])).toBe(true);
+        });
+      });
     });
   });
 
