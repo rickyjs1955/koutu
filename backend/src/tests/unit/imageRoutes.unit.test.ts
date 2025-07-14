@@ -11,6 +11,8 @@ import {
 
 describe('Image Routes - Fixed Comprehensive Test Suite', () => {
     let app: express.Application;
+    let mockAuth: any;
+    let validateUUID: any;
     
     beforeAll(async () => {
         // Create Express app with comprehensive middleware stack
@@ -19,7 +21,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         
         // Enhanced mock authentication with role-based access
-        const mockAuth = (req: any, res: any, next: any) => {
+        mockAuth = (req: any, res: any, next: any) => {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
             return res.status(401).json({
@@ -74,7 +76,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         router.use(mockAuth);
         
         // Validation middleware
-        const validateUUID = (req: any, res: any, next: any) => {
+        validateUUID = (req: any, res: any, next: any) => {
         if (req.params.id) {
             if (req.params.id === 'non-existent-id' || req.params.id === 'unauthorized-image-id') {
             return next();
@@ -188,7 +190,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         
         res.status(200).json({
             success: true,
-            data: Array.from({ length: Math.min(limitNum, 5) }, (_, i) => 
+            data: Array.from({ length: Math.min(limitNum, 5) }, () => 
             createMockImage({ 
                 user_id: req.user?.id || 'default-user-id',
                 status: status as any || 'new'
@@ -207,7 +209,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         });
         });
         
-        router.get('/stats', (req, res) => {
+        router.get('/stats', (req: any, res: any) => {
         if (req.headers['x-test-slow-response']) {
             // Simulate slow response
             setTimeout(() => {
@@ -247,7 +249,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         });
         });
         
-        router.post('/upload', validateFileUpload, (req, res) => {
+        router.post('/upload', validateFileUpload, (req: any, res: any) => {
         const file = req.file || req.body.mockFile;
         
         if (req.headers['x-test-instagram-validation']) {
@@ -368,7 +370,48 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         });
         });
         
-        router.get('/:id', validateUUID, authorizeImageAccess, (req, res) => {
+        // Add sync route before /:id route to avoid UUID validation
+        router.get('/sync', (req: any, res: any) => {
+            const { lastSync, includeDeleted = false, limit = 50 } = req.query;
+            
+            if (limit && (isNaN(Number(limit)) || Number(limit) < 1 || Number(limit) > 100)) {
+                return res.status(400).json({
+                    success: false,
+                    error: { code: 'INVALID_LIMIT', message: 'Limit must be between 1 and 100' }
+                });
+            }
+            
+            if (lastSync && isNaN(Date.parse(lastSync as string))) {
+                return res.status(400).json({
+                    success: false,
+                    error: { code: 'INVALID_DATE', message: 'lastSync must be a valid ISO date' }
+                });
+            }
+            
+            const syncTimestamp = new Date().toISOString();
+            const limitNum = Number(limit);
+            
+            const changes = Array.from({ length: Math.min(limitNum, 20) }, (_, i) => ({
+                id: `sync-image-${i}`,
+                action: ['create', 'update', 'delete'][i % 3],
+                timestamp: new Date(Date.now() - (i * 60000)).toISOString(),
+                data: i % 3 !== 2 ? createMockImage({ user_id: req.user.id }) : null // No data for deletes
+            }));
+            
+            const filtered = includeDeleted === 'true' ? changes : changes.filter(c => c.action !== 'delete');
+            
+            res.status(200).json({
+                success: true,
+                data: {
+                    changes: filtered,
+                    syncTimestamp: syncTimestamp,
+                    hasMore: filtered.length === limitNum,
+                    deletedCount: includeDeleted === 'true' ? changes.filter(c => c.action === 'delete').length : 0
+                }
+            });
+        });
+        
+        router.get('/:id', validateUUID, authorizeImageAccess, (req: any, res: any) => {
         res.status(200).json({
             success: true,
             data: createMockImage({ 
@@ -421,7 +464,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         });
         });
         
-        router.post('/:id/thumbnail', validateUUID, authorizeImageAccess, (req, res) => {
+        router.post('/:id/thumbnail', validateUUID, authorizeImageAccess, (req: any, res: any) => {
         if (req.headers['x-test-processing-error']) {
             res.status(500).json({
             success: false,
@@ -466,7 +509,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         });
         });
         
-        router.post('/:id/optimize', validateUUID, authorizeImageAccess, (req, res) => {
+        router.post('/:id/optimize', validateUUID, authorizeImageAccess, (req: any, res: any) => {
         const { quality = 80, format = 'jpeg' } = req.body;
         
         if (quality < 1 || quality > 100) {
@@ -490,7 +533,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         });
         });
         
-        router.delete('/:id', validateUUID, authorizeImageAccess, (req, res) => {
+        router.delete('/:id', validateUUID, authorizeImageAccess, (req: any, res: any) => {
         if (req.headers['x-test-has-dependencies']) {
             res.status(409).json({
             success: false,
@@ -919,7 +962,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         const responses = await Promise.all(concurrentRequests);
         const endTime = Date.now();
         
-        responses.forEach(response => {
+        responses.forEach((response: request.Response) => {
             expect(response.status).toBe(200);
             expect(response.body.success).toBe(true);
         });
@@ -1214,7 +1257,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         
         const responses = await Promise.all(concurrentUpdates);
         
-        responses.forEach(response => {
+        responses.forEach((response: request.Response) => {
             expect(response.status).toBe(200);
             expect(response.body.success).toBe(true);
         });
@@ -1375,7 +1418,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         describe('GET /mobile/thumbnails', () => {
             beforeEach(() => {
                 // Add mobile thumbnail route handler
-                app.get('/api/v1/images/mobile/thumbnails', router, (req: any, res: any) => {
+                app.get('/api/v1/images/mobile/thumbnails', mockAuth, (req: any, res: any) => {
                     const { page = 1, limit = 20, size = 'medium' } = req.query;
                     
                     if (isNaN(Number(page)) || Number(page) < 1) {
@@ -1392,7 +1435,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
                         });
                     }
                     
-                    if (!['small', 'medium', 'large'].includes(size)) {
+                    if (!['small', 'medium', 'large'].includes(size as string)) {
                         return res.status(400).json({
                             success: false,
                             error: { code: 'INVALID_SIZE', message: 'Size must be small, medium, or large' }
@@ -1412,7 +1455,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
                                 small: { width: 150, height: 150 },
                                 medium: { width: 300, height: 300 },
                                 large: { width: 600, height: 600 }
-                            }[size],
+                            }[size as 'small' | 'medium' | 'large'],
                             optimizedForMobile: true
                         })),
                         pagination: {
@@ -1484,7 +1527,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         describe('GET /:id/mobile', () => {
             beforeEach(() => {
                 // Add mobile-optimized image route handler
-                app.get('/api/v1/images/:id/mobile', router, (req: any, res: any) => {
+                app.get('/api/v1/images/:id/mobile', validateUUID, mockAuth, (req: any, res: any) => {
                     const { id } = req.params;
                     
                     if (id === 'non-existent-id') {
@@ -1568,7 +1611,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         describe('POST /batch/thumbnails', () => {
             beforeEach(() => {
                 // Add batch thumbnail generation route handler
-                app.post('/api/v1/images/batch/thumbnails', router, (req: any, res: any) => {
+                app.post('/api/v1/images/batch/thumbnails', mockAuth, (req: any, res: any) => {
                     const { imageIds, sizes = ['medium'] } = req.body;
                     
                     if (!Array.isArray(imageIds) || imageIds.length === 0) {
@@ -1595,7 +1638,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
                     res.status(200).json({
                         success: true,
                         data: {
-                            jobId: 'batch-job-' + Math.random().toString(36).substr(2, 9),
+                            jobId: 'batch-job-' + Math.random().toString(36).substring(2, 11),
                             processed: imageIds.length,
                             thumbnails: imageIds.flatMap(id => 
                                 sizes.map(size => ({
@@ -1674,7 +1717,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         describe('POST /batch/sync', () => {
             beforeEach(() => {
                 // Add batch sync operations route handler
-                app.post('/api/v1/images/batch/sync', router, (req: any, res: any) => {
+                app.post('/api/v1/images/batch/sync', mockAuth, (req: any, res: any) => {
                     const { operations } = req.body;
                     
                     if (!Array.isArray(operations) || operations.length === 0) {
@@ -1717,7 +1760,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
                     res.status(200).json({
                         success: true,
                         data: {
-                            syncId: 'sync-' + Math.random().toString(36).substr(2, 9),
+                            syncId: 'sync-' + Math.random().toString(36).substring(2, 11),
                             processedOperations: operations.length,
                             results: results,
                             conflicts: results.filter(r => r.status === 'conflict').length,
@@ -1815,48 +1858,6 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
 
     describe('🔄 Flutter Sync & Offline Support', () => {
         describe('GET /sync', () => {
-            beforeEach(() => {
-                // Add sync data route handler
-                app.get('/api/v1/images/sync', router, (req: any, res: any) => {
-                    const { lastSync, includeDeleted = false, limit = 50 } = req.query;
-                    
-                    if (limit && (isNaN(Number(limit)) || Number(limit) < 1 || Number(limit) > 100)) {
-                        return res.status(400).json({
-                            success: false,
-                            error: { code: 'INVALID_LIMIT', message: 'Limit must be between 1 and 100' }
-                        });
-                    }
-                    
-                    if (lastSync && isNaN(Date.parse(lastSync))) {
-                        return res.status(400).json({
-                            success: false,
-                            error: { code: 'INVALID_DATE', message: 'lastSync must be a valid ISO date' }
-                        });
-                    }
-                    
-                    const syncTimestamp = new Date().toISOString();
-                    const limitNum = Number(limit);
-                    
-                    const changes = Array.from({ length: Math.min(limitNum, 20) }, (_, i) => ({
-                        id: `sync-image-${i}`,
-                        action: ['create', 'update', 'delete'][i % 3],
-                        timestamp: new Date(Date.now() - (i * 60000)).toISOString(),
-                        data: i % 3 !== 2 ? createMockImage({ user_id: req.user.id }) : null // No data for deletes
-                    }));
-                    
-                    const filtered = includeDeleted === 'true' ? changes : changes.filter(c => c.action !== 'delete');
-                    
-                    res.status(200).json({
-                        success: true,
-                        data: {
-                            changes: filtered,
-                            syncTimestamp: syncTimestamp,
-                            hasMore: filtered.length === limitNum,
-                            deletedCount: includeDeleted === 'true' ? changes.filter(c => c.action === 'delete').length : 0
-                        }
-                    });
-                });
-            });
 
             test('should return sync data for offline support', async () => {
                 const response = await request(app)
@@ -1935,7 +1936,7 @@ describe('Image Routes - Fixed Comprehensive Test Suite', () => {
         describe('POST /flutter/upload', () => {
             beforeEach(() => {
                 // Add Flutter-optimized upload route handler
-                app.post('/api/v1/images/flutter/upload', router, (req: any, res: any) => {
+                app.post('/api/v1/images/flutter/upload', mockAuth, (req: any, res: any) => {
                     const file = req.file || req.body.mockFile;
                     
                     if (!file) {
