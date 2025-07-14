@@ -129,7 +129,7 @@ router.delete('/:id',
   imageController.deleteImage
 );
 
-/**
+/** NEWLY ADDED ROUTES
  * @route GET /api/v1/images/mobile/thumbnails
  * @desc Get thumbnails optimized for mobile display
  * @access Private
@@ -144,7 +144,7 @@ router.get('/mobile/thumbnails',
   imageController.getMobileThumbnails
 );
 
-/**
+/** NEWLY ADDED ROUTES
  * @route GET /api/v1/images/:id/mobile
  * @desc Get mobile-optimized image with automatic format selection
  * @access Private
@@ -156,7 +156,7 @@ router.get('/:id/mobile',
   imageController.getMobileOptimizedImage
 );
 
-/**
+/** NEWLY ADDED ROUTES
  * @route POST /api/v1/images/batch/thumbnails
  * @desc Generate thumbnails for multiple images (Flutter batch operation)
  * @access Private
@@ -170,7 +170,7 @@ router.post('/batch/thumbnails',
   imageController.batchGenerateThumbnails
 );
 
-/**
+/** NEWLY ADDED ROUTES
  * @route GET /api/v1/images/sync
  * @desc Get images with sync metadata for Flutter offline support
  * @access Private
@@ -185,7 +185,7 @@ router.get('/sync',
   imageController.getSyncData
 );
 
-/**
+/** NEWLY ADDED ROUTES
  * @route POST /api/v1/images/flutter/upload
  * @desc Flutter-optimized upload with progress support
  * @access Private
@@ -197,7 +197,7 @@ router.post('/flutter/upload',
   imageController.flutterUploadImage
 );
 
-/**
+/** 
  * @route PUT /api/v1/images/batch/status
  * @desc Batch update image statuses
  * @access Private
@@ -211,7 +211,7 @@ router.put('/batch/status',
   imageController.batchUpdateStatus
 );
 
-/**
+/** NEWLY ADDED ROUTES
  * @route POST /api/v1/images/batch/sync
  * @desc Batch sync operation for Flutter offline/online sync
  * @access Private
