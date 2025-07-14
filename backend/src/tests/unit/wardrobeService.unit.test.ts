@@ -281,37 +281,213 @@ describe('WardrobeService', () => {
   });
 
   describe('getUserWardrobes', () => {
-    it('should return user wardrobes with garment counts', async () => {
-      const wardrobes = wardrobeMocks.createMultipleWardrobes(testUserId, 3);
-      mockedWardrobeModel.findByUserId.mockResolvedValue(wardrobes);
-      
-      // Mock garment counts for each wardrobe
-      mockedWardrobeModel.getGarments
-        .mockResolvedValueOnce([mockGarment, mockGarment]) // 2 garments
-        .mockResolvedValueOnce([mockGarment]) // 1 garment
-        .mockResolvedValueOnce([]); // 0 garments
+    describe('Legacy Mode', () => {
+      it('should return user wardrobes with garment counts', async () => {
+        const wardrobes = wardrobeMocks.createMultipleWardrobes(testUserId, 3);
+        mockedWardrobeModel.findByUserId.mockResolvedValue(wardrobes);
+        
+        // Mock garment counts for each wardrobe
+        mockedWardrobeModel.getGarments
+          .mockResolvedValueOnce([mockGarment, mockGarment]) // 2 garments
+          .mockResolvedValueOnce([mockGarment]) // 1 garment
+          .mockResolvedValueOnce([]); // 0 garments
 
-      const result = await wardrobeService.getUserWardrobes(testUserId);
+        const result = await wardrobeService.getUserWardrobes({ userId: testUserId });
 
-      expect(result).toHaveLength(3);
-      expect(result[0].garmentCount).toBe(2);
-      expect(result[1].garmentCount).toBe(1);
-      expect(result[2].garmentCount).toBe(0);
-      expect(mockedWardrobeModel.findByUserId).toHaveBeenCalledWith(testUserId);
+        expect(result.wardrobes).toHaveLength(3);
+        // Check that garment counts are assigned (order may vary due to sorting)
+        const counts = result.wardrobes.map(w => w.garmentCount).sort((a, b) => b - a);
+        expect(counts).toEqual([2, 1, 0]);
+        expect(mockedWardrobeModel.findByUserId).toHaveBeenCalledWith(testUserId);
+      });
+
+      it('should return empty array for user with no wardrobes', async () => {
+        mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+
+        const result = await wardrobeService.getUserWardrobes({ userId: testUserId });
+
+        expect(result.wardrobes).toEqual([]);
+        expect(result.total).toBe(0);
+      });
+
+      it('should handle legacy pagination', async () => {
+        const wardrobes = wardrobeMocks.createMultipleWardrobes(testUserId, 10);
+        mockedWardrobeModel.findByUserId.mockResolvedValue(wardrobes);
+        mockedWardrobeModel.getGarments.mockResolvedValue([]);
+
+        const result = await wardrobeService.getUserWardrobes({
+          userId: testUserId,
+          legacy: { page: 2, limit: 3 }
+        });
+
+        expect(result.wardrobes).toHaveLength(3);
+        expect(result.page).toBe(2);
+        expect(result.limit).toBe(3);
+        expect(result.total).toBe(10);
+      });
     });
 
-    it('should return empty array for user with no wardrobes', async () => {
-      mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+    describe('Mobile Mode - Cursor Pagination', () => {
+      let wardrobes: any[];
+      
+      beforeEach(() => {
+        // Create wardrobes with different timestamps for predictable sorting
+        wardrobes = Array.from({ length: 5 }, (_, i) => 
+          wardrobeMocks.createValidWardrobe({
+            user_id: testUserId,
+            name: `Wardrobe ${i}`,
+            created_at: new Date(2024, 0, i + 1),
+            updated_at: new Date(2024, 0, i + 1)
+          })
+        );
+        mockedWardrobeModel.findByUserId.mockResolvedValue(wardrobes);
+        mockedWardrobeModel.getGarments.mockResolvedValue([]);
+      });
 
-      const result = await wardrobeService.getUserWardrobes(testUserId);
+      it('should handle forward cursor pagination', async () => {
+        const result = await wardrobeService.getUserWardrobes({
+          userId: testUserId,
+          pagination: { cursor: wardrobes[1].id, limit: 2, direction: 'forward' },
+          filters: { sortBy: 'name', sortOrder: 'asc' } // Use predictable sorting
+        });
 
-      expect(result).toEqual([]);
+        expect(result.wardrobes).toHaveLength(2);
+        expect(result.pagination?.hasNext).toBe(true);
+        expect(result.pagination?.hasPrev).toBe(true);
+        expect(result.pagination?.nextCursor).toBeDefined();
+      });
+
+      it('should handle backward cursor pagination', async () => {
+        const result = await wardrobeService.getUserWardrobes({
+          userId: testUserId,
+          pagination: { cursor: wardrobes[3].id, limit: 2, direction: 'backward' },
+          filters: { sortBy: 'name', sortOrder: 'asc' } // Use predictable sorting
+        });
+
+        expect(result.wardrobes).toHaveLength(2);
+        expect(result.pagination?.hasPrev).toBe(true);
+      });
+
+      it('should handle no cursor (first page)', async () => {
+        const result = await wardrobeService.getUserWardrobes({
+          userId: testUserId,
+          pagination: { limit: 3 }
+        });
+
+        expect(result.wardrobes).toHaveLength(3);
+        expect(result.pagination?.hasPrev).toBe(false);
+        expect(result.pagination?.hasNext).toBe(true);
+      });
+    });
+
+    describe('Filtering', () => {
+      const wardrobes = [
+        wardrobeMocks.createValidWardrobe({
+          user_id: testUserId,
+          name: 'Summer Collection',
+          description: 'Light clothes',
+          created_at: new Date('2024-01-01'),
+          updated_at: new Date('2024-01-15')
+        }),
+        wardrobeMocks.createValidWardrobe({
+          user_id: testUserId,
+          name: 'Winter Wardrobe',
+          description: 'Warm clothes',
+          created_at: new Date('2024-02-01'),
+          updated_at: new Date('2024-02-10')
+        }),
+        wardrobeMocks.createValidWardrobe({
+          user_id: testUserId,
+          name: 'Work Attire',
+          description: 'Professional outfits',
+          created_at: new Date('2024-03-01'),
+          updated_at: new Date('2024-03-05')
+        })
+      ];
+
+      beforeEach(() => {
+        mockedWardrobeModel.findByUserId.mockResolvedValue(wardrobes);
+      });
+
+      it('should filter by search term', async () => {
+        mockedWardrobeModel.getGarments.mockResolvedValue([]);
+        
+        const result = await wardrobeService.getUserWardrobes({
+          userId: testUserId,
+          filters: { search: 'summer' }
+        });
+
+        expect(result.wardrobes).toHaveLength(1);
+        expect(result.wardrobes[0].name).toBe('Summer Collection');
+      });
+
+      it('should filter by hasGarments', async () => {
+        mockedWardrobeModel.getGarments
+          .mockResolvedValueOnce([mockGarment]) // Has garments
+          .mockResolvedValueOnce([]) // No garments
+          .mockResolvedValueOnce([mockGarment, mockGarment]); // Has garments
+
+        const result = await wardrobeService.getUserWardrobes({
+          userId: testUserId,
+          filters: { hasGarments: true }
+        });
+
+        expect(result.wardrobes).toHaveLength(2);
+      });
+
+      it('should filter by date ranges', async () => {
+        mockedWardrobeModel.getGarments.mockResolvedValue([]);
+        
+        const result = await wardrobeService.getUserWardrobes({
+          userId: testUserId,
+          filters: { 
+            createdAfter: '2024-01-15',
+            updatedAfter: '2024-02-01'
+          }
+        });
+
+        expect(result.wardrobes).toHaveLength(2); // Winter and Work wardrobes
+      });
+
+      it('should sort by different fields', async () => {
+        mockedWardrobeModel.getGarments
+          .mockResolvedValueOnce([mockGarment, mockGarment]) // 2 garments
+          .mockResolvedValueOnce([mockGarment]) // 1 garment
+          .mockResolvedValueOnce([mockGarment, mockGarment, mockGarment]); // 3 garments
+
+        const result = await wardrobeService.getUserWardrobes({
+          userId: testUserId,
+          filters: { sortBy: 'garment_count', sortOrder: 'desc' }
+        });
+
+        expect(result.wardrobes[0].garmentCount).toBe(3);
+        expect(result.wardrobes[1].garmentCount).toBe(2);
+        expect(result.wardrobes[2].garmentCount).toBe(1);
+      });
+
+      it('should combine multiple filters', async () => {
+        mockedWardrobeModel.getGarments.mockResolvedValue([mockGarment]);
+        
+        const result = await wardrobeService.getUserWardrobes({
+          userId: testUserId,
+          filters: { 
+            search: 'w',
+            hasGarments: true,
+            sortBy: 'name',
+            sortOrder: 'asc'
+          }
+        });
+
+        expect(result.wardrobes).toHaveLength(2); // Winter and Work
+        expect(result.wardrobes[0].name).toBe('Winter Wardrobe');
+        expect(result.wardrobes[1].name).toBe('Work Attire');
+      });
     });
 
     it('should handle database errors', async () => {
       mockedWardrobeModel.findByUserId.mockRejectedValue(new Error('Database error'));
 
-      await expect(wardrobeService.getUserWardrobes(testUserId))
+      await expect(wardrobeService.getUserWardrobes({ userId: testUserId }))
         .rejects.toThrow(ApiError);
     });
 
@@ -320,7 +496,7 @@ describe('WardrobeService', () => {
       mockedWardrobeModel.findByUserId.mockResolvedValue(wardrobes);
       mockedWardrobeModel.getGarments.mockRejectedValue(new Error('Garment error'));
 
-      await expect(wardrobeService.getUserWardrobes(testUserId))
+      await expect(wardrobeService.getUserWardrobes({ userId: testUserId }))
         .rejects.toThrow(ApiError);
     });
   });
@@ -1173,7 +1349,7 @@ describe('WardrobeService', () => {
       mockedWardrobeModel.findByUserId.mockResolvedValue(manyWardrobes);
       mockedWardrobeModel.getGarments.mockResolvedValue([]);
 
-      await expect(wardrobeService.getUserWardrobes(testUserId))
+      await expect(wardrobeService.getUserWardrobes({ userId: testUserId }))
         .resolves.toBeDefined();
     });
 
@@ -1299,13 +1475,13 @@ describe('WardrobeService', () => {
       // Mock getGarments for each wardrobe call
       mockedWardrobeModel.getGarments.mockResolvedValue([mockGarment]);
 
-      const user1Wardrobes = await wardrobeService.getUserWardrobes(user1Id);
-      const user2Wardrobes = await wardrobeService.getUserWardrobes(user2Id);
+      const user1Result = await wardrobeService.getUserWardrobes({ userId: user1Id });
+      const user2Result = await wardrobeService.getUserWardrobes({ userId: user2Id });
 
-      expect(user1Wardrobes).toHaveLength(1);
-      expect(user2Wardrobes).toHaveLength(1);
-      expect(user1Wardrobes[0].user_id).toBe(user1Id);
-      expect(user2Wardrobes[0].user_id).toBe(user2Id);
+      expect(user1Result.wardrobes).toHaveLength(1);
+      expect(user2Result.wardrobes).toHaveLength(1);
+      expect(user1Result.wardrobes[0].user_id).toBe(user1Id);
+      expect(user2Result.wardrobes[0].user_id).toBe(user2Id);
     });
   });
 
@@ -1322,10 +1498,10 @@ describe('WardrobeService', () => {
       mockedWardrobeModel.getGarments.mockResolvedValue([]);
 
       const start = Date.now();
-      const result = await wardrobeService.getUserWardrobes(testUserId);
+      const result = await wardrobeService.getUserWardrobes({ userId: testUserId });
       const duration = Date.now() - start;
 
-      expect(result).toHaveLength(50);
+      expect(result.wardrobes).toHaveLength(50);
       expect(duration).toBeLessThan(1000); // Should complete within 1 second
     });
 
@@ -1339,6 +1515,309 @@ describe('WardrobeService', () => {
       );
 
       await expect(Promise.all(concurrentReads)).resolves.toBeDefined();
+    });
+  });
+
+  describe('syncWardrobes', () => {
+    const syncParams = {
+      userId: testUserId,
+      lastSyncTimestamp: new Date('2024-01-01'),
+      clientVersion: 1
+    };
+
+    beforeEach(() => {
+      const wardrobes = [
+        wardrobeMocks.createValidWardrobe({
+          user_id: testUserId,
+          created_at: new Date('2023-12-15'),
+          updated_at: new Date('2023-12-20')
+        }),
+        wardrobeMocks.createValidWardrobe({
+          user_id: testUserId,
+          created_at: new Date('2024-01-05'),
+          updated_at: new Date('2024-01-05')
+        }),
+        wardrobeMocks.createValidWardrobe({
+          user_id: testUserId,
+          created_at: new Date('2023-12-01'),
+          updated_at: new Date('2024-01-10')
+        })
+      ];
+      mockedWardrobeModel.findByUserId.mockResolvedValue(wardrobes);
+      mockedWardrobeModel.getGarments.mockResolvedValue([]);
+    });
+
+    it('should return created wardrobes since last sync', async () => {
+      const result = await wardrobeService.syncWardrobes(syncParams);
+
+      expect(result.wardrobes.created).toHaveLength(1);
+      expect(result.wardrobes.created[0].created_at).toEqual(new Date('2024-01-05'));
+    });
+
+    it('should return updated wardrobes since last sync', async () => {
+      const result = await wardrobeService.syncWardrobes(syncParams);
+
+      expect(result.wardrobes.updated).toHaveLength(1);
+      expect(result.wardrobes.updated[0].updated_at).toEqual(new Date('2024-01-10'));
+    });
+
+    it('should not include deleted wardrobes in basic implementation', async () => {
+      const result = await wardrobeService.syncWardrobes(syncParams);
+
+      expect(result.wardrobes.deleted).toEqual([]);
+    });
+
+    it('should include sync metadata', async () => {
+      const result = await wardrobeService.syncWardrobes(syncParams);
+
+      expect(result.sync).toHaveProperty('timestamp');
+      expect(result.sync.version).toBe(1);
+      expect(result.sync.hasMore).toBe(false);
+      expect(result.sync.changeCount).toBe(2); // 1 created + 1 updated
+    });
+
+    it('should handle no changes since last sync', async () => {
+      const futureSync = {
+        ...syncParams,
+        lastSyncTimestamp: new Date('2024-12-31')
+      };
+
+      const result = await wardrobeService.syncWardrobes(futureSync);
+
+      expect(result.wardrobes.created).toHaveLength(0);
+      expect(result.wardrobes.updated).toHaveLength(0);
+      expect(result.sync.changeCount).toBe(0);
+    });
+
+    it('should handle database errors', async () => {
+      mockedWardrobeModel.findByUserId.mockRejectedValue(new Error('Database error'));
+
+      await expect(wardrobeService.syncWardrobes(syncParams))
+        .rejects.toThrow(ApiError);
+    });
+  });
+
+  describe('batchOperations', () => {
+    const batchParams: {
+      userId: string;
+      operations: Array<{
+        type: 'create' | 'update' | 'delete';
+        data: any;
+        clientId: string;
+      }>;
+    } = {
+      userId: testUserId,
+      operations: []
+    };
+
+    beforeEach(() => {
+      // Reset batchParams userId in case testUserId changed
+      batchParams.userId = testUserId;
+      batchParams.operations = [];
+      
+      mockedWardrobeModel.create.mockResolvedValue(mockWardrobe);
+      mockedWardrobeModel.findById.mockResolvedValue(mockWardrobe);
+      mockedWardrobeModel.update.mockResolvedValue(mockWardrobe);
+      mockedWardrobeModel.delete.mockResolvedValue(true);
+    });
+
+    it('should handle create operations', async () => {
+      // Mock for wardrobe limit check and duplicate name check
+      mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+      
+      batchParams.operations = [
+        {
+          type: 'create',
+          data: { name: 'Batch Wardrobe 1', description: 'Test' },
+          clientId: 'temp-1'
+        },
+        {
+          type: 'create',
+          data: { name: 'Batch Wardrobe 2' },
+          clientId: 'temp-2'
+        }
+      ];
+
+      const result = await wardrobeService.batchOperations(batchParams);
+
+      expect(result.results).toHaveLength(2);
+      expect(result.errors).toHaveLength(0);
+      expect(result.summary.successful).toBe(2);
+      expect(mockedWardrobeModel.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle update operations', async () => {
+      // Mock for duplicate name check in updateWardrobe
+      mockedWardrobeModel.findByUserId.mockResolvedValue([mockWardrobe]);
+      
+      batchParams.operations = [
+        {
+          type: 'update',
+          data: { id: testWardrobeId, name: 'Updated Name' },
+          clientId: 'temp-3'
+        }
+      ];
+
+      const result = await wardrobeService.batchOperations(batchParams);
+
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0].type).toBe('update');
+      expect(mockedWardrobeModel.update).toHaveBeenCalled();
+    });
+
+    it('should handle delete operations', async () => {
+      mockedWardrobeModel.getGarments.mockResolvedValue([]); // No garments
+      
+      batchParams.operations = [
+        {
+          type: 'delete',
+          data: { id: testWardrobeId },
+          clientId: 'temp-4'
+        }
+      ];
+
+      const result = await wardrobeService.batchOperations(batchParams);
+
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0].type).toBe('delete');
+      expect(mockedWardrobeModel.delete).toHaveBeenCalled();
+    });
+
+    it('should handle mixed operations', async () => {
+      const deleteWardrobeId = uuidv4();
+      const deleteWardrobe = { ...mockWardrobe, id: deleteWardrobeId };
+      
+      // Setup mocks for mixed operations
+      mockedWardrobeModel.findByUserId.mockResolvedValue([]); // For create
+      mockedWardrobeModel.getGarments.mockResolvedValue([]); // For delete
+      mockedWardrobeModel.findById
+        .mockResolvedValueOnce(mockWardrobe) // For update ownership check
+        .mockResolvedValueOnce(deleteWardrobe); // For delete ownership check
+      
+      batchParams.operations = [
+        {
+          type: 'create',
+          data: { name: 'New Wardrobe' },
+          clientId: 'temp-5'
+        },
+        {
+          type: 'update',
+          data: { id: testWardrobeId, description: 'Updated' },
+          clientId: 'temp-6'
+        },
+        {
+          type: 'delete',
+          data: { id: deleteWardrobeId },
+          clientId: 'temp-7'
+        }
+      ];
+
+      const result = await wardrobeService.batchOperations(batchParams);
+
+      expect(result.summary.total).toBe(3);
+      expect(result.results.length + result.errors.length).toBe(3);
+    });
+
+    it('should handle validation errors gracefully', async () => {
+      // Mock for the successful create operation
+      mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+      
+      batchParams.operations = [
+        {
+          type: 'create',
+          data: { name: '' }, // Invalid name
+          clientId: 'temp-8'
+        },
+        {
+          type: 'create',
+          data: { name: 'Valid Name' },
+          clientId: 'temp-9'
+        }
+      ];
+
+      const result = await wardrobeService.batchOperations(batchParams);
+
+      expect(result.results).toHaveLength(1);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].clientId).toBe('temp-8');
+    });
+
+    it('should validate operations array', async () => {
+      await expect(wardrobeService.batchOperations({ userId: testUserId, operations: null as any }))
+        .rejects.toThrow(ApiError);
+
+      await expect(wardrobeService.batchOperations({ userId: testUserId, operations: [] }))
+        .rejects.toThrow(ApiError);
+
+      const tooManyOps = Array.from({ length: 51 }, (_, i) => ({
+        type: 'create' as const,
+        data: { name: `Wardrobe ${i}` },
+        clientId: `temp-${i}`
+      }));
+
+      await expect(wardrobeService.batchOperations({ userId: testUserId, operations: tooManyOps }))
+        .rejects.toThrow(ApiError);
+    });
+
+    it('should handle unknown operation types', async () => {
+      batchParams.operations = [
+        {
+          type: 'unknown' as any,
+          data: {},
+          clientId: 'temp-10'
+        }
+      ];
+
+      const result = await wardrobeService.batchOperations(batchParams);
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].error).toContain('Unknown operation type');
+    });
+
+    it('should handle missing required fields', async () => {
+      batchParams.operations = [
+        {
+          type: 'update',
+          data: { name: 'New Name' }, // Missing id
+          clientId: 'temp-11'
+        },
+        {
+          type: 'delete',
+          data: {}, // Missing id
+          clientId: 'temp-12'
+        }
+      ];
+
+      const result = await wardrobeService.batchOperations(batchParams);
+
+      expect(result.errors).toHaveLength(2);
+      expect(result.results).toHaveLength(0);
+    });
+
+    it('should handle database errors per operation', async () => {
+      mockedWardrobeModel.create
+        .mockResolvedValueOnce(mockWardrobe)
+        .mockRejectedValueOnce(new Error('Database error'));
+
+      batchParams.operations = [
+        {
+          type: 'create',
+          data: { name: 'Success' },
+          clientId: 'temp-13'
+        },
+        {
+          type: 'create',
+          data: { name: 'Failure' },
+          clientId: 'temp-14'
+        }
+      ];
+
+      const result = await wardrobeService.batchOperations(batchParams);
+
+      expect(result.results).toHaveLength(1);
+      expect(result.errors).toHaveLength(1);
+      expect(result.summary.successful).toBe(1);
+      expect(result.summary.failed).toBe(1);
     });
   });
 });

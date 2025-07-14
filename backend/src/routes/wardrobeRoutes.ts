@@ -27,6 +27,27 @@ const AddGarmentToWardrobeSchema = z.object({
   position: z.number().int().min(0, 'Position must be a non-negative integer').optional()
 });
 
+const ReorderGarmentsSchema = z.object({
+  garmentPositions: z.array(z.object({
+    garmentId: z.string().uuid('Invalid garment ID format'),
+    position: z.number().int().min(0, 'Position must be non-negative')
+  })).min(1).max(100)
+});
+
+// Offline sync schemas
+const SyncSchema = z.object({
+  lastSyncTimestamp: z.string().datetime(),
+  clientVersion: z.number().int().min(1).optional()
+});
+
+const BatchOperationSchema = z.object({
+  operations: z.array(z.object({
+    type: z.enum(['create', 'update', 'delete']),
+    data: z.record(z.any()),
+    clientId: z.string()
+  })).min(1).max(50)
+});
+
 // Wardrobe routes
 
 /**
@@ -101,6 +122,52 @@ router.delete('/:id/items/:itemId',
 router.delete('/:id', 
   validateParams(UUIDParamSchema),
   wardrobeController.deleteWardrobe
+);
+
+/**
+ * @route PUT /api/v1/wardrobes/:id/items/reorder
+ * @desc Reorder garments in wardrobe
+ * @access Private
+ */
+router.put('/:id/items/reorder',
+  validateParams(UUIDParamSchema),
+  validateBody(ReorderGarmentsSchema),
+  wardrobeController.reorderGarments
+);
+
+/**
+ * @route GET /api/v1/wardrobes/:id/stats
+ * @desc Get wardrobe statistics
+ * @access Private
+ */
+router.get('/:id/stats',
+  validateParams(UUIDParamSchema),
+  wardrobeController.getWardrobeStats
+);
+
+// Offline sync routes
+
+/**
+ * @route POST /api/v1/wardrobes/sync
+ * @desc Sync wardrobes - get changes since last sync
+ * @access Private
+ * @body lastSyncTimestamp - ISO date string of last sync
+ * @body clientVersion - Client version number (optional)
+ */
+router.post('/sync',
+  validateBody(SyncSchema),
+  wardrobeController.syncWardrobes
+);
+
+/**
+ * @route POST /api/v1/wardrobes/batch
+ * @desc Batch operations for offline sync
+ * @access Private
+ * @body operations - Array of operations to perform
+ */
+router.post('/batch',
+  validateBody(BatchOperationSchema),
+  wardrobeController.batchOperations
 );
 
 export { router as wardrobeRoutes };

@@ -41,6 +41,49 @@ interface WardrobeWithGarments {
   garmentCount: number;
 }
 
+// Mobile-specific interfaces
+interface MobilePaginationParams {
+  cursor?: string;
+  limit?: number;
+  direction?: 'forward' | 'backward';
+}
+
+interface MobileFilterOptions {
+  search?: string;
+  sortBy?: 'name' | 'created_at' | 'updated_at' | 'garment_count';
+  sortOrder?: 'asc' | 'desc';
+  hasGarments?: boolean;
+  createdAfter?: string;
+  updatedAfter?: string;
+}
+
+interface GetWardrobesParams {
+  userId: string;
+  pagination?: MobilePaginationParams;
+  filters?: MobileFilterOptions;
+  legacy?: {
+    page: number;
+    limit: number;
+  };
+}
+
+interface SyncParams {
+  userId: string;
+  lastSyncTimestamp: Date;
+  clientVersion?: number;
+}
+
+interface BatchOperation {
+  type: 'create' | 'update' | 'delete';
+  data: any;
+  clientId: string;
+}
+
+interface BatchOperationsParams {
+  userId: string;
+  operations: BatchOperation[];
+}
+
 export const wardrobeService = {
   /**
    * Create a new wardrobe with validation
@@ -77,11 +120,34 @@ export const wardrobeService = {
   },
 
   /**
-   * Get all wardrobes for a user
+   * Get all wardrobes for a user with mobile pagination and filtering support
    */
-  async getUserWardrobes(userId: string) {
+  async getUserWardrobes(params: GetWardrobesParams) {
+    const { userId, pagination, filters, legacy } = params;
+    
     try {
-      const wardrobes = await wardrobeModel.findByUserId(userId);
+      // Get all wardrobes for the user
+      let wardrobes = await wardrobeModel.findByUserId(userId);
+
+      // Apply search filter
+      if (filters?.search) {
+        const searchLower = filters.search.toLowerCase();
+        wardrobes = wardrobes.filter(w => 
+          w.name.toLowerCase().includes(searchLower) ||
+          (w.description && w.description.toLowerCase().includes(searchLower))
+        );
+      }
+
+      // Apply date filters
+      if (filters?.createdAfter) {
+        const afterDate = new Date(filters.createdAfter);
+        wardrobes = wardrobes.filter(w => new Date(w.created_at) > afterDate);
+      }
+
+      if (filters?.updatedAfter) {
+        const afterDate = new Date(filters.updatedAfter);
+        wardrobes = wardrobes.filter(w => new Date(w.updated_at) > afterDate);
+      }
 
       // Enhance with garment counts
       const enhancedWardrobes = await Promise.all(
@@ -94,7 +160,87 @@ export const wardrobeService = {
         })
       );
 
-      return enhancedWardrobes;
+      // Apply hasGarments filter
+      let filteredWardrobes = enhancedWardrobes;
+      if (filters?.hasGarments !== undefined) {
+        filteredWardrobes = enhancedWardrobes.filter(w => 
+          filters.hasGarments ? w.garmentCount > 0 : w.garmentCount === 0
+        );
+      }
+
+      // Apply sorting
+      const sortBy = filters?.sortBy || 'updated_at';
+      const sortOrder = filters?.sortOrder || 'desc';
+      
+      filteredWardrobes.sort((a, b) => {
+        let compareValue = 0;
+        
+        switch (sortBy) {
+          case 'name':
+            compareValue = a.name.localeCompare(b.name);
+            break;
+          case 'created_at':
+            compareValue = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+            break;
+          case 'updated_at':
+            compareValue = new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
+            break;
+          case 'garment_count':
+            compareValue = a.garmentCount - b.garmentCount;
+            break;
+        }
+        
+        return sortOrder === 'asc' ? compareValue : -compareValue;
+      });
+
+      // Handle mobile cursor-based pagination
+      if (pagination) {
+        let startIndex = 0;
+        if (pagination.cursor) {
+          const cursorIndex = filteredWardrobes.findIndex(w => w.id === pagination.cursor);
+          if (cursorIndex !== -1) {
+            startIndex = pagination.direction === 'forward' 
+              ? cursorIndex + 1 
+              : Math.max(0, cursorIndex - (pagination.limit || 20));
+          }
+        }
+
+        const limit = pagination.limit || 20;
+        const endIndex = Math.min(startIndex + limit, filteredWardrobes.length);
+        const paginatedWardrobes = filteredWardrobes.slice(startIndex, endIndex);
+
+        return {
+          wardrobes: paginatedWardrobes,
+          pagination: {
+            hasNext: endIndex < filteredWardrobes.length,
+            hasPrev: startIndex > 0,
+            nextCursor: endIndex < filteredWardrobes.length ? filteredWardrobes[endIndex - 1]?.id : undefined,
+            prevCursor: startIndex > 0 ? filteredWardrobes[startIndex]?.id : undefined,
+            count: paginatedWardrobes.length,
+            totalFiltered: filteredWardrobes.length
+          }
+        };
+      }
+
+      // Handle legacy pagination
+      if (legacy) {
+        const startIndex = (legacy.page - 1) * legacy.limit;
+        const endIndex = startIndex + legacy.limit;
+        const paginatedWardrobes = filteredWardrobes.slice(startIndex, endIndex);
+
+        return {
+          wardrobes: paginatedWardrobes,
+          total: filteredWardrobes.length,
+          page: legacy.page,
+          limit: legacy.limit
+        };
+      }
+
+      // No pagination - return all
+      return {
+        wardrobes: filteredWardrobes,
+        total: filteredWardrobes.length
+      };
     } catch (error) {
       console.error('Error retrieving user wardrobes:', error);
       throw ApiError.internal('Failed to retrieve wardrobes');
@@ -605,5 +751,171 @@ export const wardrobeService = {
       console.error('Error checking wardrobe capacity:', error);
       throw ApiError.internal('Failed to check wardrobe capacity');
     }
+  },
+
+  /**
+   * Sync wardrobes - get changes since last sync
+   */
+  async syncWardrobes(params: SyncParams) {
+    const { userId, lastSyncTimestamp, clientVersion = 1 } = params;
+
+    try {
+      // Get all wardrobes for the user
+      const allWardrobes = await wardrobeModel.findByUserId(userId);
+
+      // Separate into created, updated, and deleted
+      const created = allWardrobes.filter(w => new Date(w.created_at) > lastSyncTimestamp);
+      const updated = allWardrobes.filter(w => 
+        new Date(w.updated_at) > lastSyncTimestamp && 
+        new Date(w.created_at) <= lastSyncTimestamp
+      );
+
+      // For deleted items, we'd need to track deletions in the database
+      // This is a simplified version - in production, use a deletion log
+      const deleted: string[] = [];
+
+      // Enhance with garment counts
+      const enhancedCreated = await Promise.all(
+        created.map(async (wardrobe) => {
+          const garments = await wardrobeModel.getGarments(wardrobe.id);
+          return {
+            ...wardrobe,
+            garmentCount: garments.length
+          };
+        })
+      );
+
+      const enhancedUpdated = await Promise.all(
+        updated.map(async (wardrobe) => {
+          const garments = await wardrobeModel.getGarments(wardrobe.id);
+          return {
+            ...wardrobe,
+            garmentCount: garments.length
+          };
+        })
+      );
+
+      return {
+        wardrobes: {
+          created: enhancedCreated,
+          updated: enhancedUpdated,
+          deleted
+        },
+        sync: {
+          timestamp: new Date().toISOString(),
+          version: clientVersion,
+          hasMore: false,
+          changeCount: created.length + updated.length + deleted.length
+        }
+      };
+    } catch (error) {
+      console.error('Error syncing wardrobes:', error);
+      throw ApiError.internal('Failed to sync wardrobes');
+    }
+  },
+
+  /**
+   * Batch operations for offline sync
+   */
+  async batchOperations(params: BatchOperationsParams) {
+    const { userId, operations } = params;
+
+    // Validate operations
+    if (!operations || !Array.isArray(operations) || operations.length === 0) {
+      throw ApiError.validation('Operations array is required and must not be empty', 'operations', operations);
+    }
+
+    if (operations.length > 50) {
+      throw ApiError.validation('Cannot process more than 50 operations at once', 'operations', operations.length);
+    }
+
+    const results = [];
+    const errors = [];
+
+    // Process each operation
+    for (const [index, operation] of operations.entries()) {
+      try {
+        const { type, data, clientId } = operation;
+
+        let result;
+        switch (type) {
+          case 'create':
+            if (!data.name) {
+              throw ApiError.validation('Name is required for create operation', 'name', null);
+            }
+
+            result = await this.createWardrobe({
+              userId,
+              name: data.name,
+              description: data.description
+            });
+
+            results.push({
+              clientId,
+              serverId: result.id,
+              type: 'create',
+              success: true,
+              data: result
+            });
+            break;
+
+          case 'update':
+            if (!data.id) {
+              throw ApiError.validation('Wardrobe ID is required for update operation', 'id', null);
+            }
+
+            result = await this.updateWardrobe({
+              wardrobeId: data.id,
+              userId,
+              name: data.name,
+              description: data.description
+            });
+
+            results.push({
+              clientId,
+              serverId: data.id,
+              type: 'update',
+              success: true,
+              data: result
+            });
+            break;
+
+          case 'delete':
+            if (!data.id) {
+              throw ApiError.validation('Wardrobe ID is required for delete operation', 'id', null);
+            }
+
+            await this.deleteWardrobe(data.id, userId);
+
+            results.push({
+              clientId,
+              serverId: data.id,
+              type: 'delete',
+              success: true
+            });
+            break;
+
+          default:
+            throw ApiError.validation(`Unknown operation type: ${type}`, 'type', type);
+        }
+      } catch (error: any) {
+        errors.push({
+          clientId: operation.clientId,
+          type: operation.type,
+          error: error.message || 'Unknown error',
+          code: error.code || 'UNKNOWN_ERROR'
+        });
+      }
+    }
+
+    return {
+      results,
+      errors,
+      summary: {
+        total: operations.length,
+        successful: results.length,
+        failed: errors.length
+      }
+    };
   }
 };
