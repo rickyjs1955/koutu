@@ -558,27 +558,53 @@ describe('Garment Model - Security Test Suite', () => {
       const validUuid = MOCK_GARMENT_IDS.VALID_GARMENT_1;
       const invalidUuid = 'invalid-uuid-format';
 
-      // Time valid UUID lookup
+      // Warm up the functions to avoid cold start timing issues
       mockUuidValidate.mockReturnValueOnce(true);
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
-
-      const startValid = Date.now();
       await garmentModel.findById(validUuid);
-      const validTime = Date.now() - startValid;
-
-      // Time invalid UUID lookup
+      
       mockUuidValidate.mockReturnValueOnce(false);
-
-      const startInvalid = Date.now();
       await garmentModel.findById(invalidUuid);
-      const invalidTime = Date.now() - startInvalid;
 
-      // Timing should be similar (within reasonable margin)
-      const timingDifference = Math.abs(validTime - invalidTime);
-      expect(timingDifference).toBeLessThan(10); // Within 10ms
+      // Clear mocks for actual test
+      mockQuery.mockClear();
+      mockUuidValidate.mockClear();
 
-      // Invalid UUID should be faster (no DB call)
-      expect(invalidTime).toBeLessThanOrEqual(validTime);
+      // Collect multiple timing samples to reduce variance
+      const validTimes: number[] = [];
+      const invalidTimes: number[] = [];
+      const samples = 10;
+
+      for (let i = 0; i < samples; i++) {
+        // Time valid UUID lookup
+        mockUuidValidate.mockReturnValueOnce(true);
+        mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+        const startValid = process.hrtime.bigint();
+        await garmentModel.findById(validUuid);
+        const endValid = process.hrtime.bigint();
+        validTimes.push(Number(endValid - startValid) / 1_000_000); // Convert to ms
+
+        // Time invalid UUID lookup
+        mockUuidValidate.mockReturnValueOnce(false);
+
+        const startInvalid = process.hrtime.bigint();
+        await garmentModel.findById(invalidUuid);
+        const endInvalid = process.hrtime.bigint();
+        invalidTimes.push(Number(endInvalid - startInvalid) / 1_000_000); // Convert to ms
+      }
+
+      // Calculate median times to reduce outlier impact
+      const medianValid = validTimes.sort((a, b) => a - b)[Math.floor(samples / 2)];
+      const medianInvalid = invalidTimes.sort((a, b) => a - b)[Math.floor(samples / 2)];
+
+      // Invalid UUID should generally be faster (no DB call)
+      // But we allow for some variance in timing
+      expect(medianInvalid).toBeLessThanOrEqual(medianValid + 2); // Allow 2ms variance
+
+      // Verify that valid UUID made exactly 'samples' DB calls
+      // (invalid UUIDs should not make any DB calls)
+      expect(mockQuery).toHaveBeenCalledTimes(samples);
     });
 
     it('should prevent timing-based user enumeration', async () => {

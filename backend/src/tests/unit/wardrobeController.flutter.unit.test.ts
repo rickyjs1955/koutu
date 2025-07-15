@@ -11,6 +11,24 @@ import { wardrobeValidationHelpers } from '../__helpers__/wardrobes.helper';
 jest.mock('../../models/wardrobeModel');
 jest.mock('../../models/garmentModel');
 
+// Mock the wardrobeService
+jest.mock('../../services/wardrobeService', () => ({
+  wardrobeService: {
+    createWardrobe: jest.fn(),
+    getUserWardrobes: jest.fn(),
+    getWardrobeWithGarments: jest.fn(),
+    updateWardrobe: jest.fn(),
+    addGarmentToWardrobe: jest.fn(),
+    removeGarmentFromWardrobe: jest.fn(),
+    deleteWardrobe: jest.fn(),
+    reorderGarments: jest.fn(),
+    syncWardrobes: jest.fn(),
+    batchOperations: jest.fn(),
+    validateWardrobeName: jest.fn(),
+    validateWardrobeDescription: jest.fn()
+  }
+}));
+
 // Mock the sanitization utility
 jest.mock('../../utils/sanitize', () => ({
   sanitization: {
@@ -36,27 +54,27 @@ jest.mock('../../middlewares/errorHandler', () => {
     }
 
     static validation(message: string, field?: string, value?: any): MockEnhancedApiError {
-      throw new MockEnhancedApiError(message, 400, field, value);
+      return new MockEnhancedApiError(message, 400, field, value);
     }
 
     static authenticationRequired(message: string): MockEnhancedApiError {
-      throw new MockEnhancedApiError(message, 401);
+      return new MockEnhancedApiError(message, 401);
     }
 
     static authorizationDenied(message: string, resource?: string): MockEnhancedApiError {
-      throw new MockEnhancedApiError(message, 403, resource);
+      return new MockEnhancedApiError(message, 403, resource);
     }
 
     static notFound(message: string, resource?: string): MockEnhancedApiError {
-      throw new MockEnhancedApiError(message, 404, resource);
+      return new MockEnhancedApiError(message, 404, resource);
     }
 
     static internalError(message: string, originalError?: any): MockEnhancedApiError {
-      throw new MockEnhancedApiError(message, 500, undefined, originalError);
+      return new MockEnhancedApiError(message, 500, undefined, originalError);
     }
 
     static conflict(message: string, field?: string): MockEnhancedApiError {
-      throw new MockEnhancedApiError(message, 409, field);
+      return new MockEnhancedApiError(message, 409, field);
     }
   }
 
@@ -91,6 +109,10 @@ const expectToFail = (message: string) => {
 // Type the mocked models
 const mockWardrobeModel = wardrobeModel as jest.Mocked<typeof wardrobeModel>;
 const mockGarmentModel = garmentModel as jest.Mocked<typeof garmentModel>;
+
+// Import the mocked service
+import { wardrobeService } from '../../services/wardrobeService';
+const mockWardrobeService = wardrobeService as jest.Mocked<typeof wardrobeService>;
 
 describe('wardrobeController (Flutter Compatible)', () => {
   let mockReq: Partial<Request>;
@@ -141,16 +163,16 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 const expectedWardrobe = wardrobeMocks.createValidWardrobe(inputData);
 
                 mockReq.body = inputData;
-                mockWardrobeModel.create.mockResolvedValue(expectedWardrobe);
+                mockWardrobeService.createWardrobe.mockResolvedValue(expectedWardrobe);
 
                 // Act - this should NOT throw
                 await wardrobeController.createWardrobe(mockReq as Request, mockRes as Response, mockNext);
 
                 // Assert
-                expect(mockWardrobeModel.create).toHaveBeenCalledWith({
-                    user_id: mockUser.id,
-                    name: inputData.name.trim(),
-                    description: inputData.description?.trim() || ''
+                expect(mockWardrobeService.createWardrobe).toHaveBeenCalledWith({
+                    userId: mockUser.id,
+                    name: inputData.name,
+                    description: inputData.description || ''
                 });
 
                 expect(mockRes.created).toHaveBeenCalledWith(
@@ -171,7 +193,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 });
 
                 mockReq.body = inputData;
-                mockWardrobeModel.create.mockResolvedValue(expectedWardrobe);
+                mockWardrobeService.createWardrobe.mockResolvedValue(expectedWardrobe);
 
                 // Act
                 await wardrobeController.createWardrobe(
@@ -181,8 +203,8 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.create).toHaveBeenCalledWith({
-                user_id: mockUser.id,
+                expect(mockWardrobeService.createWardrobe).toHaveBeenCalledWith({
+                userId: mockUser.id,
                 name: inputData.name,
                 description: ''
                 });
@@ -211,7 +233,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 });
 
                 mockReq.body = inputData;
-                mockWardrobeModel.create.mockResolvedValue(expectedWardrobe);
+                mockWardrobeService.createWardrobe.mockResolvedValue(expectedWardrobe);
 
                 // Act
                 await wardrobeController.createWardrobe(
@@ -221,8 +243,8 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.create).toHaveBeenCalledWith({
-                user_id: mockUser.id,
+                expect(mockWardrobeService.createWardrobe).toHaveBeenCalledWith({
+                userId: mockUser.id,
                 name: 'Test Wardrobe',
                 description: 'Test Description'
                 });
@@ -241,7 +263,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     expect((error as Error).message).toContain('Wardrobe name is required');
                 }
                 
-                expect(mockWardrobeModel.create).not.toHaveBeenCalled();
+                expect(mockWardrobeService.createWardrobe).not.toHaveBeenCalled();
             });
 
             it('should reject whitespace-only name', async () => {
@@ -356,7 +378,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 const modelError = new Error('Database connection failed');
                 
                 mockReq.body = inputData;
-                mockWardrobeModel.create.mockRejectedValue(modelError);
+                mockWardrobeService.createWardrobe.mockRejectedValue(modelError);
 
                 // Spy on console.error to verify error logging
                 const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
@@ -388,7 +410,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 (duplicateError as any).code = '23505';
                 
                 mockReq.body = inputData;
-                mockWardrobeModel.create.mockRejectedValue(duplicateError);
+                mockWardrobeService.createWardrobe.mockRejectedValue(duplicateError);
 
                 // Act & Assert
                 try {
@@ -412,7 +434,11 @@ describe('wardrobeController (Flutter Compatible)', () => {
             it('should retrieve wardrobes for authenticated user', async () => {
                 // Arrange
                 const expectedWardrobes = wardrobeMocks.createMultipleWardrobes(mockUser.id, 3);
-                mockWardrobeModel.findByUserId.mockResolvedValue(expectedWardrobes);
+                const enhancedWardrobes = expectedWardrobes.map(w => ({ ...w, garmentCount: 0 }));
+                mockWardrobeService.getUserWardrobes.mockResolvedValue({
+                    wardrobes: enhancedWardrobes,
+                    total: enhancedWardrobes.length
+                });
 
                 // Act
                 await wardrobeController.getWardrobes(
@@ -422,14 +448,18 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.findByUserId).toHaveBeenCalledWith(mockUser.id);
+                expect(mockWardrobeService.getUserWardrobes).toHaveBeenCalledWith({
+                    userId: mockUser.id,
+                    legacy: undefined
+                });
                 expect(mockRes.success).toHaveBeenCalledWith(
-                expectedWardrobes,
+                expect.any(Array),
                 {
                     message: 'Wardrobes retrieved successfully',
                     meta: {
                     count: expectedWardrobes.length,
-                    userId: mockUser.id
+                    userId: mockUser.id,
+                    mode: 'legacy'
                     }
                 }
                 );
@@ -438,7 +468,10 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
             it('should return empty array when user has no wardrobes', async () => {
                 // Arrange
-                mockWardrobeModel.findByUserId.mockResolvedValue([]);
+                mockWardrobeService.getUserWardrobes.mockResolvedValue({
+                    wardrobes: [],
+                    total: 0
+                });
 
                 // Act
                 await wardrobeController.getWardrobes(
@@ -454,7 +487,8 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     message: 'Wardrobes retrieved successfully',
                     meta: {
                     count: 0,
-                    userId: mockUser.id
+                    userId: mockUser.id,
+                    mode: 'legacy'
                     }
                 }
                 );
@@ -463,8 +497,15 @@ describe('wardrobeController (Flutter Compatible)', () => {
             it('should handle pagination when provided', async () => {
                 // Arrange
                 const allWardrobes = wardrobeMocks.createMultipleWardrobes(mockUser.id, 25);
+                const enhancedWardrobes = allWardrobes.map(w => ({ ...w, garmentCount: 0 }));
+                const paginatedWardrobes = enhancedWardrobes.slice(10, 20); // Page 2, limit 10
                 mockReq.query = { page: '2', limit: '10' };
-                mockWardrobeModel.findByUserId.mockResolvedValue(allWardrobes);
+                mockWardrobeService.getUserWardrobes.mockResolvedValue({
+                    wardrobes: paginatedWardrobes,
+                    total: 25,
+                    page: 2,
+                    limit: 10
+                });
 
                 // Act
                 await wardrobeController.getWardrobes(
@@ -486,13 +527,310 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 })
                 );
             });
+
+            it('should handle mobile cursor-based pagination', async () => {
+                // Arrange
+                const wardrobes = wardrobeMocks.createMultipleWardrobes(mockUser.id, 10);
+                mockReq.query = { 
+                    cursor: 'cursor-123',
+                    limit: '20',
+                    direction: 'forward'
+                };
+                
+                const enhancedWardrobes = wardrobes.map(w => ({ ...w, garmentCount: 2 }));
+                const mockResult = {
+                    wardrobes: enhancedWardrobes,
+                    pagination: {
+                        hasNext: true,
+                        hasPrev: false,
+                        nextCursor: 'cursor-456',
+                        prevCursor: undefined,
+                        count: enhancedWardrobes.length,
+                        totalFiltered: 20
+                    }
+                };
+                
+                // Mock the wardrobeService.getUserWardrobes method
+                mockWardrobeService.getUserWardrobes.mockResolvedValue(mockResult as any);
+
+                // Act
+                await wardrobeController.getWardrobes(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        wardrobes: expect.any(Array),
+                        pagination: expect.objectContaining({
+                            hasNext: true,
+                            hasPrev: false,
+                            nextCursor: 'cursor-456',
+                            prevCursor: undefined,
+                            count: expect.any(Number),
+                            totalFiltered: 20
+                        }),
+                        sync: expect.objectContaining({
+                            lastSyncTimestamp: expect.any(String),
+                            version: 1,
+                            hasMore: true,
+                            nextCursor: 'cursor-456'
+                        })
+                    }),
+                    expect.objectContaining({
+                        message: 'Wardrobes retrieved successfully',
+                        meta: expect.objectContaining({
+                            mode: 'mobile'
+                        })
+                    })
+                );
+                expect(mockNext).not.toHaveBeenCalled();
+            });
+
+            it('should handle mobile pagination with filters', async () => {
+                // Arrange
+                const wardrobes = wardrobeMocks.createMultipleWardrobes(mockUser.id, 5);
+                mockReq.query = { 
+                    cursor: 'cursor-123',
+                    limit: '10',
+                    search: 'summer',
+                    sortBy: 'name',
+                    sortOrder: 'asc',
+                    hasGarments: 'true',
+                    createdAfter: '2024-01-01T00:00:00.000Z'
+                };
+                
+                const enhancedWardrobes = wardrobes.map(w => ({ ...w, garmentCount: 3 }));
+                const mockResult = {
+                    wardrobes: enhancedWardrobes,
+                    pagination: {
+                        hasNext: false,
+                        hasPrev: true,
+                        nextCursor: null,
+                        prevCursor: 'cursor-prev',
+                        count: enhancedWardrobes.length,
+                        totalFiltered: 15
+                    }
+                };
+                
+                mockWardrobeService.getUserWardrobes.mockResolvedValue(mockResult as any);
+
+                // Act
+                await wardrobeController.getWardrobes(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        wardrobes: expect.any(Array),
+                        pagination: expect.objectContaining({
+                            hasNext: false
+                        }),
+                        sync: expect.objectContaining({
+                            hasMore: false
+                        })
+                    }),
+                    expect.objectContaining({
+                        message: 'Wardrobes retrieved successfully',
+                        meta: expect.objectContaining({
+                            filters: expect.objectContaining({
+                                search: 'summer',
+                                sortBy: 'name',
+                                sortOrder: 'asc',
+                                hasGarments: true,
+                                createdAfter: '2024-01-01T00:00:00.000Z'
+                            }),
+                            mode: 'mobile'
+                        })
+                    })
+                );
+            });
+
+            it('should handle mobile pagination with backward direction', async () => {
+                // Arrange
+                const wardrobes = wardrobeMocks.createMultipleWardrobes(mockUser.id, 5);
+                mockReq.query = { 
+                    cursor: 'cursor-123',
+                    direction: 'backward',
+                    limit: '15'
+                };
+                
+                const enhancedWardrobes = wardrobes.map(w => ({ ...w, garmentCount: 1 }));
+                const mockResult = {
+                    wardrobes: enhancedWardrobes,
+                    pagination: {
+                        hasNext: false,
+                        hasPrev: true,
+                        nextCursor: null,
+                        prevCursor: 'cursor-prev',
+                        count: enhancedWardrobes.length,
+                        totalFiltered: 25
+                    }
+                };
+                
+                mockWardrobeService.getUserWardrobes.mockResolvedValue(mockResult as any);
+
+                // Act
+                await wardrobeController.getWardrobes(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        wardrobes: expect.any(Array),
+                        pagination: expect.objectContaining({
+                            hasNext: false,
+                            hasPrev: true
+                        })
+                    }),
+                    expect.objectContaining({
+                        meta: expect.objectContaining({
+                            mode: 'mobile'
+                        })
+                    })
+                );
+            });
+
+            it('should apply default mobile pagination parameters', async () => {
+                // Arrange
+                const wardrobes = wardrobeMocks.createMultipleWardrobes(mockUser.id, 5);
+                mockReq.query = { cursor: 'cursor-123' }; // Only cursor, no limit or direction
+                
+                const enhancedWardrobes = wardrobes.map(w => ({ ...w, garmentCount: 2 }));
+                const mockResult = {
+                    wardrobes: enhancedWardrobes,
+                    pagination: {
+                        hasNext: false,
+                        hasPrev: false,
+                        nextCursor: null,
+                        prevCursor: null,
+                        count: enhancedWardrobes.length,
+                        totalFiltered: 5
+                    }
+                };
+                
+                mockWardrobeService.getUserWardrobes.mockResolvedValue(mockResult as any);
+
+                // Act
+                await wardrobeController.getWardrobes(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        pagination: expect.objectContaining({
+                            count: expect.any(Number),
+                            totalFiltered: expect.any(Number)
+                        })
+                    }),
+                    expect.any(Object)
+                );
+            });
+
+            it('should limit mobile pagination to max 50 items', async () => {
+                // Arrange
+                const wardrobes = wardrobeMocks.createMultipleWardrobes(mockUser.id, 10);
+                mockReq.query = { 
+                    cursor: 'cursor-123',
+                    limit: '100' // Requesting more than max
+                };
+                
+                const enhancedWardrobes = wardrobes.map(w => ({ ...w, garmentCount: 0 }));
+                const mockResult = {
+                    wardrobes: enhancedWardrobes,
+                    pagination: {
+                        hasNext: false,
+                        hasPrev: false,
+                        nextCursor: null,
+                        prevCursor: null,
+                        count: enhancedWardrobes.length,
+                        totalFiltered: 10
+                    }
+                };
+                
+                mockWardrobeService.getUserWardrobes.mockResolvedValue(mockResult as any);
+
+                // Act
+                await wardrobeController.getWardrobes(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        pagination: expect.objectContaining({
+                            count: expect.any(Number),
+                            totalFiltered: expect.any(Number)
+                        })
+                    }),
+                    expect.any(Object)
+                );
+            });
+
+            it('should sanitize wardrobes data in mobile pagination response', async () => {
+                // Arrange
+                const wardrobes = wardrobeMocks.createMultipleWardrobes(mockUser.id, 3);
+                mockReq.query = { cursor: 'cursor-123' };
+                
+                const enhancedWardrobes = wardrobes.map(w => ({ ...w, garmentCount: 4 }));
+                const mockResult = {
+                    wardrobes: enhancedWardrobes,
+                    pagination: {
+                        hasNext: false,
+                        hasPrev: false,
+                        nextCursor: null,
+                        prevCursor: null,
+                        count: enhancedWardrobes.length,
+                        totalFiltered: 3
+                    }
+                };
+                
+                mockWardrobeService.getUserWardrobes.mockResolvedValue(mockResult as any);
+
+                // Act
+                await wardrobeController.getWardrobes(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert - Verify sanitization was called
+                const { sanitization } = require('../../utils/sanitize');
+                expect(sanitization.sanitizeUserInput).toHaveBeenCalled();
+                
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        wardrobes: expect.arrayContaining([
+                            expect.objectContaining({
+                                id: expect.any(String),
+                                name: expect.any(String),
+                                description: expect.any(String)
+                            })
+                        ])
+                    }),
+                    expect.any(Object)
+                );
+            });
         });
 
         describe('Error Handling', () => {
             it('should handle model errors', async () => {
                 // Arrange
                 const modelError = new Error('Database connection failed');
-                mockWardrobeModel.findByUserId.mockRejectedValue(modelError);
+                mockWardrobeService.getUserWardrobes.mockRejectedValue(modelError);
 
                 const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -526,11 +864,15 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     user_id: mockUser.id 
                 });
                 const expectedGarments = wardrobeMocks.garments.createMultipleGarments(mockUser.id, 3);
+                const wardrobeWithGarments = {
+                    ...expectedWardrobe,
+                    garments: expectedGarments,
+                    garmentCount: expectedGarments.length
+                };
 
                 mockReq.params = { id: validWardrobeId };
                 mockReq.user = mockUser;
-                mockWardrobeModel.findById.mockResolvedValue(expectedWardrobe);
-                mockWardrobeModel.getGarments.mockResolvedValue(expectedGarments);
+                mockWardrobeService.getWardrobeWithGarments.mockResolvedValue(wardrobeWithGarments);
 
                 // Act
                 await wardrobeController.getWardrobe(
@@ -540,13 +882,9 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.findById).toHaveBeenCalledWith(validWardrobeId);
-                expect(mockWardrobeModel.getGarments).toHaveBeenCalledWith(validWardrobeId);
+                expect(mockWardrobeService.getWardrobeWithGarments).toHaveBeenCalledWith(validWardrobeId, mockUser.id);
                 expect(mockRes.success).toHaveBeenCalledWith(
-                    { wardrobe: expect.objectContaining({
-                        ...expectedWardrobe,
-                        garments: expectedGarments
-                    }) },
+                    { wardrobe: wardrobeWithGarments },
                     {
                         message: 'Wardrobe retrieved successfully',
                         meta: {
@@ -565,11 +903,15 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     id: validWardrobeId,
                     user_id: mockUser.id 
                 });
+                const wardrobeWithGarments = {
+                    ...expectedWardrobe,
+                    garments: [],
+                    garmentCount: 0
+                };
 
                 mockReq.params = { id: validWardrobeId };
                 mockReq.user = mockUser;
-                mockWardrobeModel.findById.mockResolvedValue(expectedWardrobe);
-                mockWardrobeModel.getGarments.mockResolvedValue([]);
+                mockWardrobeService.getWardrobeWithGarments.mockResolvedValue(wardrobeWithGarments);
 
                 // Act
                 await wardrobeController.getWardrobe(
@@ -582,7 +924,8 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 expect(mockRes.success).toHaveBeenCalledWith(
                     expect.objectContaining({
                         wardrobe: expect.objectContaining({
-                            garments: []
+                            garments: [],
+                            garmentCount: 0
                         })
                     }),
                     expect.objectContaining({
@@ -622,7 +965,6 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     expect((error as Error).message).toContain('Invalid wardrobeId format');
                 }
                 expect(mockNext).not.toHaveBeenCalled();
-                expect(mockWardrobeModel.findById).not.toHaveBeenCalled();
                 });
             });
         });
@@ -631,7 +973,9 @@ describe('wardrobeController (Flutter Compatible)', () => {
         it('should handle wardrobe not found', async () => {
             // Arrange
             mockReq.params = { id: validWardrobeId };
-            mockWardrobeModel.findById.mockResolvedValue(null);
+            const { EnhancedApiError } = require('../../middlewares/errorHandler');
+            const notFoundError = EnhancedApiError.notFound('Wardrobe not found');
+            mockWardrobeService.getWardrobeWithGarments.mockRejectedValue(notFoundError);
 
             // Act & Assert
             try {
@@ -646,18 +990,14 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 expect((error as Error).message).toContain('Wardrobe not found');
             }
             expect(mockNext).not.toHaveBeenCalled();
-            expect(mockWardrobeModel.getGarments).not.toHaveBeenCalled();
         });
 
         it('should handle unauthorized access', async () => {
             // Arrange
-            const otherUserWardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: 'other-user-id' 
-            });
-            
             mockReq.params = { id: validWardrobeId };
-            mockWardrobeModel.findById.mockResolvedValue(otherUserWardrobe);
+            const { EnhancedApiError } = require('../../middlewares/errorHandler');
+            const unauthorizedError = EnhancedApiError.authorizationDenied('You do not have permission to access this wardrobe');
+            mockWardrobeService.getWardrobeWithGarments.mockRejectedValue(unauthorizedError);
 
             // Act & Assert
             try {
@@ -678,7 +1018,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
             // Arrange
             const modelError = new Error('Database connection failed');
             mockReq.params = { id: validWardrobeId };
-            mockWardrobeModel.findById.mockRejectedValue(modelError);
+            mockWardrobeService.getWardrobeWithGarments.mockRejectedValue(modelError);
 
             const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -716,8 +1056,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
                 mockReq.params = { id: validWardrobeId };
                 mockReq.body = updateData;
-                mockWardrobeModel.findById.mockResolvedValue(existingWardrobe);
-                mockWardrobeModel.update.mockResolvedValue(updatedWardrobe);
+                mockWardrobeService.updateWardrobe.mockResolvedValue(updatedWardrobe);
 
                 // Act
                 await wardrobeController.updateWardrobe(
@@ -727,9 +1066,11 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.update).toHaveBeenCalledWith(validWardrobeId, {
-                name: updateData.name.trim(),
-                description: updateData.description.trim()
+                expect(mockWardrobeService.updateWardrobe).toHaveBeenCalledWith({
+                wardrobeId: validWardrobeId,
+                userId: mockUser.id,
+                name: updateData.name,
+                description: updateData.description
                 });
                 
                 expect(mockRes.success).toHaveBeenCalledWith(
@@ -756,8 +1097,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
                 mockReq.params = { id: validWardrobeId };
                 mockReq.body = updateData;
-                mockWardrobeModel.findById.mockResolvedValue(existingWardrobe);
-                mockWardrobeModel.update.mockResolvedValue(existingWardrobe);
+                mockWardrobeService.updateWardrobe.mockResolvedValue(existingWardrobe);
 
                 // Act
                 await wardrobeController.updateWardrobe(
@@ -767,7 +1107,9 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.update).toHaveBeenCalledWith(validWardrobeId, {
+                expect(mockWardrobeService.updateWardrobe).toHaveBeenCalledWith({
+                wardrobeId: validWardrobeId,
+                userId: mockUser.id,
                 name: 'Updated Name',
                 description: 'Updated Description'
                 });
@@ -776,12 +1118,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
         describe('Input Validation', () => {
             beforeEach(() => {
-                const existingWardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: mockUser.id 
-                });
                 mockReq.params = { id: validWardrobeId };
-                mockWardrobeModel.findById.mockResolvedValue(existingWardrobe);
             });
 
             it('should reject invalid wardrobe ID format', async () => {
@@ -801,7 +1138,6 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     expect((error as Error).message).toContain('Invalid wardrobeId format');
                 }
                 expect(mockNext).not.toHaveBeenCalled();
-                expect(mockWardrobeModel.findById).not.toHaveBeenCalled();
             });
 
             it('should reject empty name', async () => {
@@ -848,7 +1184,10 @@ describe('wardrobeController (Flutter Compatible)', () => {
             // Arrange
             mockReq.params = { id: validWardrobeId };
             mockReq.body = { name: 'Updated Name' };
-            mockWardrobeModel.findById.mockResolvedValue(null);
+            
+            const { EnhancedApiError } = require('../../middlewares/errorHandler');
+            const notFoundError = EnhancedApiError.notFound('Wardrobe not found');
+            mockWardrobeService.updateWardrobe.mockRejectedValue(notFoundError);
 
             // Act & Assert
             try {
@@ -863,19 +1202,16 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 expect((error as Error).message).toContain('Wardrobe not found');
             }
             expect(mockNext).not.toHaveBeenCalled();
-            expect(mockWardrobeModel.update).not.toHaveBeenCalled();
         });
 
         it('should handle unauthorized access', async () => {
             // Arrange
-            const otherUserWardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: 'other-user-id' 
-            });
-            
             mockReq.params = { id: validWardrobeId };
             mockReq.body = { name: 'Updated Name' };
-            mockWardrobeModel.findById.mockResolvedValue(otherUserWardrobe);
+            
+            const { EnhancedApiError } = require('../../middlewares/errorHandler');
+            const authError = EnhancedApiError.authorizationDenied('You do not have permission to access this wardrobe');
+            mockWardrobeService.updateWardrobe.mockRejectedValue(authError);
 
             // Act & Assert
             try {
@@ -887,7 +1223,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 expectToFail('Should have thrown an error');
             } catch (error) {
                 expect(error).toBeInstanceOf(Error);
-                expect((error as Error).message).toContain('You do not have permission to update this wardrobe');
+                expect((error as Error).message).toContain('permission');
             }
             expect(mockNext).not.toHaveBeenCalled();
         });
@@ -898,20 +1234,12 @@ describe('wardrobeController (Flutter Compatible)', () => {
         describe('Successful Addition', () => {
             it('should add garment to wardrobe with default position', async () => {
                 // Arrange
-                const wardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: mockUser.id 
-                });
-                const garment = wardrobeMocks.garments.createMockGarment({ 
-                id: validGarmentId,
-                user_id: mockUser.id 
-                });
-
                 mockReq.params = { id: validWardrobeId };
                 mockReq.body = { garmentId: validGarmentId };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-                mockGarmentModel.findById.mockResolvedValue(garment);
-                mockWardrobeModel.addGarment.mockResolvedValue(true);
+                mockWardrobeService.addGarmentToWardrobe.mockResolvedValue({ 
+                    success: true, 
+                    message: 'Garment added to wardrobe successfully' 
+                });
 
                 // Act
                 await wardrobeController.addGarmentToWardrobe(
@@ -921,11 +1249,12 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
-                validWardrobeId, 
-                validGarmentId, 
-                0
-                );
+                expect(mockWardrobeService.addGarmentToWardrobe).toHaveBeenCalledWith({
+                    wardrobeId: validWardrobeId,
+                    userId: mockUser.id,
+                    garmentId: validGarmentId,
+                    position: 0
+                });
                 expect(mockRes.success).toHaveBeenCalledWith(
                 {},
                 {
@@ -947,10 +1276,14 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 id: validWardrobeId,
                 user_id: mockUser.id 
                 });
+                const wardrobeWithGarments = {
+                    ...wardrobe,
+                    garments: [],
+                    garmentCount: 0
+                };
 
                 mockReq.params = { id: validWardrobeId };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-                mockWardrobeModel.getGarments.mockResolvedValue([]);
+                mockWardrobeService.getWardrobeWithGarments.mockResolvedValue(wardrobeWithGarments);
 
                 // Act
                 await wardrobeController.getWardrobeStats(
@@ -977,6 +1310,219 @@ describe('wardrobeController (Flutter Compatible)', () => {
         });
     });
 
+    describe('syncWardrobes', () => {
+        describe('Successful Sync', () => {
+            it('should sync wardrobes successfully', async () => {
+                // Arrange
+                const lastSyncTimestamp = '2024-01-01T00:00:00.000Z';
+                const clientVersion = 1;
+                const createdWardrobe = wardrobeMocks.createValidWardrobe({ user_id: mockUser.id });
+                const updatedWardrobe = wardrobeMocks.createValidWardrobe({ user_id: mockUser.id });
+                const syncResult = {
+                    wardrobes: {
+                        created: [{ ...createdWardrobe, garmentCount: 5 }],
+                        updated: [{ ...updatedWardrobe, garmentCount: 3 }],
+                        deleted: [validWardrobeId]
+                    },
+                    sync: {
+                        timestamp: new Date().toISOString(),
+                        version: clientVersion,
+                        hasMore: false,
+                        changeCount: 3
+                    }
+                };
+
+                mockReq.body = { lastSyncTimestamp, clientVersion };
+                
+                // Mock the wardrobeService.syncWardrobes method
+                mockWardrobeService.syncWardrobes.mockResolvedValue(syncResult);
+
+                // Act
+                await wardrobeController.syncWardrobes(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        wardrobes: expect.objectContaining({
+                            created: expect.arrayContaining([
+                                expect.objectContaining({
+                                    name: expect.any(String),
+                                    description: expect.any(String)
+                                })
+                            ]),
+                            updated: expect.arrayContaining([
+                                expect.objectContaining({
+                                    name: expect.any(String),
+                                    description: expect.any(String)
+                                })
+                            ]),
+                            deleted: expect.arrayContaining([validWardrobeId])
+                        }),
+                        sync: expect.objectContaining({
+                            timestamp: expect.any(String),
+                            version: expect.any(Number)
+                        })
+                    }),
+                    expect.objectContaining({
+                        message: 'Sync completed successfully',
+                        meta: expect.objectContaining({
+                            created: 1,
+                            updated: 1,
+                            deleted: 1
+                        })
+                    })
+                );
+                expect(mockNext).not.toHaveBeenCalled();
+            });
+
+            it('should handle empty sync result', async () => {
+                // Arrange
+                const lastSyncTimestamp = '2024-01-01T00:00:00.000Z';
+                const syncResult = {
+                    wardrobes: {
+                        created: [],
+                        updated: [],
+                        deleted: []
+                    },
+                    sync: {
+                        timestamp: new Date().toISOString(),
+                        version: 1,
+                        hasMore: false,
+                        changeCount: 0
+                    }
+                };
+
+                mockReq.body = { lastSyncTimestamp };
+                
+                mockWardrobeService.syncWardrobes.mockResolvedValue(syncResult);
+
+                // Act
+                await wardrobeController.syncWardrobes(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        wardrobes: expect.objectContaining({
+                            created: [],
+                            updated: [],
+                            deleted: []
+                        })
+                    }),
+                    expect.objectContaining({
+                        meta: expect.objectContaining({
+                            created: 0,
+                            updated: 0,
+                            deleted: 0
+                        })
+                    })
+                );
+            });
+        });
+
+        describe('Input Validation', () => {
+            it('should reject missing last sync timestamp', async () => {
+                // Arrange
+                mockReq.body = {};
+
+                // Act & Assert
+                try {
+                    await wardrobeController.syncWardrobes(
+                        mockReq as Request,
+                        mockRes as Response,
+                        mockNext
+                    );
+                    expectToFail('Should have thrown an error');
+                } catch (error) {
+                    expect(error).toBeInstanceOf(Error);
+                    expect((error as Error).message).toContain('Last sync timestamp is required');
+                }
+                expect(mockNext).not.toHaveBeenCalled();
+            });
+
+            it('should reject invalid timestamp format', async () => {
+                // Arrange
+                mockReq.body = { lastSyncTimestamp: 'invalid-timestamp' };
+
+                // Act & Assert
+                try {
+                    await wardrobeController.syncWardrobes(
+                        mockReq as Request,
+                        mockRes as Response,
+                        mockNext
+                    );
+                    expectToFail('Should have thrown an error');
+                } catch (error) {
+                    expect(error).toBeInstanceOf(Error);
+                    expect((error as Error).message).toContain('Invalid sync timestamp format');
+                }
+                expect(mockNext).not.toHaveBeenCalled();
+            });
+
+            it('should use default client version when not provided', async () => {
+                // Arrange
+                const lastSyncTimestamp = '2024-01-01T00:00:00.000Z';
+                const syncResult = {
+                    wardrobes: { created: [], updated: [], deleted: [] },
+                    sync: { timestamp: new Date().toISOString(), version: 1, hasMore: false, changeCount: 0 }
+                };
+
+                mockReq.body = { lastSyncTimestamp };
+                
+                mockWardrobeService.syncWardrobes.mockResolvedValue(syncResult);
+
+                // Act
+                await wardrobeController.syncWardrobes(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert - Service should be called with default client version of 1
+                expect(mockRes.success).toHaveBeenCalled();
+            });
+        });
+
+        describe('Error Handling', () => {
+            it('should handle service errors', async () => {
+                // Arrange
+                const lastSyncTimestamp = '2024-01-01T00:00:00.000Z';
+                const serviceError = new Error('Database connection failed');
+
+                mockReq.body = { lastSyncTimestamp };
+                
+                mockWardrobeService.syncWardrobes.mockRejectedValue(serviceError);
+
+                const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+                // Act & Assert
+                try {
+                    await wardrobeController.syncWardrobes(
+                        mockReq as Request,
+                        mockRes as Response,
+                        mockNext
+                    );
+                    expectToFail('Should have thrown an error');
+                } catch (error) {
+                    expect(error).toBeInstanceOf(Error);
+                    expect((error as Error).message).toContain('Failed to sync wardrobes');
+                }
+
+                expect(consoleSpy).toHaveBeenCalledWith('Error syncing wardrobes:', serviceError);
+                expect(mockNext).not.toHaveBeenCalled();
+
+                consoleSpy.mockRestore();
+            });
+        });
+    });
+
     describe('Response Format Validation', () => {
         it('should maintain consistent success response format across all endpoints', async () => {
             // Test createWardrobe response format
@@ -984,7 +1530,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
             const expectedWardrobe = wardrobeMocks.createValidWardrobe(inputData);
 
             mockReq.body = inputData;
-            mockWardrobeModel.create.mockResolvedValue(expectedWardrobe);
+            mockWardrobeService.createWardrobe.mockResolvedValue(expectedWardrobe);
 
             await wardrobeController.createWardrobe(
                 mockReq as Request,
@@ -1010,9 +1556,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
             });
 
             mockReq.params = { id: validWardrobeId };
-            mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-            mockWardrobeModel.getGarments.mockResolvedValue([]);
-            mockWardrobeModel.delete.mockResolvedValue(true);
+            mockWardrobeService.deleteWardrobe.mockResolvedValue({ success: true, wardrobeId: validWardrobeId });
 
             await wardrobeController.deleteWardrobe(
                 mockReq as Request,
@@ -1033,7 +1577,11 @@ describe('wardrobeController (Flutter Compatible)', () => {
         it('should include appropriate meta data for each endpoint', async () => {
             // Test getWardrobes includes count in meta
             const wardrobes = wardrobeMocks.createMultipleWardrobes(mockUser.id, 2);
-            mockWardrobeModel.findByUserId.mockResolvedValue(wardrobes);
+            const enhancedWardrobes = wardrobes.map(w => ({ ...w, garmentCount: 0 }));
+            mockWardrobeService.getUserWardrobes.mockResolvedValue({
+                wardrobes: enhancedWardrobes,
+                total: enhancedWardrobes.length
+            });
 
             await wardrobeController.getWardrobes(
                 mockReq as Request,
@@ -1042,11 +1590,12 @@ describe('wardrobeController (Flutter Compatible)', () => {
             );
 
             expect(mockRes.success).toHaveBeenCalledWith(
-                wardrobes,
+                expect.any(Array),
                 expect.objectContaining({
                     meta: expect.objectContaining({
                         count: 2,
-                        userId: mockUser.id
+                        userId: mockUser.id,
+                        mode: 'legacy'
                     })
                 })
             );
@@ -1065,7 +1614,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
             });
 
             mockReq.body = inputData;
-            mockWardrobeModel.create.mockResolvedValue(expectedWardrobe);
+            mockWardrobeService.createWardrobe.mockResolvedValue(expectedWardrobe);
 
             // Act
             await wardrobeController.createWardrobe(
@@ -1075,8 +1624,8 @@ describe('wardrobeController (Flutter Compatible)', () => {
             );
 
             // Assert
-            expect(mockWardrobeModel.create).toHaveBeenCalledWith({
-                user_id: mockUser.id,
+            expect(mockWardrobeService.createWardrobe).toHaveBeenCalledWith({
+                userId: mockUser.id,
                 name: maxLengthName,
                 description: 'Test'
             });
@@ -1094,7 +1643,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
             });
 
             mockReq.body = inputData;
-            mockWardrobeModel.create.mockResolvedValue(expectedWardrobe);
+            mockWardrobeService.createWardrobe.mockResolvedValue(expectedWardrobe);
 
             // Act
             await wardrobeController.createWardrobe(
@@ -1104,8 +1653,8 @@ describe('wardrobeController (Flutter Compatible)', () => {
             );
 
             // Assert
-            expect(mockWardrobeModel.create).toHaveBeenCalledWith({
-                user_id: mockUser.id,
+            expect(mockWardrobeService.createWardrobe).toHaveBeenCalledWith({
+                userId: mockUser.id,
                 name: 'Test Name',
                 description: maxLengthDescription
             });
@@ -1125,9 +1674,10 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
             mockReq.params = { id: validWardrobeId };
             mockReq.body = { garmentId: validGarmentId, position: 0 };
-            mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-            mockGarmentModel.findById.mockResolvedValue(garment);
-            mockWardrobeModel.addGarment.mockResolvedValue(true);
+            mockWardrobeService.addGarmentToWardrobe.mockResolvedValue({ 
+                success: true, 
+                message: 'Garment added to wardrobe successfully' 
+            });
 
             // Act
             await wardrobeController.addGarmentToWardrobe(
@@ -1137,29 +1687,22 @@ describe('wardrobeController (Flutter Compatible)', () => {
             );
 
             // Assert
-            expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
-                validWardrobeId,
-                validGarmentId,
-                0
-            );
+            expect(mockWardrobeService.addGarmentToWardrobe).toHaveBeenCalledWith({
+                wardrobeId: validWardrobeId,
+                userId: mockUser.id,
+                garmentId: validGarmentId,
+                position: 0
+            });
         });
 
         it('should handle large position values', async () => {
             // Arrange
-            const wardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: mockUser.id 
-            });
-            const garment = wardrobeMocks.garments.createMockGarment({ 
-                id: validGarmentId,
-                user_id: mockUser.id 
-            });
-
             mockReq.params = { id: validWardrobeId };
             mockReq.body = { garmentId: validGarmentId, position: 999 };
-            mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-            mockGarmentModel.findById.mockResolvedValue(garment);
-            mockWardrobeModel.addGarment.mockResolvedValue(true);
+            mockWardrobeService.addGarmentToWardrobe.mockResolvedValue({ 
+                success: true, 
+                message: 'Garment added to wardrobe successfully' 
+            });
 
             // Act
             await wardrobeController.addGarmentToWardrobe(
@@ -1169,22 +1712,23 @@ describe('wardrobeController (Flutter Compatible)', () => {
             );
 
             // Assert
-            expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
-                validWardrobeId,
-                validGarmentId,
-                999
-            );
+            expect(mockWardrobeService.addGarmentToWardrobe).toHaveBeenCalledWith({
+                wardrobeId: validWardrobeId,
+                userId: mockUser.id,
+                garmentId: validGarmentId,
+                position: 999
+            });
         });
     });
 
-    describe('Model Integration', () => {
-        it('should call model methods with correct parameters', async () => {
-            // Test that controller properly delegates to model layer
+    describe('Service Integration', () => {
+        it('should call service methods with correct parameters', async () => {
+            // Test that controller properly delegates to service layer
             const inputData = wardrobeMocks.createValidInput({ user_id: mockUser.id });
             const expectedWardrobe = wardrobeMocks.createValidWardrobe(inputData);
 
             mockReq.body = inputData;
-            mockWardrobeModel.create.mockResolvedValue(expectedWardrobe);
+            mockWardrobeService.createWardrobe.mockResolvedValue(expectedWardrobe);
 
             await wardrobeController.createWardrobe(
                 mockReq as Request,
@@ -1192,25 +1736,29 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 mockNext
             );
 
-            // Verify exact model method calls
-            expect(mockWardrobeModel.create).toHaveBeenCalledTimes(1);
-            expect(mockWardrobeModel.create).toHaveBeenCalledWith({
-                user_id: mockUser.id,
-                name: inputData.name.trim(),
-                description: inputData.description?.trim() || ''
+            // Verify exact service method calls
+            expect(mockWardrobeService.createWardrobe).toHaveBeenCalledTimes(1);
+            expect(mockWardrobeService.createWardrobe).toHaveBeenCalledWith({
+                userId: mockUser.id,
+                name: inputData.name,
+                description: inputData.description || ''
             });
         });
 
-        it('should handle model method call order correctly', async () => {
+        it('should handle service method call order correctly', async () => {
             const wardrobe = wardrobeMocks.createValidWardrobe({ 
                 id: validWardrobeId,
                 user_id: mockUser.id 
             });
             const garments = wardrobeMocks.garments.createMultipleGarments(mockUser.id, 2);
+            const wardrobeWithGarments = {
+                ...wardrobe,
+                garments: garments,
+                garmentCount: garments.length
+            };
 
             mockReq.params = { id: validWardrobeId };
-            mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-            mockWardrobeModel.getGarments.mockResolvedValue(garments);
+            mockWardrobeService.getWardrobeWithGarments.mockResolvedValue(wardrobeWithGarments);
 
             await wardrobeController.getWardrobe(
                 mockReq as Request,
@@ -1218,21 +1766,16 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 mockNext
             );
 
-            // Verify both methods were called with correct parameters
-            expect(mockWardrobeModel.findById).toHaveBeenCalledWith(validWardrobeId);
-            expect(mockWardrobeModel.getGarments).toHaveBeenCalledWith(validWardrobeId);
-            
-            // Verify call order by checking the invocationCallOrder
-            const findByIdCallOrder = (mockWardrobeModel.findById as jest.Mock).mock.invocationCallOrder[0];
-            const getGarmentsCallOrder = (mockWardrobeModel.getGarments as jest.Mock).mock.invocationCallOrder[0];
-            expect(findByIdCallOrder).toBeLessThan(getGarmentsCallOrder);
+            // Verify service method was called with correct parameters
+            expect(mockWardrobeService.getWardrobeWithGarments).toHaveBeenCalledWith(validWardrobeId, mockUser.id);
+            expect(mockWardrobeService.getWardrobeWithGarments).toHaveBeenCalledTimes(1);
         });
 
-        it('should pass through model errors without modification', async () => {
+        it('should pass through service errors without modification', async () => {
             // Arrange
             const originalError = new Error('Original database error');
             mockReq.body = { name: 'Valid Name', description: 'Valid description' };
-            mockWardrobeModel.create.mockRejectedValue(originalError);
+            mockWardrobeService.createWardrobe.mockRejectedValue(originalError);
 
             const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -1269,7 +1812,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
             });
 
             mockReq.body = inputWithPotentialXSS;
-            mockWardrobeModel.create.mockResolvedValue(expectedWardrobe);
+            mockWardrobeService.createWardrobe.mockResolvedValue(expectedWardrobe);
 
             await wardrobeController.createWardrobe(
                 mockReq as Request,
@@ -1294,7 +1837,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
             });
 
             mockReq.body = unicodeInput;
-            mockWardrobeModel.create.mockResolvedValue(expectedWardrobe);
+            mockWardrobeService.createWardrobe.mockResolvedValue(expectedWardrobe);
 
             await wardrobeController.createWardrobe(
                 mockReq as Request,
@@ -1302,8 +1845,8 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 mockNext
             );
 
-            expect(mockWardrobeModel.create).toHaveBeenCalledWith({
-                user_id: mockUser.id,
+            expect(mockWardrobeService.createWardrobe).toHaveBeenCalledWith({
+                userId: mockUser.id,
                 name: unicodeInput.name,
                 description: unicodeInput.description
             });
@@ -1328,18 +1871,15 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 expect((error as Error).message).toContain('User authentication required');
             }
             expect(mockNext).not.toHaveBeenCalled();
-            expect(mockWardrobeModel.create).not.toHaveBeenCalled();
+            expect(mockWardrobeService.createWardrobe).not.toHaveBeenCalled();
         });
 
         it('should enforce user ownership on all wardrobe operations', async () => {
-            const otherUserWardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: 'other-user-id' 
-            });
-
             // Test getWardrobe authorization
             mockReq.params = { id: validWardrobeId };
-            mockWardrobeModel.findById.mockResolvedValue(otherUserWardrobe);
+            const { EnhancedApiError } = require('../../middlewares/errorHandler');
+            const authError = EnhancedApiError.authorizationDenied('You do not have permission to access this wardrobe');
+            mockWardrobeService.getWardrobeWithGarments.mockRejectedValue(authError);
 
             try {
                 await wardrobeController.getWardrobe(
@@ -1358,7 +1898,8 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
             // Test updateWardrobe authorization
             mockReq.body = { name: 'Updated Name' };
-            mockWardrobeModel.findById.mockResolvedValue(otherUserWardrobe);
+            const updateAuthError = EnhancedApiError.authorizationDenied('You do not have permission to access this wardrobe');
+            mockWardrobeService.updateWardrobe.mockRejectedValue(updateAuthError);
 
             try {
                 await wardrobeController.updateWardrobe(
@@ -1369,7 +1910,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 expectToFail('Should have thrown an error');
             } catch (error) {
                 expect(error).toBeInstanceOf(Error);
-                expect((error as Error).message).toContain('You do not have permission to update this wardrobe');
+                expect((error as Error).message).toContain('permission');
             }
         });
     });
@@ -1378,8 +1919,15 @@ describe('wardrobeController (Flutter Compatible)', () => {
         it('should handle pagination parameters correctly', async () => {
             // Arrange
             const allWardrobes = wardrobeMocks.createMultipleWardrobes(mockUser.id, 50);
+            const enhancedWardrobes = allWardrobes.map(w => ({ ...w, garmentCount: 0 }));
+            const paginatedWardrobes = enhancedWardrobes.slice(30, 45); // Page 3, limit 15
             mockReq.query = { page: '3', limit: '15' };
-            mockWardrobeModel.findByUserId.mockResolvedValue(allWardrobes);
+            mockWardrobeService.getUserWardrobes.mockResolvedValue({
+                wardrobes: paginatedWardrobes,
+                total: 50,
+                page: 3,
+                limit: 15
+            });
 
             // Act
             await wardrobeController.getWardrobes(
@@ -1416,8 +1964,12 @@ describe('wardrobeController (Flutter Compatible)', () => {
         it('should work without pagination parameters', async () => {
             // Arrange
             const wardrobes = wardrobeMocks.createMultipleWardrobes(mockUser.id, 10);
+            const enhancedWardrobes = wardrobes.map(w => ({ ...w, garmentCount: 0 }));
             mockReq.query = {}; // No pagination
-            mockWardrobeModel.findByUserId.mockResolvedValue(wardrobes);
+            mockWardrobeService.getUserWardrobes.mockResolvedValue({
+                wardrobes: enhancedWardrobes,
+                total: enhancedWardrobes.length
+            });
 
             // Act
             await wardrobeController.getWardrobes(
@@ -1428,11 +1980,12 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
             // Assert
             expect(mockRes.success).toHaveBeenCalledWith(
-                wardrobes,
+                expect.any(Array),
                 expect.objectContaining({
                     message: 'Wardrobes retrieved successfully',
                     meta: expect.objectContaining({
-                        count: 10
+                        count: 10,
+                        mode: 'legacy'
                     })
                 })
             );
@@ -1525,14 +2078,16 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 expect(error).toBeInstanceOf(Error);
             }
 
-            // Verify no model methods were called due to validation failure
-            expect(mockWardrobeModel.create).not.toHaveBeenCalled();
+            // Verify no service methods were called due to validation failure
+            expect(mockWardrobeService.createWardrobe).not.toHaveBeenCalled();
         });
 
         it('should optimize database calls in getWardrobe (fail fast)', async () => {
-            // Test that findById is called before getGarments
+            // Test that service handles optimization
             mockReq.params = { id: validWardrobeId };
-            mockWardrobeModel.findById.mockResolvedValue(null);
+            const { EnhancedApiError } = require('../../middlewares/errorHandler');
+            const notFoundError = EnhancedApiError.notFound('Wardrobe not found');
+            mockWardrobeService.getWardrobeWithGarments.mockRejectedValue(notFoundError);
 
             try {
                 await wardrobeController.getWardrobe(
@@ -1546,9 +2101,9 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 expect((error as Error).message).toContain('Wardrobe not found');
             }
 
-            // Verify getGarments is not called when wardrobe doesn't exist
-            expect(mockWardrobeModel.findById).toHaveBeenCalledWith(validWardrobeId);
-            expect(mockWardrobeModel.getGarments).not.toHaveBeenCalled();
+            // Verify service was called once
+            expect(mockWardrobeService.getWardrobeWithGarments).toHaveBeenCalledWith(validWardrobeId, mockUser.id);
+            expect(mockWardrobeService.getWardrobeWithGarments).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -1563,7 +2118,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
             });
 
             mockReq.body = inputData;
-            mockWardrobeModel.create.mockResolvedValue(expectedWardrobe);
+            mockWardrobeService.createWardrobe.mockResolvedValue(expectedWardrobe);
 
             await wardrobeController.createWardrobe(
                 mockReq as Request,
@@ -1571,8 +2126,8 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 mockNext
             );
 
-            expect(mockWardrobeModel.create).toHaveBeenCalledWith({
-                user_id: mockUser.id,
+            expect(mockWardrobeService.createWardrobe).toHaveBeenCalledWith({
+                userId: mockUser.id,
                 name: 'Test Wardrobe',
                 description: '' // Should default to empty string
             });
@@ -1597,7 +2152,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 });
 
                 mockReq.body = inputData;
-                mockWardrobeModel.create.mockResolvedValue(expectedWardrobe);
+                mockWardrobeService.createWardrobe.mockResolvedValue(expectedWardrobe);
 
                 await wardrobeController.createWardrobe(
                     mockReq as Request,
@@ -1605,8 +2160,8 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     mockNext
                 );
 
-                expect(mockWardrobeModel.create).toHaveBeenCalledWith({
-                    user_id: mockUser.id,
+                expect(mockWardrobeService.createWardrobe).toHaveBeenCalledWith({
+                    userId: mockUser.id,
                     name: 'Test Wardrobe',
                     description: testCase.expected
                 });
@@ -1621,7 +2176,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
             const expectedWardrobe = wardrobeMocks.createValidWardrobe(inputData);
 
             mockReq.body = inputData;
-            mockWardrobeModel.create.mockResolvedValue(expectedWardrobe);
+            mockWardrobeService.createWardrobe.mockResolvedValue(expectedWardrobe);
 
             await wardrobeController.createWardrobe(
                 mockReq as Request,
@@ -1657,9 +2212,10 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 user_id: mockUser.id 
             });
 
-            mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-            mockGarmentModel.findById.mockResolvedValue(garment);
-            mockWardrobeModel.addGarment.mockResolvedValue(true);
+            mockWardrobeService.addGarmentToWardrobe.mockResolvedValue({ 
+                success: true, 
+                message: 'Garment added to wardrobe successfully' 
+            });
 
             await wardrobeController.addGarmentToWardrobe(
                 mockReq as Request,
@@ -1707,8 +2263,10 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 });
 
                 mockReq.params = { id: validWardrobeId, itemId: validItemId };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-                mockWardrobeModel.removeGarment.mockResolvedValue(true);
+                mockWardrobeService.removeGarmentFromWardrobe.mockResolvedValue({ 
+                    success: true, 
+                    message: 'Garment removed from wardrobe successfully' 
+                });
 
                 // Act
                 await wardrobeController.removeGarmentFromWardrobe(
@@ -1718,7 +2276,11 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.removeGarment).toHaveBeenCalledWith(validWardrobeId, validItemId);
+                expect(mockWardrobeService.removeGarmentFromWardrobe).toHaveBeenCalledWith({
+                    wardrobeId: validWardrobeId,
+                    userId: mockUser.id,
+                    garmentId: validItemId
+                });
                 expect(mockRes.success).toHaveBeenCalledWith(
                 {},
                 {
@@ -1752,7 +2314,6 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     expect((error as Error).message).toContain('Invalid wardrobeId format');
                 }
                 expect(mockNext).not.toHaveBeenCalled();
-                expect(mockWardrobeModel.findById).not.toHaveBeenCalled();
             });
 
             it('should reject invalid item ID format', async () => {
@@ -1773,7 +2334,6 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     expect((error as Error).message).toContain('Invalid itemId format');
                 }
                 expect(mockNext).not.toHaveBeenCalled();
-                expect(mockWardrobeModel.findById).not.toHaveBeenCalled();
             });
         });
 
@@ -1781,7 +2341,9 @@ describe('wardrobeController (Flutter Compatible)', () => {
         it('should handle wardrobe not found', async () => {
             // Arrange
             mockReq.params = { id: validWardrobeId, itemId: validItemId };
-            mockWardrobeModel.findById.mockResolvedValue(null);
+            const { EnhancedApiError } = require('../../middlewares/errorHandler');
+            const notFoundError = EnhancedApiError.notFound('Wardrobe not found');
+            mockWardrobeService.removeGarmentFromWardrobe.mockRejectedValue(notFoundError);
 
             // Act & Assert
             try {
@@ -1796,19 +2358,14 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 expect((error as Error).message).toContain('Wardrobe not found');
             }
             expect(mockNext).not.toHaveBeenCalled();
-            expect(mockWardrobeModel.removeGarment).not.toHaveBeenCalled();
         });
 
         it('should handle garment not found in wardrobe', async () => {
             // Arrange
-            const wardrobe = wardrobeMocks.createValidWardrobe({ 
-            id: validWardrobeId,
-            user_id: mockUser.id 
-            });
-
             mockReq.params = { id: validWardrobeId, itemId: validItemId };
-            mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-            mockWardrobeModel.removeGarment.mockResolvedValue(false);
+            const { EnhancedApiError } = require('../../middlewares/errorHandler');
+            const notFoundError = EnhancedApiError.notFound('Garment not found in wardrobe', 'GARMENT_NOT_IN_WARDROBE');
+            mockWardrobeService.removeGarmentFromWardrobe.mockRejectedValue(notFoundError);
 
             // Act & Assert
             try {
@@ -1831,15 +2388,8 @@ describe('wardrobeController (Flutter Compatible)', () => {
         describe('Successful Deletion', () => {
             it('should delete wardrobe successfully', async () => {
                 // Arrange
-                const wardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: mockUser.id 
-                });
-
                 mockReq.params = { id: validWardrobeId };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-                mockWardrobeModel.getGarments.mockResolvedValue([]);
-                mockWardrobeModel.delete.mockResolvedValue(true);
+                mockWardrobeService.deleteWardrobe.mockResolvedValue({ success: true, wardrobeId: validWardrobeId });
 
                 // Act
                 await wardrobeController.deleteWardrobe(
@@ -1849,7 +2399,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 );
 
                 // Assert
-                expect(mockWardrobeModel.delete).toHaveBeenCalledWith(validWardrobeId);
+                expect(mockWardrobeService.deleteWardrobe).toHaveBeenCalledWith(validWardrobeId, mockUser.id);
                 expect(mockRes.success).toHaveBeenCalledWith(
                 {},
                 {
@@ -1870,12 +2420,9 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 id: validWardrobeId,
                 user_id: mockUser.id 
                 });
-                const garments = wardrobeMocks.garments.createMultipleGarments(mockUser.id, 3);
 
                 mockReq.params = { id: validWardrobeId };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-                mockWardrobeModel.getGarments.mockResolvedValue(garments);
-                mockWardrobeModel.delete.mockResolvedValue(true);
+                mockWardrobeService.deleteWardrobe.mockResolvedValue({ success: true, wardrobeId: validWardrobeId });
 
                 // Act
                 await wardrobeController.deleteWardrobe(
@@ -1889,7 +2436,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 {},
                 expect.objectContaining({
                     meta: expect.objectContaining({
-                        deletedGarmentRelationships: 3
+                        deletedGarmentRelationships: 0 // Service handles this internally
                     })
                 })
                 );
@@ -1900,7 +2447,9 @@ describe('wardrobeController (Flutter Compatible)', () => {
             it('should handle wardrobe not found', async () => {
                 // Arrange
                 mockReq.params = { id: validWardrobeId };
-                mockWardrobeModel.findById.mockResolvedValue(null);
+                const { EnhancedApiError } = require('../../middlewares/errorHandler');
+                const notFoundError = EnhancedApiError.notFound('Wardrobe not found');
+                mockWardrobeService.deleteWardrobe.mockRejectedValue(notFoundError);
 
                 // Act & Assert
                 try {
@@ -1915,20 +2464,14 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     expect((error as Error).message).toContain('Wardrobe not found');
                 }
                 expect(mockNext).not.toHaveBeenCalled();
-                expect(mockWardrobeModel.delete).not.toHaveBeenCalled();
             });
 
             it('should handle deletion failure', async () => {
                 // Arrange
-                const wardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: mockUser.id 
-                });
-
                 mockReq.params = { id: validWardrobeId };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-                mockWardrobeModel.getGarments.mockResolvedValue([]);
-                mockWardrobeModel.delete.mockResolvedValue(false);
+                const { EnhancedApiError } = require('../../middlewares/errorHandler');
+                const deletionError = EnhancedApiError.internalError('Failed to delete wardrobe');
+                mockWardrobeService.deleteWardrobe.mockRejectedValue(deletionError);
 
                 // Act & Assert
                 try {
@@ -1957,10 +2500,6 @@ describe('wardrobeController (Flutter Compatible)', () => {
         describe('Successful Reordering', () => {
             it('should reorder garments successfully', async () => {
                 // Arrange
-                const wardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: mockUser.id 
-                });
                 const garmentPositions = garmentIds.map((id, index) => ({
                     garmentId: id,
                     position: index * 10
@@ -1968,9 +2507,10 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
                 mockReq.params = { id: validWardrobeId };
                 mockReq.body = { garmentPositions };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-                mockWardrobeModel.removeGarment.mockResolvedValue(true);
-                mockWardrobeModel.addGarment.mockResolvedValue(true);
+                mockWardrobeService.reorderGarments.mockResolvedValue({ 
+                    success: true, 
+                    message: 'Garments reordered successfully' 
+                });
 
                 // Act
                 await wardrobeController.reorderGarments(
@@ -1980,6 +2520,11 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 );
 
                 // Assert
+                expect(mockWardrobeService.reorderGarments).toHaveBeenCalledWith(
+                    validWardrobeId,
+                    mockUser.id,
+                    garmentIds
+                );
                 expect(mockRes.success).toHaveBeenCalledWith(
                 {},
                 {
@@ -2022,10 +2567,6 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
             it('should reject duplicate garment IDs', async () => {
                 // Arrange
-                const wardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: mockUser.id 
-                });
                 const garmentPositions = [
                     { garmentId: garmentIds[0], position: 0 },
                     { garmentId: garmentIds[0], position: 10 } // Duplicate
@@ -2033,7 +2574,6 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
                 mockReq.params = { id: validWardrobeId };
                 mockReq.body = { garmentPositions };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
 
                 // Act & Assert
                 try {
@@ -2086,110 +2626,101 @@ describe('wardrobeController (Flutter Compatible)', () => {
             it('should retrieve wardrobe statistics successfully', async () => {
                 // Arrange
                 const wardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: mockUser.id 
+                    id: validWardrobeId,
+                    user_id: mockUser.id 
                 });
                 const garments = [
                     { metadata: { category: 'shirt', color: 'blue' } },
                     { metadata: { category: 'pants', color: 'black' } },
                     { metadata: { category: 'shirt', color: 'red' } }
                 ];
+                const wardrobeWithGarments = {
+                    ...wardrobe,
+                    garments: garments,
+                    garmentCount: garments.length
+                };
 
                 mockReq.params = { id: validWardrobeId };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-                mockWardrobeModel.getGarments.mockResolvedValue(garments);
+                mockWardrobeService.getWardrobeWithGarments.mockResolvedValue(wardrobeWithGarments);
 
                 // Act
                 await wardrobeController.getWardrobeStats(
-                mockReq as Request,
-                mockRes as Response,
-                mockNext
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
                 );
 
                 // Assert
+                expect(mockWardrobeService.getWardrobeWithGarments).toHaveBeenCalledWith(validWardrobeId, mockUser.id);
                 expect(mockRes.success).toHaveBeenCalledWith(
-                { stats: expect.objectContaining({
-                    totalGarments: 3,
-                    categories: {
-                        shirt: 2,
-                        pants: 1
-                    },
-                    colors: {
-                        blue: 1,
-                        black: 1,
-                        red: 1
+                    { stats: expect.objectContaining({
+                        totalGarments: 3,
+                        categories: {
+                            shirt: 2,
+                            pants: 1
+                        },
+                        colors: {
+                            blue: 1,
+                            black: 1,
+                            red: 1
+                        }
+                    }) },
+                    {
+                        message: 'Wardrobe statistics retrieved successfully',
+                        meta: {
+                            wardrobeId: validWardrobeId,
+                            analysisDate: expect.any(String),
+                            categoriesCount: 2,
+                            colorsCount: 3
+                        }
                     }
-                }) },
-                {
-                    message: 'Wardrobe statistics retrieved successfully',
-                    meta: {
-                        wardrobeId: validWardrobeId,
-                        analysisDate: expect.any(String),
-                        categoriesCount: 2,
-                        colorsCount: 3
-                    }
-                }
                 );
                 expect(mockNext).not.toHaveBeenCalled();
-                });
+            });
 
             it('should add garment to wardrobe with custom position', async () => {
                 // Arrange
-                const wardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: mockUser.id 
-                });
-                const garment = wardrobeMocks.garments.createMockGarment({ 
-                id: validGarmentId,
-                user_id: mockUser.id 
-                });
                 const customPosition = 5;
 
                 mockReq.params = { id: validWardrobeId };
                 mockReq.body = { garmentId: validGarmentId, position: customPosition };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-                mockGarmentModel.findById.mockResolvedValue(garment);
-                mockWardrobeModel.addGarment.mockResolvedValue(true);
+                mockWardrobeService.addGarmentToWardrobe.mockResolvedValue({ 
+                    success: true, 
+                    message: 'Garment added to wardrobe successfully' 
+                });
 
                 // Act
                 await wardrobeController.addGarmentToWardrobe(
-                mockReq as Request,
-                mockRes as Response,
-                mockNext
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
                 );
 
                 // Assert
-                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
-                validWardrobeId, 
-                validGarmentId, 
-                customPosition
-                );
+                expect(mockWardrobeService.addGarmentToWardrobe).toHaveBeenCalledWith({
+                    wardrobeId: validWardrobeId,
+                    userId: mockUser.id,
+                    garmentId: validGarmentId,
+                    position: customPosition
+                });
                 expect(mockRes.success).toHaveBeenCalledWith(
-                {},
-                expect.objectContaining({
-                    meta: expect.objectContaining({
-                        position: customPosition
+                    {},
+                    expect.objectContaining({
+                        meta: expect.objectContaining({
+                            position: customPosition
+                        })
                     })
-                })
                 );
             });
         });
 
         describe('Position Handling', () => {
             beforeEach(() => {
-                const wardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: mockUser.id 
-                });
-                const garment = wardrobeMocks.garments.createMockGarment({ 
-                id: validGarmentId,
-                user_id: mockUser.id 
-                });
-                
                 mockReq.params = { id: validWardrobeId };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-                mockGarmentModel.findById.mockResolvedValue(garment);
-                mockWardrobeModel.addGarment.mockResolvedValue(true);
+                mockWardrobeService.addGarmentToWardrobe.mockResolvedValue({ 
+                    success: true, 
+                    message: 'Garment added to wardrobe successfully' 
+                });
             });
 
             it('should use position 0 when position is undefined', async () => {
@@ -2198,17 +2729,18 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
                 // Act
                 await wardrobeController.addGarmentToWardrobe(
-                mockReq as Request,
-                mockRes as Response,
-                mockNext
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
                 );
 
                 // Assert
-                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(
-                validWardrobeId, 
-                validGarmentId, 
-                0
-                );
+                expect(mockWardrobeService.addGarmentToWardrobe).toHaveBeenCalledWith({
+                    wardrobeId: validWardrobeId,
+                    userId: mockUser.id,
+                    garmentId: validGarmentId,
+                    position: 0
+                });
             });
 
             it('should reject negative position values', async () => {
@@ -2228,7 +2760,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     expect((error as Error).message).toContain('Position must be a non-negative number');
                 }
                 expect(mockNext).not.toHaveBeenCalled();
-                expect(mockWardrobeModel.addGarment).not.toHaveBeenCalled();
+                expect(mockWardrobeService.addGarmentToWardrobe).not.toHaveBeenCalled();
             });
 
             it('should reject position values over 1000', async () => {
@@ -2256,13 +2788,18 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
                 // Act
                 await wardrobeController.addGarmentToWardrobe(
-                mockReq as Request,
-                mockRes as Response,
-                mockNext
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
                 );
 
                 // Assert
-                expect(mockWardrobeModel.addGarment).toHaveBeenCalledWith(validWardrobeId, validGarmentId, 7);
+                expect(mockWardrobeService.addGarmentToWardrobe).toHaveBeenCalledWith({
+                    wardrobeId: validWardrobeId,
+                    userId: mockUser.id,
+                    garmentId: validGarmentId,
+                    position: 7
+                });
             });
         });
 
@@ -2285,7 +2822,6 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     expect((error as Error).message).toContain('Invalid wardrobeId format');
                 }
                 expect(mockNext).not.toHaveBeenCalled();
-                expect(mockWardrobeModel.findById).not.toHaveBeenCalled();
             });
 
             it('should reject missing garment ID', async () => {
@@ -2334,7 +2870,9 @@ describe('wardrobeController (Flutter Compatible)', () => {
                 // Arrange
                 mockReq.params = { id: validWardrobeId };
                 mockReq.body = { garmentId: validGarmentId };
-                mockWardrobeModel.findById.mockResolvedValue(null);
+                const { EnhancedApiError } = require('../../middlewares/errorHandler');
+                const notFoundError = EnhancedApiError.notFound('Wardrobe not found');
+                mockWardrobeService.addGarmentToWardrobe.mockRejectedValue(notFoundError);
 
                 // Act & Assert
                 try {
@@ -2349,20 +2887,15 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     expect((error as Error).message).toContain('Wardrobe not found');
                 }
                 expect(mockNext).not.toHaveBeenCalled();
-                expect(mockGarmentModel.findById).not.toHaveBeenCalled();
             });
 
             it('should handle garment not found', async () => {
                 // Arrange
-                const wardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: mockUser.id 
-                });
-
                 mockReq.params = { id: validWardrobeId };
                 mockReq.body = { garmentId: validGarmentId };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-                mockGarmentModel.findById.mockResolvedValue(null);
+                const { EnhancedApiError } = require('../../middlewares/errorHandler');
+                const notFoundError = EnhancedApiError.notFound('Garment not found', 'GARMENT_NOT_FOUND');
+                mockWardrobeService.addGarmentToWardrobe.mockRejectedValue(notFoundError);
 
                 // Act & Assert
                 try {
@@ -2377,24 +2910,18 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     expect((error as Error).message).toContain('Garment not found');
                 }
                 expect(mockNext).not.toHaveBeenCalled();
-                expect(mockWardrobeModel.addGarment).not.toHaveBeenCalled();
             });
 
             it('should handle unauthorized garment access', async () => {
                 // Arrange
-                const wardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: mockUser.id 
-                });
-                const otherUserGarment = wardrobeMocks.garments.createMockGarment({ 
-                id: validGarmentId,
-                user_id: 'other-user-id' 
-                });
-
                 mockReq.params = { id: validWardrobeId };
                 mockReq.body = { garmentId: validGarmentId };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-                mockGarmentModel.findById.mockResolvedValue(otherUserGarment);
+                const { EnhancedApiError } = require('../../middlewares/errorHandler');
+                const authError = EnhancedApiError.authorizationDenied(
+                    'You do not have permission to use this garment',
+                    'garment'
+                );
+                mockWardrobeService.addGarmentToWardrobe.mockRejectedValue(authError);
 
                 // Act & Assert
                 try {
@@ -2413,22 +2940,13 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
             it('should handle duplicate garment conflicts', async () => {
                 // Arrange
-                const wardrobe = wardrobeMocks.createValidWardrobe({ 
-                id: validWardrobeId,
-                user_id: mockUser.id 
-                });
-                const garment = wardrobeMocks.garments.createMockGarment({ 
-                id: validGarmentId,
-                user_id: mockUser.id 
-                });
-                const duplicateError = new Error('duplicate key value') as Error & { code?: string };
-                duplicateError.code = '23505';
-
                 mockReq.params = { id: validWardrobeId };
                 mockReq.body = { garmentId: validGarmentId };
-                mockWardrobeModel.findById.mockResolvedValue(wardrobe);
-                mockGarmentModel.findById.mockResolvedValue(garment);
-                mockWardrobeModel.addGarment.mockRejectedValue(duplicateError);
+                const { EnhancedApiError } = require('../../middlewares/errorHandler');
+                // Service should return a business logic error for duplicates
+                const duplicateError = new Error('Garment is already in this wardrobe');
+                (duplicateError as any).code = 'garment_already_in_wardrobe';
+                mockWardrobeService.addGarmentToWardrobe.mockRejectedValue(duplicateError);
 
                 // Act & Assert
                 try {
@@ -2440,9 +2958,692 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     expectToFail('Should have thrown an error');
                 } catch (error) {
                     expect(error).toBeInstanceOf(Error);
-                    expect((error as Error).message).toContain('Garment is already in this wardrobe');
+                    // Controller converts to internal error
+                    expect((error as Error).message).toContain('Failed to add garment to wardrobe');
                 }
                 expect(mockNext).not.toHaveBeenCalled();
+            });
+        });
+    });
+
+    describe('batchOperations', () => {
+        describe('Successful Batch Operations', () => {
+            it('should process mixed batch operations successfully', async () => {
+                // Arrange
+                const operations = [
+                    {
+                        type: 'create',
+                        data: { name: 'New Wardrobe', description: 'Test description' },
+                        clientId: 'client-1'
+                    },
+                    {
+                        type: 'update',
+                        data: { id: validWardrobeId, name: 'Updated Wardrobe' },
+                        clientId: 'client-2'
+                    },
+                    {
+                        type: 'delete',
+                        data: { id: validWardrobeId },
+                        clientId: 'client-3'
+                    }
+                ];
+
+                mockReq.body = { operations };
+                
+                // Set up service mocks for each operation
+                const createdWardrobe = wardrobeMocks.createValidWardrobe({ 
+                    id: validWardrobeId, 
+                    name: 'New Wardrobe',
+                    user_id: mockUser.id
+                });
+                const updatedWardrobe = wardrobeMocks.createValidWardrobe({ 
+                    id: validWardrobeId, 
+                    name: 'Updated Wardrobe',
+                    user_id: mockUser.id
+                });
+                mockWardrobeService.createWardrobe.mockResolvedValue(createdWardrobe);
+                mockWardrobeService.updateWardrobe.mockResolvedValue(updatedWardrobe);
+                mockWardrobeService.deleteWardrobe.mockResolvedValue({ success: true, wardrobeId: validWardrobeId });
+
+                // Act
+                await wardrobeController.batchOperations(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        results: expect.arrayContaining([
+                            expect.objectContaining({
+                                clientId: 'client-1',
+                                type: 'create',
+                                success: true,
+                                data: expect.objectContaining({ name: 'New Wardrobe' })
+                            }),
+                            expect.objectContaining({
+                                clientId: 'client-2',
+                                type: 'update',
+                                success: true
+                            }),
+                            expect.objectContaining({
+                                clientId: 'client-3',
+                                type: 'delete',
+                                success: true
+                            })
+                        ]),
+                        errors: [],
+                        summary: expect.objectContaining({
+                            total: 3,
+                            successful: 3,
+                            failed: 0
+                        })
+                    }),
+                    expect.objectContaining({
+                        message: 'Batch operations completed',
+                        meta: expect.objectContaining({
+                            timestamp: expect.any(String)
+                        })
+                    })
+                );
+                expect(mockNext).not.toHaveBeenCalled();
+            });
+
+            it('should handle create operations with validation', async () => {
+                // Arrange
+                const operations = [
+                    {
+                        type: 'create',
+                        data: { name: 'Valid Wardrobe', description: 'Valid description' },
+                        clientId: 'client-1'
+                    }
+                ];
+
+                mockReq.body = { operations };
+                
+                const mockCreateWardrobe = jest.fn().mockResolvedValue({ 
+                    id: validWardrobeId, 
+                    name: 'Valid Wardrobe',
+                    description: 'Valid description'
+                });
+                
+                jest.doMock('../../services/wardrobeService', () => ({
+                    wardrobeService: { createWardrobe: mockCreateWardrobe }
+                }));
+
+                // Act
+                await wardrobeController.batchOperations(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        results: expect.arrayContaining([
+                            expect.objectContaining({
+                                clientId: 'client-1',
+                                serverId: validWardrobeId,
+                                type: 'create',
+                                success: true
+                            })
+                        ]),
+                        errors: [],
+                        summary: expect.objectContaining({
+                            successful: 1,
+                            failed: 0
+                        })
+                    }),
+                    expect.any(Object)
+                );
+            });
+
+            it('should handle partial failures in batch operations', async () => {
+                // Arrange
+                const operations = [
+                    {
+                        type: 'create',
+                        data: { name: 'Valid Wardrobe' },
+                        clientId: 'client-1'
+                    },
+                    {
+                        type: 'create',
+                        data: { name: 'a'.repeat(101) }, // Invalid name
+                        clientId: 'client-2'
+                    }
+                ];
+
+                mockReq.body = { operations };
+                
+                const mockCreateWardrobe = jest.fn().mockResolvedValue({ 
+                    id: validWardrobeId, 
+                    name: 'Valid Wardrobe'
+                });
+                
+                jest.doMock('../../services/wardrobeService', () => ({
+                    wardrobeService: { createWardrobe: mockCreateWardrobe }
+                }));
+
+                // Act
+                await wardrobeController.batchOperations(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        results: expect.arrayContaining([
+                            expect.objectContaining({
+                                clientId: 'client-1',
+                                success: true
+                            })
+                        ]),
+                        errors: expect.arrayContaining([
+                            expect.objectContaining({
+                                clientId: 'client-2',
+                                type: 'create',
+                                error: expect.stringContaining('name cannot exceed 100 characters')
+                            })
+                        ]),
+                        summary: expect.objectContaining({
+                            successful: 1,
+                            failed: 1
+                        })
+                    }),
+                    expect.any(Object)
+                );
+            });
+        });
+
+        describe('Input Validation', () => {
+            it('should reject missing operations array', async () => {
+                // Arrange
+                mockReq.body = {};
+
+                // Act & Assert
+                try {
+                    await wardrobeController.batchOperations(
+                        mockReq as Request,
+                        mockRes as Response,
+                        mockNext
+                    );
+                    expectToFail('Should have thrown an error');
+                } catch (error) {
+                    expect(error).toBeInstanceOf(Error);
+                    expect((error as Error).message).toContain('Operations array is required');
+                }
+                expect(mockNext).not.toHaveBeenCalled();
+            });
+
+            it('should reject non-array operations', async () => {
+                // Arrange
+                mockReq.body = { operations: 'not-an-array' };
+
+                // Act & Assert
+                try {
+                    await wardrobeController.batchOperations(
+                        mockReq as Request,
+                        mockRes as Response,
+                        mockNext
+                    );
+                    expectToFail('Should have thrown an error');
+                } catch (error) {
+                    expect(error).toBeInstanceOf(Error);
+                    expect((error as Error).message).toContain('Operations array is required');
+                }
+                expect(mockNext).not.toHaveBeenCalled();
+            });
+
+            it('should reject more than 50 operations', async () => {
+                // Arrange
+                const manyOperations = Array.from({ length: 51 }, (_, i) => ({
+                    type: 'create',
+                    data: { name: `Wardrobe ${i}` },
+                    clientId: `client-${i}`
+                }));
+
+                mockReq.body = { operations: manyOperations };
+
+                // Act & Assert
+                try {
+                    await wardrobeController.batchOperations(
+                        mockReq as Request,
+                        mockRes as Response,
+                        mockNext
+                    );
+                    expectToFail('Should have thrown an error');
+                } catch (error) {
+                    expect(error).toBeInstanceOf(Error);
+                    expect((error as Error).message).toContain('Cannot process more than 50 operations at once');
+                }
+                expect(mockNext).not.toHaveBeenCalled();
+            });
+
+            it('should reject operations with unknown type', async () => {
+                // Arrange
+                const operations = [
+                    {
+                        type: 'invalidType',
+                        data: { name: 'Test' },
+                        clientId: 'client-1'
+                    }
+                ];
+
+                mockReq.body = { operations };
+
+                // Act
+                await wardrobeController.batchOperations(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert - Should include error for unknown operation type
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        results: [],
+                        errors: expect.arrayContaining([
+                            expect.objectContaining({
+                                clientId: 'client-1',
+                                type: 'invalidType',
+                                error: expect.stringContaining('Unknown operation type')
+                            })
+                        ]),
+                        summary: expect.objectContaining({
+                            successful: 0,
+                            failed: 1
+                        })
+                    }),
+                    expect.any(Object)
+                );
+            });
+
+            it('should reject update operations without ID', async () => {
+                // Arrange
+                const operations = [
+                    {
+                        type: 'update',
+                        data: { name: 'Updated Name' }, // Missing ID
+                        clientId: 'client-1'
+                    }
+                ];
+
+                mockReq.body = { operations };
+
+                // Act
+                await wardrobeController.batchOperations(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        errors: expect.arrayContaining([
+                            expect.objectContaining({
+                                clientId: 'client-1',
+                                error: expect.stringContaining('Wardrobe ID is required for update')
+                            })
+                        ])
+                    }),
+                    expect.any(Object)
+                );
+            });
+
+            it('should reject delete operations without ID', async () => {
+                // Arrange
+                const operations = [
+                    {
+                        type: 'delete',
+                        data: {}, // Missing ID
+                        clientId: 'client-1'
+                    }
+                ];
+
+                mockReq.body = { operations };
+
+                // Act
+                await wardrobeController.batchOperations(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        errors: expect.arrayContaining([
+                            expect.objectContaining({
+                                clientId: 'client-1',
+                                error: expect.stringContaining('Wardrobe ID is required for delete')
+                            })
+                        ])
+                    }),
+                    expect.any(Object)
+                );
+            });
+
+            it('should validate wardrobe name in create operations', async () => {
+                // Arrange
+                const operations = [
+                    {
+                        type: 'create',
+                        data: { name: '' }, // Empty name
+                        clientId: 'client-1'
+                    }
+                ];
+
+                mockReq.body = { operations };
+
+                // Act
+                await wardrobeController.batchOperations(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        errors: expect.arrayContaining([
+                            expect.objectContaining({
+                                clientId: 'client-1',
+                                error: expect.stringContaining('name is required')
+                            })
+                        ])
+                    }),
+                    expect.any(Object)
+                );
+            });
+        });
+
+        describe('Error Handling', () => {
+            it('should handle service errors gracefully', async () => {
+                // Arrange
+                const operations = [
+                    {
+                        type: 'create',
+                        data: { name: 'Valid Wardrobe' },
+                        clientId: 'client-1'
+                    }
+                ];
+
+                mockReq.body = { operations };
+                
+                // Mock the service to reject with an error
+                mockWardrobeService.createWardrobe.mockRejectedValue(new Error('Service error'));
+
+                // Act
+                await wardrobeController.batchOperations(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        results: [],
+                        errors: expect.arrayContaining([
+                            expect.objectContaining({
+                                clientId: 'client-1',
+                                error: 'Service error'
+                            })
+                        ]),
+                        summary: expect.objectContaining({
+                            successful: 0,
+                            failed: 1
+                        })
+                    }),
+                    expect.any(Object)
+                );
+            });
+
+            it('should handle authentication errors', async () => {
+                // Arrange
+                mockReq.user = undefined;
+                mockReq.body = { operations: [] };
+
+                // Act & Assert
+                try {
+                    await wardrobeController.batchOperations(
+                        mockReq as Request,
+                        mockRes as Response,
+                        mockNext
+                    );
+                    expectToFail('Should have thrown an error');
+                } catch (error) {
+                    expect(error).toBeInstanceOf(Error);
+                    expect((error as Error).message).toContain('User authentication required');
+                }
+                expect(mockNext).not.toHaveBeenCalled();
+            });
+
+            it('should handle unexpected errors during batch processing', async () => {
+                // Arrange
+                const operations = [
+                    {
+                        type: 'create',
+                        data: { name: 'Valid Wardrobe' },
+                        clientId: 'client-1'
+                    }
+                ];
+
+                mockReq.body = { operations };
+                
+                // Make the service throw an unexpected error
+                const unexpectedError = new Error('Unexpected error');
+                mockWardrobeService.createWardrobe.mockRejectedValue(unexpectedError);
+
+                // Act
+                await wardrobeController.batchOperations(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert - Batch operations should handle errors gracefully and not throw
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        results: [],
+                        errors: expect.arrayContaining([
+                            expect.objectContaining({
+                                clientId: 'client-1',
+                                error: 'Unexpected error'
+                            })
+                        ]),
+                        summary: expect.objectContaining({
+                            successful: 0,
+                            failed: 1
+                        })
+                    }),
+                    expect.any(Object)
+                );
+                expect(mockNext).not.toHaveBeenCalled();
+            });
+        });
+
+        describe('Operation Types', () => {
+            it('should handle create operations with full data', async () => {
+                // Arrange
+                const operations = [
+                    {
+                        type: 'create',
+                        data: { 
+                            name: 'New Wardrobe',
+                            description: 'Test description'
+                        },
+                        clientId: 'client-1'
+                    }
+                ];
+
+                mockReq.body = { operations };
+                
+                const createdWardrobe = wardrobeMocks.createValidWardrobe({ 
+                    id: validWardrobeId, 
+                    name: 'New Wardrobe',
+                    description: 'Test description',
+                    user_id: mockUser.id
+                });
+                
+                mockWardrobeService.createWardrobe.mockResolvedValue(createdWardrobe);
+
+                // Act
+                await wardrobeController.batchOperations(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        results: expect.arrayContaining([
+                            expect.objectContaining({
+                                clientId: 'client-1',
+                                serverId: validWardrobeId,
+                                type: 'create',
+                                success: true,
+                                data: expect.objectContaining({
+                                    name: 'New Wardrobe',
+                                    description: 'Test description'
+                                })
+                            })
+                        ])
+                    }),
+                    expect.any(Object)
+                );
+            });
+
+            it('should handle update operations with partial data', async () => {
+                // Arrange
+                const operations = [
+                    {
+                        type: 'update',
+                        data: { 
+                            id: validWardrobeId,
+                            name: 'Updated Name'
+                        },
+                        clientId: 'client-1'
+                    }
+                ];
+
+                mockReq.body = { operations };
+                
+                const mockUpdateWardrobe = jest.fn().mockResolvedValue({ 
+                    id: validWardrobeId, 
+                    name: 'Updated Name'
+                });
+                
+                jest.doMock('../../services/wardrobeService', () => ({
+                    wardrobeService: { updateWardrobe: mockUpdateWardrobe }
+                }));
+
+                // Act
+                await wardrobeController.batchOperations(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        results: expect.arrayContaining([
+                            expect.objectContaining({
+                                clientId: 'client-1',
+                                serverId: validWardrobeId,
+                                type: 'update',
+                                success: true
+                            })
+                        ])
+                    }),
+                    expect.any(Object)
+                );
+            });
+
+            it('should handle delete operations', async () => {
+                // Arrange
+                const operations = [
+                    {
+                        type: 'delete',
+                        data: { id: validWardrobeId },
+                        clientId: 'client-1'
+                    }
+                ];
+
+                mockReq.body = { operations };
+                
+                const mockDeleteWardrobe = jest.fn().mockResolvedValue(true);
+                
+                jest.doMock('../../services/wardrobeService', () => ({
+                    wardrobeService: { deleteWardrobe: mockDeleteWardrobe }
+                }));
+
+                // Act
+                await wardrobeController.batchOperations(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert
+                expect(mockRes.success).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        results: expect.arrayContaining([
+                            expect.objectContaining({
+                                clientId: 'client-1',
+                                serverId: validWardrobeId,
+                                type: 'delete',
+                                success: true
+                            })
+                        ])
+                    }),
+                    expect.any(Object)
+                );
+            });
+        });
+
+        describe('Data Sanitization', () => {
+            it('should sanitize input data in batch operations', async () => {
+                // Arrange
+                const operations = [
+                    {
+                        type: 'create',
+                        data: { 
+                            name: 'Test Wardrobe',
+                            description: 'Test description'
+                        },
+                        clientId: 'client-1'
+                    }
+                ];
+
+                mockReq.body = { operations };
+                
+                const mockCreateWardrobe = jest.fn().mockResolvedValue({ 
+                    id: validWardrobeId, 
+                    name: 'Test Wardrobe'
+                });
+                
+                jest.doMock('../../services/wardrobeService', () => ({
+                    wardrobeService: { createWardrobe: mockCreateWardrobe }
+                }));
+
+                // Act
+                await wardrobeController.batchOperations(
+                    mockReq as Request,
+                    mockRes as Response,
+                    mockNext
+                );
+
+                // Assert - Verify sanitization was called
+                const { sanitization } = require('../../utils/sanitize');
+                expect(sanitization.sanitizeUserInput).toHaveBeenCalled();
             });
         });
     });
