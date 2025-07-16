@@ -731,7 +731,7 @@ describe('wardrobeController - Security Tests', () => {
         mockReq.body = { garmentId: validGarmentId, position: null };
         
         // Mock service to succeed
-        mockWardrobeService.addGarmentToWardrobe.mockResolvedValue({ success: true });
+        mockWardrobeService.addGarmentToWardrobe.mockResolvedValue({ success: true, message: 'Garment added successfully' });
 
         await wardrobeController.addGarmentToWardrobe(
           mockReq as Request,
@@ -1099,6 +1099,7 @@ describe('wardrobeController - Security Tests', () => {
           user_id: sessionUser.id,
           name: 'Test Wardrobe',
           description: '',
+          is_default: false,
           created_at: new Date(),
           updated_at: new Date()
         };
@@ -1213,6 +1214,7 @@ describe('wardrobeController - Security Tests', () => {
           user_id: mockUser.id,
           name: 'Test Wardrobe',
           description: 'Test Description',
+          is_default: false,
           created_at: new Date(),
           updated_at: new Date()
         };
@@ -1410,6 +1412,7 @@ describe('wardrobeController - Security Tests', () => {
             user_id: mockUser.id,
             name: unicodeName.trim(),
             description: 'Test',
+            is_default: false,
             created_at: new Date(),
             updated_at: new Date()
           };
