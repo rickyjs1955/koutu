@@ -8,7 +8,9 @@ module.exports = {
     '**/?(*.)+(spec|test).ts'
   ],
   transform: {
-    '^.+\\.ts$': 'ts-jest',
+    '^.+\\.ts$': ['ts-jest', {
+      tsconfig: '<rootDir>/tsconfig.test.json'
+    }],
   },
   collectCoverageFrom: [
     'src/**/*.ts',
@@ -24,7 +26,7 @@ module.exports = {
   maxWorkers: 1,
   verbose: true,
   forceExit: true,
-  detectOpenHandles: true,  
+  detectOpenHandles: false,  
   // Exclude dist folder to avoid duplicate mock conflicts
   testPathIgnorePatterns: [
     '/node_modules/',

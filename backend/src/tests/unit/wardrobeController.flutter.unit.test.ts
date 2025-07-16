@@ -453,7 +453,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
                     legacy: undefined
                 });
                 expect(mockRes.success).toHaveBeenCalledWith(
-                expect.any(Array),
+                { wardrobes: expect.any(Array) },
                 {
                     message: 'Wardrobes retrieved successfully',
                     meta: {
@@ -482,7 +482,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
                 // Assert
                 expect(mockRes.success).toHaveBeenCalledWith(
-                [],
+                { wardrobes: [] },
                 {
                     message: 'Wardrobes retrieved successfully',
                     meta: {
@@ -1590,7 +1590,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
             );
 
             expect(mockRes.success).toHaveBeenCalledWith(
-                expect.any(Array),
+                { wardrobes: expect.any(Array) },
                 expect.objectContaining({
                     meta: expect.objectContaining({
                         count: 2,
@@ -1980,7 +1980,7 @@ describe('wardrobeController (Flutter Compatible)', () => {
 
             // Assert
             expect(mockRes.success).toHaveBeenCalledWith(
-                expect.any(Array),
+                { wardrobes: expect.any(Array) },
                 expect.objectContaining({
                     message: 'Wardrobes retrieved successfully',
                     meta: expect.objectContaining({

@@ -3,7 +3,25 @@
     "allow": [
       "Bash(npm test:*)",
       "Bash(find:*)",
-      "Bash(npx jest:*)"
+      "Bash(npx jest:*)",
+      "Bash(npm i:*)",
+      "Bash(sudo npm i -g @anthropic-ai/claude-code)",
+      "Bash(npm ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node:*)",
+      "Bash(npm run build:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npm run lint)",
+      "Bash(npm run:*)",
+      "Bash(grep:*)",
+      "Bash(/dev/null)",
+      "Bash(cat:*)",
+      "Bash(rm:*)",
+      "Bash(awk:*)",
+      "Bash(mv:*)",
+      "Bash(git pull:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

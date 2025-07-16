@@ -234,11 +234,11 @@ return filters;
 };
 
 export const wardrobeController = {
-/**
- * Create a new wardrobe
- * Flutter-optimized response format
- */
-async createWardrobe(req: Request, res: Response, next: NextFunction) {
+  /**
+   * Create a new wardrobe
+   * Flutter-optimized response format
+   */
+  async createWardrobe(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.user) {
       throw EnhancedApiError.authenticationRequired('User authentication required');
@@ -390,7 +390,7 @@ async getWardrobes(req: Request, res: Response, next: NextFunction) {
           }
         });
       } else {
-        res.success(safeWardrobes, {
+        res.success({ wardrobes: safeWardrobes }, {
           message: 'Wardrobes retrieved successfully',
           meta: {
             count: safeWardrobes.length,
@@ -813,7 +813,7 @@ async reorderGarments(req: Request, res: Response, next: NextFunction) {
  * Get wardrobe statistics
  * Flutter-optimized response format
  */
-async getWardrobeStats(req: Request, res: Response, next: NextFunction) {
+getWardrobeStats: async function(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.user) {
       throw EnhancedApiError.authenticationRequired('User authentication required');
@@ -880,7 +880,7 @@ async getWardrobeStats(req: Request, res: Response, next: NextFunction) {
  * Sync wardrobes - get changes since last sync
  * For offline sync support
  */
-async syncWardrobes(req: Request, res: Response, next: NextFunction) {
+syncWardrobes: async function(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.user) {
       throw EnhancedApiError.authenticationRequired('User authentication required');
@@ -952,7 +952,7 @@ async syncWardrobes(req: Request, res: Response, next: NextFunction) {
  * Batch operations for offline sync
  * Allows multiple create/update/delete operations in single request
  */
-async batchOperations(req: Request, res: Response, next: NextFunction) {
+batchOperations: async function(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.user) {
       throw EnhancedApiError.authenticationRequired('User authentication required');
