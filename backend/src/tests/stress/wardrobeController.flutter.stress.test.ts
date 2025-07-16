@@ -152,7 +152,12 @@ describe('WardrobeController Stress Tests', () => {
       metrics.successfulRequests++;
     } catch (error) {
       metrics.failedRequests++;
-      metrics.errors.push(error);
+      // Ensure error is properly captured
+      if (error instanceof Error) {
+        metrics.errors.push(error);
+      } else {
+        metrics.errors.push(new Error(String(error)));
+      }
     }
     
     const duration = performance.now() - startTime;
@@ -669,39 +674,75 @@ describe('WardrobeController Stress Tests', () => {
 
   describe('Failure Recovery Tests', () => {
     it('should recover from intermittent service failures', async () => {
-      const totalRequests = 100;
-      const failureRate = 0.2; // 20% failure rate
+      const totalRequests = 50; // Reduced for stability
+      const plannedFailures = 10; // Fixed number of failures instead of random
+      const failureIndices = new Set<number>();
+      
+      // Pre-determine which requests will fail for consistency
+      for (let i = 0; i < plannedFailures; i++) {
+        failureIndices.add(Math.floor((i / plannedFailures) * totalRequests));
+      }
 
+      let actualSuccesses = 0;
+      let actualFailures = 0;
+      const capturedErrors: Error[] = [];
+
+      // Execute all requests sequentially
       for (let i = 0; i < totalRequests; i++) {
-        mockReq.body = { 
-          name: `Recovery Test ${i}`,
-          description: `Testing failure recovery`
-        };
+        // Create fresh mock request and response for each iteration
+        const req = {
+          user: mockUser,
+          body: { 
+            name: `Recovery Test ${i}`,
+            description: `Testing failure recovery`
+          }
+        } as Request;
 
-        // Simulate intermittent failures
-        if (Math.random() < failureRate) {
-          mockWardrobeService.createWardrobe.mockRejectedValue(
+        const res = {
+          status: jest.fn().mockReturnThis(),
+          json: jest.fn().mockReturnThis(),
+          created: jest.fn().mockReturnThis()
+        } as unknown as Response;
+
+        const next = jest.fn((error?: any) => {
+          if (error) {
+            actualFailures++;
+            capturedErrors.push(error);
+          }
+        }) as unknown as NextFunction;
+
+        // Mock response for this specific request
+        if (failureIndices.has(i)) {
+          mockWardrobeService.createWardrobe.mockRejectedValueOnce(
             new Error('Service temporarily unavailable')
           );
         } else {
-          mockWardrobeService.createWardrobe.mockResolvedValue(
+          mockWardrobeService.createWardrobe.mockResolvedValueOnce(
             generateLargeWardrobe(i, 5)
           );
         }
 
-        await executeWithMetrics(async () => {
-          await wardrobeController.createWardrobe(
-            mockReq as Request,
-            mockRes as Response,
-            mockNext
-          );
-        });
+        try {
+          await wardrobeController.createWardrobe(req, res, next);
+          
+          // Check if response was sent (success case)
+          if ((res.created as jest.Mock).mock.calls.length > 0) {
+            actualSuccesses++;
+          }
+        } catch (error) {
+          // In case of unhandled errors
+          actualFailures++;
+          capturedErrors.push(error as Error);
+        }
       }
 
       // System should handle failures gracefully
-      const actualFailureRate = metrics.failedRequests / metrics.totalRequests;
-      expect(actualFailureRate).toBeCloseTo(failureRate, 1);
-      expect(metrics.errors.length).toBe(metrics.failedRequests);
+      expect(actualFailures).toBe(plannedFailures);
+      expect(actualSuccesses).toBe(totalRequests - plannedFailures);
+      expect(capturedErrors.length).toBe(plannedFailures);
+      
+      // Verify the mock was called correct number of times
+      expect(mockWardrobeService.createWardrobe).toHaveBeenCalledTimes(totalRequests);
     });
 
     it('should handle database connection pool exhaustion', async () => {
@@ -711,7 +752,7 @@ describe('WardrobeController Stress Tests', () => {
 
       let activeConnections = 0;
       
-      mockWardrobeService.createWardrobe.mockImplementation(async (data) => {
+      mockWardrobeService.createWardrobe.mockImplementation(async () => {
         if (activeConnections >= connectionPoolSize) {
           throw new Error('Connection pool exhausted');
         }

@@ -86,22 +86,38 @@ const enhancedErrorHandler = (error: any, req: any, res: any, next: any) => {
   // Handle ApiError instances (from services - React Native era)
   // These have specific messages but generic codes
   if (error.constructor.name === 'ApiError' || error.isOperational === true) {
-    // Map specific error messages to Flutter-compatible codes
-    if (statusCode === 404) {
-      if (message === 'Wardrobe not found') {
-        code = 'WARDROBE_NOT_FOUND';
-      } else if (message === 'Garment not found') {
+    // First check if error has a specific code from service layer
+    if (error.code) {
+      // Use the specific code from the service layer
+      if (error.code === 'GARMENT_NOT_FOUND') {
         code = 'GARMENT_NOT_FOUND';
-      } else if (message === 'Garment not found in wardrobe') {
+      } else if (error.code === 'GARMENT_NOT_IN_WARDROBE') {
         code = 'GARMENT_NOT_IN_WARDROBE';
-      }
-    } else if (statusCode === 403) {
-      if (message.includes('You do not have permission to access this wardrobe')) {
+      } else if (error.code === 'WARDROBE_NOT_FOUND') {
+        code = 'WARDROBE_NOT_FOUND';
+      } else if (error.code === 'AUTHORIZATION_ERROR') {
         code = 'AUTHORIZATION_DENIED';
-      }
-    } else if (statusCode === 409) {
-      if (message.includes('Cannot delete wardrobe with')) {
+      } else if (error.code === 'BUSINESS_LOGIC_ERROR' && message.includes('Cannot delete wardrobe with')) {
         code = 'WARDROBE_HAS_GARMENTS';
+      }
+    } else {
+      // Fall back to message-based mapping for backward compatibility
+      if (statusCode === 404) {
+        if (message === 'Wardrobe not found') {
+          code = 'WARDROBE_NOT_FOUND';
+        } else if (message === 'Garment not found') {
+          code = 'GARMENT_NOT_FOUND';
+        } else if (message === 'Garment not found in wardrobe') {
+          code = 'GARMENT_NOT_IN_WARDROBE';
+        }
+      } else if (statusCode === 403) {
+        if (message.includes('You do not have permission to access this wardrobe')) {
+          code = 'AUTHORIZATION_DENIED';
+        }
+      } else if (statusCode === 409) {
+        if (message.includes('Cannot delete wardrobe with')) {
+          code = 'WARDROBE_HAS_GARMENTS';
+        }
       }
     }
   }
@@ -111,24 +127,26 @@ const enhancedErrorHandler = (error: any, req: any, res: any, next: any) => {
   if (error.cause) {
     const cause = error.cause;
     if (cause.constructor.name === 'ApiError' || cause.isOperational === true || cause.name === 'ApiError') {
-      // If the main error is 404/403, check the cause for specific messages
-      if (statusCode === 404) {
-        if (cause.message === 'Wardrobe not found') {
-          code = 'WARDROBE_NOT_FOUND';
-        } else if (cause.message === 'Garment not found') {
+      // First check if the cause has a specific code
+      if (cause.code) {
+        // Use the specific code from the wrapped ApiError
+        if (cause.code === 'GARMENT_NOT_FOUND') {
           code = 'GARMENT_NOT_FOUND';
-        } else if (cause.message === 'Garment not found in wardrobe') {
+        } else if (cause.code === 'GARMENT_NOT_IN_WARDROBE') {
           code = 'GARMENT_NOT_IN_WARDROBE';
+        } else if (cause.code === 'WARDROBE_NOT_FOUND') {
+          code = 'WARDROBE_NOT_FOUND';
+        } else if (cause.code === 'AUTHORIZATION_ERROR') {
+          code = 'AUTHORIZATION_DENIED';
+        } else if (cause.code === 'BUSINESS_LOGIC_ERROR') {
+          if (cause.message.includes('Cannot delete wardrobe with')) {
+            code = 'WARDROBE_HAS_GARMENTS';
+            statusCode = 409; // Business logic errors should be 409
+          }
         }
-      } else if (statusCode === 403 && cause.statusCode === 403) {
-        code = 'AUTHORIZATION_DENIED';
-      } else if (error.type === 'internal' && cause.statusCode) {
-        // For internal errors, use the cause's status and message
-        statusCode = cause.statusCode;
-        message = cause.message || message;
-        
-        // Map based on the original error
-        if (cause.statusCode === 404) {
+      } else {
+        // Fall back to message-based mapping
+        if (statusCode === 404) {
           if (cause.message === 'Wardrobe not found') {
             code = 'WARDROBE_NOT_FOUND';
           } else if (cause.message === 'Garment not found') {
@@ -136,8 +154,25 @@ const enhancedErrorHandler = (error: any, req: any, res: any, next: any) => {
           } else if (cause.message === 'Garment not found in wardrobe') {
             code = 'GARMENT_NOT_IN_WARDROBE';
           }
-        } else if (cause.statusCode === 403) {
+        } else if (statusCode === 403 && cause.statusCode === 403) {
           code = 'AUTHORIZATION_DENIED';
+        } else if (error.type === 'internal' && cause.statusCode) {
+          // For internal errors, use the cause's status and message
+          statusCode = cause.statusCode;
+          message = cause.message || message;
+          
+          // Map based on the original error
+          if (cause.statusCode === 404) {
+            if (cause.message === 'Wardrobe not found') {
+              code = 'WARDROBE_NOT_FOUND';
+            } else if (cause.message === 'Garment not found') {
+              code = 'GARMENT_NOT_FOUND';
+            } else if (cause.message === 'Garment not found in wardrobe') {
+              code = 'GARMENT_NOT_IN_WARDROBE';
+            }
+          } else if (cause.statusCode === 403) {
+            code = 'AUTHORIZATION_DENIED';
+          }
         }
       }
     }
@@ -164,7 +199,7 @@ const enhancedErrorHandler = (error: any, req: any, res: any, next: any) => {
   } else if (error.name === 'ConflictError' || statusCode === 409) {
     statusCode = 409;
     code = 'CONFLICT';
-  } else if (error.code === 'BUSINESS_LOGIC_ERROR' && message.includes('Cannot delete wardrobe with')) {
+  } else if ((error.code === 'BUSINESS_LOGIC_ERROR' || code === 'BUSINESS_LOGIC_ERROR') && message.includes('Cannot delete wardrobe with')) {
     statusCode = 409;
     code = 'WARDROBE_HAS_GARMENTS';
   }
@@ -547,6 +582,11 @@ describe('Wardrobe Routes - Flutter Integration Test Suite', () => {
     afterAll(async () => {
         try {
             await TestDatabaseConnection.cleanup();
+            // Close the global database pool to prevent open handles
+            const db = require('../../models/db');
+            if (db.pool && !db.pool.ended) {
+                await db.closePool();
+            }
         } catch (error) {
             console.warn('⚠️ Cleanup issues:', error);
         }
@@ -591,7 +631,8 @@ describe('Wardrobe Routes - Flutter Integration Test Suite', () => {
                 .expect(200);
 
             expectFlutterSuccessResponse(response, 200);
-            expect(Array.isArray(response.body.data)).toBe(true);
+            expect(response.body.data).toHaveProperty('wardrobes');
+            expect(Array.isArray(response.body.data.wardrobes)).toBe(true);
         });
 
         test('should enforce user data isolation between users', async () => {
@@ -615,7 +656,7 @@ describe('Wardrobe Routes - Flutter Integration Test Suite', () => {
                 .expect(200);
 
             expectFlutterSuccessResponse(listResponse, 200);
-            expect(listResponse.body.data).toHaveLength(0); // Fixed: data is array directly
+            expect(listResponse.body.data.wardrobes).toHaveLength(0); // Fixed: data.wardrobes is the array
 
             // User2 should not access user1's specific wardrobe
             const accessResponse = await request(app)
@@ -632,7 +673,7 @@ describe('Wardrobe Routes - Flutter Integration Test Suite', () => {
                 .expect(200);
 
             expectFlutterSuccessResponse(user1Response, 200);
-            expect(user1Response.body.data).toHaveLength(1); // Fixed: data is array directly
+            expect(user1Response.body.data.wardrobes).toHaveLength(1); // Fixed: data.wardrobes is the array
         });
     });
     // #endregion
@@ -811,7 +852,7 @@ describe('Wardrobe Routes - Flutter Integration Test Suite', () => {
                 expectFlutterSuccessResponse(response, 200);
                 expect(response.body.message).toBe('Wardrobes retrieved successfully');
                 
-                const testWardrobes = response.body.data.filter((w: any) => 
+                const testWardrobes = response.body.data.wardrobes.filter((w: any) => 
                     ['Summer Collection', 'Winter Collection'].includes(w.name)
                 );
                 
@@ -819,7 +860,7 @@ describe('Wardrobe Routes - Flutter Integration Test Suite', () => {
                 expect(response.body.meta.count).toBeGreaterThanOrEqual(createdWardrobes.length); // Fixed: use meta.count
 
                 if (createdWardrobes.length > 0) {
-                    const wardrobe = testWardrobes[0] || response.body.data[0]; // Fixed: removed .wardrobes
+                    const wardrobe = testWardrobes[0] || response.body.data.wardrobes[0]; // Fixed: use data.wardrobes
                     expect(wardrobe).toHaveProperty('id');
                     expect(wardrobe).toHaveProperty('user_id');
                     expect(wardrobe).toHaveProperty('name');
@@ -840,7 +881,7 @@ describe('Wardrobe Routes - Flutter Integration Test Suite', () => {
                     .expect(200);
 
                 expectFlutterSuccessResponse(response, 200);
-                expect(response.body.data).toEqual([]);
+                expect(response.body.data.wardrobes).toEqual([]);
             });
         });
 
@@ -1652,7 +1693,7 @@ describe('Wardrobe Routes - Flutter Integration Test Suite', () => {
             // Filter to only the wardrobes created in this test
             if (user1WardrobeResponse.status === 201) {
                 expectFlutterSuccessResponse(user1WardrobeResponse, 201);
-                const user1TestWardrobes = user1ListResponse.body.data.filter((w: any) => 
+                const user1TestWardrobes = user1ListResponse.body.data.wardrobes.filter((w: any) => 
                     w.name === 'User1 Summer Collection'
                 );
                 expect(user1TestWardrobes).toHaveLength(1);
@@ -1661,7 +1702,7 @@ describe('Wardrobe Routes - Flutter Integration Test Suite', () => {
             
             if (user2WardrobeResponse.status === 201) {
                 expectFlutterSuccessResponse(user2WardrobeResponse, 201);
-                const user2TestWardrobes = user2ListResponse.body.data.filter((w: any) =>
+                const user2TestWardrobes = user2ListResponse.body.data.wardrobes.filter((w: any) =>
                 w.name === 'User2 Summer Collection'
                 );
                 expect(user2TestWardrobes).toHaveLength(1);
@@ -1709,7 +1750,7 @@ describe('Wardrobe Routes - Flutter Integration Test Suite', () => {
                     .expect(200);
 
                 expectFlutterSuccessResponse(finalResponse, 200);
-                expect(finalResponse.body.data.length).toBeGreaterThanOrEqual(wardrobeIds.length);
+                expect(finalResponse.body.data.wardrobes.length).toBeGreaterThanOrEqual(wardrobeIds.length);
             }
         });
 
@@ -1813,7 +1854,7 @@ describe('Wardrobe Routes - Flutter Integration Test Suite', () => {
             expectFlutterSuccessResponse(finalListResponse, 200);
             
             // Should have no wardrobes from this test (other tests might have created some)
-            const testWardrobeNames = finalListResponse.body.data
+            const testWardrobeNames = finalListResponse.body.data.wardrobes
                 .filter((w: any) => w.name.startsWith('Rapid Wardrobe'));
             expect(testWardrobeNames).toHaveLength(0);
         });

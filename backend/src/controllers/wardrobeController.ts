@@ -41,9 +41,17 @@ let enhancedError: EnhancedApiError;
 // Ensure we have a valid status code
 const statusCode = error.statusCode || 500;
 
+// Preserve the original error code from the service layer
+const errorCode = error.code || 'API_ERROR';
+
 switch (statusCode) {
   case 400:
-    enhancedError = EnhancedApiError.validation(error.message);
+    // Use the specific error code from service layer for validation errors
+    if (errorCode === 'BUSINESS_LOGIC_ERROR') {
+      enhancedError = new EnhancedApiError(error.message, 400, errorCode);
+    } else {
+      enhancedError = EnhancedApiError.validation(error.message);
+    }
     break;
   case 401:
     enhancedError = EnhancedApiError.authenticationRequired(error.message);
@@ -52,14 +60,15 @@ switch (statusCode) {
     enhancedError = EnhancedApiError.authorizationDenied(error.message);
     break;
   case 404:
-    enhancedError = EnhancedApiError.notFound(error.message);
+    // Pass the specific code from service layer (e.g., 'GARMENT_NOT_FOUND', 'GARMENT_NOT_IN_WARDROBE')
+    enhancedError = new EnhancedApiError(error.message, 404, errorCode);
     break;
   case 409:
     enhancedError = EnhancedApiError.conflict(error.message);
     break;
   default:
     // For other status codes, create a generic error with the original status
-    enhancedError = new EnhancedApiError(error.message, statusCode, error.code || 'API_ERROR');
+    enhancedError = new EnhancedApiError(error.message, statusCode, errorCode);
 }
 
 // Manually set the cause to preserve the original ApiError for the test handler
@@ -813,7 +822,7 @@ async reorderGarments(req: Request, res: Response, next: NextFunction) {
  * Get wardrobe statistics
  * Flutter-optimized response format
  */
-getWardrobeStats: async function(req: Request, res: Response, next: NextFunction) {
+async getWardrobeStats(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.user) {
       throw EnhancedApiError.authenticationRequired('User authentication required');
@@ -880,7 +889,7 @@ getWardrobeStats: async function(req: Request, res: Response, next: NextFunction
  * Sync wardrobes - get changes since last sync
  * For offline sync support
  */
-syncWardrobes: async function(req: Request, res: Response, next: NextFunction) {
+async syncWardrobes(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.user) {
       throw EnhancedApiError.authenticationRequired('User authentication required');
@@ -952,7 +961,7 @@ syncWardrobes: async function(req: Request, res: Response, next: NextFunction) {
  * Batch operations for offline sync
  * Allows multiple create/update/delete operations in single request
  */
-batchOperations: async function(req: Request, res: Response, next: NextFunction) {
+async batchOperations(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.user) {
       throw EnhancedApiError.authenticationRequired('User authentication required');
@@ -1097,5 +1106,5 @@ batchOperations: async function(req: Request, res: Response, next: NextFunction)
     
     throw EnhancedApiError.internalError('Failed to process batch operations', error);
   }
-}
+},
 };
