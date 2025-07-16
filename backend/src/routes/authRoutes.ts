@@ -1,4 +1,4 @@
-// /backend/src/routes/authRoutes.ts - Updated with security middleware
+// /backend/src/routes/authRoutes.ts - Updated with security middleware and mobile support
 import express from 'express';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
@@ -8,11 +8,21 @@ import { authenticate, requireAuth, rateLimitByUser } from '../middlewares/auth'
 import { validateAuthTypes, validateBody, validateRequestTypes } from '../middlewares/validate';
 import { securityMiddleware } from '../middlewares/security';
 import { ApiError } from '../utils/ApiError';
+import { 
+  BiometricLoginSchema, 
+  DeviceRegistrationSchema,
+  MobileValidation 
+} from '../../../shared/src/schemas';
 
 declare global {
   namespace Express {
     interface Request {
       user?: any;
+      device?: {
+        id: string;
+        type: 'ios' | 'android' | 'web';
+        name?: string;
+      };
     }
   }
 }
@@ -67,6 +77,36 @@ const UpdateEmailSchema = z.object({
   password: z.string()
     .min(1, 'Password is required for email changes')
     // REMOVED: Password complexity validation - controller handles this
+});
+
+// ==================== MOBILE-SPECIFIC VALIDATION SCHEMAS ====================
+
+// Mobile registration schema with device info
+const MobileRegisterSchema = RegisterSchema.extend({
+  device_id: z.string().regex(MobileValidation.MOBILE_PATTERNS.deviceId),
+  device_type: z.enum(['ios', 'android']),
+  device_name: z.string().max(100).optional(),
+  push_token: z.string().regex(MobileValidation.MOBILE_PATTERNS.pushToken).optional()
+});
+
+// Mobile login schema with device tracking
+const MobileLoginSchema = LoginSchema.extend({
+  device_id: z.string().regex(MobileValidation.MOBILE_PATTERNS.deviceId),
+  device_type: z.enum(['ios', 'android']),
+  remember_device: z.boolean().default(false)
+});
+
+// Biometric registration schema
+const BiometricRegistrationSchema = z.object({
+  biometric_type: z.enum(['fingerprint', 'face_id', 'touch_id']),
+  device_id: z.string().regex(MobileValidation.MOBILE_PATTERNS.deviceId),
+  public_key: z.string() // For secure key exchange
+});
+
+// Refresh token schema
+const RefreshTokenSchema = z.object({
+  refresh_token: z.string(),
+  device_id: z.string().regex(MobileValidation.MOBILE_PATTERNS.deviceId).optional()
 });
 
 // ==================== ENHANCED CONTROLLERS (UNCHANGED) ====================
@@ -248,6 +288,188 @@ const validateToken = async (req: Request, res: Response, next: NextFunction) =>
   }
 };
 
+// ==================== MOBILE-SPECIFIC CONTROLLERS ====================
+
+// Mobile register controller with device registration
+const mobileRegister = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, password, device_id, device_type, device_name, push_token } = req.body;
+    
+    // Register user first
+    const authResult = await authService.register({ email, password });
+    
+    // Register device (mock implementation - would call device service)
+    const deviceRegistered = true; // Mock success
+    
+    res.status(201).json({
+      status: 'success',
+      message: 'User registered successfully',
+      data: {
+        ...authResult,
+        device_registered: deviceRegistered,
+        sync_required: false,
+        server_time: new Date().toISOString(),
+        features: {
+          biometric_available: true,
+          offline_mode_available: true,
+          push_notifications_available: Boolean(push_token)
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Mobile login controller with device tracking
+const mobileLogin = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, password, device_id, device_type, remember_device } = req.body;
+    
+    const result = await authService.login({ email, password });
+    
+    // Track device login (mock implementation)
+    const deviceTracked = true; // Mock success
+    
+    res.status(200).json({
+      status: 'success',
+      message: 'Login successful',
+      data: {
+        ...result,
+        refresh_token: remember_device ? `refresh_${result.token}_${device_id}` : undefined,
+        expires_in: 3600, // 1 hour
+        device_registered: deviceTracked,
+        sync_required: true,
+        server_time: new Date().toISOString(),
+        features: {
+          biometric_available: true,
+          offline_mode_available: true,
+          push_notifications_available: true
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Biometric registration controller
+const registerBiometric = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      return next(ApiError.unauthorized('Authentication required'));
+    }
+
+    const { biometric_type, device_id, public_key } = req.body;
+    
+    // Mock biometric registration
+    const biometricId = `bio_${req.user.id}_${device_id}`;
+    const challenge = Buffer.from(Math.random().toString()).toString('base64');
+    
+    res.status(200).json({
+      status: 'success',
+      message: 'Biometric registration successful',
+      data: {
+        biometric_id: biometricId,
+        biometric_type,
+        challenge,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Biometric login controller
+const biometricLogin = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { user_id, biometric_id, device_id, challenge } = req.body;
+    
+    // Mock biometric verification
+    const isValid = biometric_id.includes(user_id) && biometric_id.includes(device_id);
+    
+    if (!isValid) {
+      return next(ApiError.authentication('Biometric authentication failed'));
+    }
+    
+    // Generate token for user (mock implementation)
+    const token = `token_bio_${user_id}_${Date.now()}`;
+    
+    res.status(200).json({
+      status: 'success',
+      message: 'Biometric login successful',
+      data: {
+        token,
+        refresh_token: `refresh_bio_${token}`,
+        expires_in: 3600,
+        user: {
+          id: user_id,
+          email: 'user@example.com' // Mock data
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Device registration controller
+const registerDevice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      return next(ApiError.unauthorized('Authentication required'));
+    }
+
+    const { device_id, device_type, device_name, push_token, app_version, os_version } = req.body;
+    
+    // Mock device registration
+    const registered = true;
+    
+    res.status(200).json({
+      status: 'success',
+      message: 'Device registered successfully',
+      data: {
+        device_id,
+        device_type,
+        registered,
+        push_notifications_enabled: Boolean(push_token),
+        biometric_available: ['ios', 'android'].includes(device_type)
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Refresh token controller
+const refreshToken = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { refresh_token, device_id } = req.body;
+    
+    // Mock refresh token validation
+    if (!refresh_token.startsWith('refresh_')) {
+      return next(ApiError.authentication('Invalid refresh token'));
+    }
+    
+    // Generate new tokens
+    const newToken = `token_refreshed_${Date.now()}`;
+    const newRefreshToken = `refresh_${newToken}`;
+    
+    res.status(200).json({
+      status: 'success',
+      message: 'Token refreshed successfully',
+      data: {
+        token: newToken,
+        refresh_token: newRefreshToken,
+        expires_in: 3600
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ==================== ROUTES WITH UPDATED VALIDATION ====================
 
 // Public routes with enhanced validation but NO password complexity checks
@@ -321,6 +543,82 @@ router.post('/login-legacy',
 router.get('/me-legacy', 
   authenticate, 
   authController.me
+);
+
+// ==================== MOBILE-SPECIFIC ROUTES ====================
+
+// Mobile authentication endpoints
+router.post('/mobile/register',
+  rateLimitByUser(5, 15 * 60 * 1000), // 5 attempts per 15 minutes
+  validateBody(MobileRegisterSchema),
+  mobileRegister
+);
+
+router.post('/mobile/login',
+  rateLimitByUser(10, 15 * 60 * 1000), // 10 attempts per 15 minutes
+  validateBody(MobileLoginSchema),
+  mobileLogin
+);
+
+// Biometric authentication endpoints
+router.post('/biometric/register',
+  authenticate,
+  requireAuth,
+  rateLimitByUser(3, 60 * 60 * 1000), // 3 attempts per hour
+  validateBody(BiometricRegistrationSchema),
+  registerBiometric
+);
+
+router.post('/biometric/login',
+  rateLimitByUser(20, 15 * 60 * 1000), // 20 attempts per 15 minutes
+  validateBody(BiometricLoginSchema),
+  biometricLogin
+);
+
+// Device management endpoints
+router.post('/device/register',
+  authenticate,
+  requireAuth,
+  rateLimitByUser(5, 60 * 60 * 1000), // 5 attempts per hour
+  validateBody(DeviceRegistrationSchema),
+  registerDevice
+);
+
+// Token refresh endpoint
+router.post('/refresh',
+  rateLimitByUser(30, 60 * 60 * 1000), // 30 attempts per hour
+  validateBody(RefreshTokenSchema),
+  refreshToken
+);
+
+// Mobile-specific profile endpoint with minimal data
+router.get('/mobile/profile',
+  authenticate,
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = await authService.getUserProfile(req.user.id);
+      
+      // Return minimal mobile-optimized response
+      res.status(200).json({
+        status: 'success',
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            // Additional fields would come from an extended user service
+            // For now, return minimal data
+            preferences: {
+              notifications_enabled: true,
+              theme: 'system'
+            }
+          }
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 );
 
 export { router as authRoutes };

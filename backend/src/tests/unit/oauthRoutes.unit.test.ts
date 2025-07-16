@@ -26,6 +26,9 @@ const mockOAuthController = {
   unlinkProvider: jest.fn()
 };
 
+// Counter for unique state generation
+let stateCounter = 0;
+
 // Define default implementations
 const defaultAuthorizeImpl = (req: any, res: any) => {
   const provider = req.params.provider || 'google';
@@ -36,7 +39,9 @@ const defaultAuthorizeImpl = (req: any, res: any) => {
   }
 
   // Build OAuth URL with provider-specific parameters
-  let oauthUrl = `https://oauth.${provider}.com/authorize?state=test-state-${Date.now()}`;
+  // Use counter to ensure unique state values
+  stateCounter++;
+  let oauthUrl = `https://oauth.${provider}.com/authorize?state=test-state-${Date.now()}-${stateCounter}`;
   
   if (access_type) oauthUrl += `&access_type=${access_type}`;
   if (prompt) oauthUrl += `&prompt=${prompt}`;
@@ -326,6 +331,9 @@ class TestHelper {
   static resetMocks() {
     jest.clearAllMocks();
     
+    // Reset state counter for unique state generation
+    stateCounter = 0;
+    
     mockAuthenticate.mockImplementation((req: any, res: any, next: any) => {
       process.nextTick(next);
     });
@@ -457,7 +465,7 @@ describe('OAuth Routes Comprehensive Unit Tests', () => {
 
         expect(new Set(states).size).toBe(3); // All unique
         states.forEach(state => {
-          expect(state).toMatch(/test-state-\d+/);
+          expect(state).toMatch(/test-state-\d+-\d+/);
         });
       });
 
