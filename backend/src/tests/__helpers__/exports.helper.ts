@@ -1,6 +1,7 @@
 // /backend/src/utils/exports.helper.ts
-import fs from 'fs';
-import path from 'path';
+import { jest } from '@jest/globals';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Request, Response, NextFunction } from 'express';
 import { MLExportBatchJob, ExportFormat } from '@koutu/shared/schemas/export';
 import { ExportMocks } from '../__mocks__/exports.mock';

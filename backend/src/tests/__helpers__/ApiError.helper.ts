@@ -1,5 +1,5 @@
 // backend/src/__tests__/__helpers__/ApiError.helper.ts
-import { jest } from '@jest/globals';
+import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import {
   MockApiError,
   errorScenarios,

@@ -1,5 +1,5 @@
 // /backend/src/__tests__/helpers/auth.helper.ts
-import { jest } from '@jest/globals';
+import { jest, it, expect } from '@jest/globals';
 import { Request, Response, NextFunction } from 'express';
 import { TestDatabaseConnection } from '../../utils/testDatabaseConnection';
 import { createMockUserModel, 

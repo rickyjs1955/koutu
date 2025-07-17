@@ -8,7 +8,7 @@
  * Used across unit and integration tests for consistent test behavior.
  */
 
-import { jest } from '@jest/globals';
+import { jest, expect } from '@jest/globals';
 import { Pool, PoolConfig } from 'pg';
 import { 
   MockPoolFactory, 

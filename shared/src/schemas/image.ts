@@ -270,7 +270,8 @@ export const ImageHelpers = {
       width: image.original_metadata?.width || 0,
       height: image.original_metadata?.height || 0,
       size: image.original_metadata?.size || 0,
-      format: image.original_metadata?.format || 'jpeg'
+      format: image.original_metadata?.format || 'jpeg',
+      mimetype: image.original_metadata?.mimetype || 'image/jpeg'
     },
     upload_date: image.upload_date,
     status: image.status,

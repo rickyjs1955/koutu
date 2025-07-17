@@ -21,14 +21,14 @@ export * from './polygon';
 // OAuth schemas
 export * from './oauth';
 
-// Base schemas
-export * from './base/common';
+// Base schemas - causes conflicts with other exports
+// export * from './base/common';
 
-// API schemas
-export * from './api';
+// API schemas - commented out to avoid conflicts
+// export * from './api';
 
-// Validator schemas
-export * from './validator';
+// Validator schemas - file doesn't exist
+// export * from './validator';
 
 // Flutter-specific type helpers for JSON serialization
 export interface FlutterSerializable {
@@ -128,3 +128,12 @@ export const MobileExportFormats = {
 
 // Re-export specific schemas that are used in routes
 export { BiometricLoginSchema, DeviceRegistrationSchema } from './user';
+
+// Temporarily comment out conflicting exports to fix build
+/*
+// Export schemas
+export * from './export';
+
+// Polygon schemas  
+export * from './polygon';
+*/
