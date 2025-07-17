@@ -154,8 +154,8 @@ Low Priority
 18. /shared/src/schemas/garment.ts                          ❌Unit ❌Integration ❌Security
 19. /shared/src/schemas/image.ts                            ❌Unit ❌Integration ❌Security
 20. /backend/src/routes/authRoutes.ts                       ✅Unit ✅Integration ✅Security ✅Performance ✅Stress
-21. /backend/src/routes/polygonRoutes.ts                    ✅Unit ❌Integration ❌Security
-22. /backend/src/routes/exportRoutes.ts                     ❌Unit ❌Integration ❌Security
+21. /backend/src/routes/polygonRoutes.ts                    ✅Unit ✅Integration ✅Security ✅Performance ✅Stress
+22. /backend/src/routes/exportRoutes.ts                     ✅Unit ✅Integration ✅Security ✅Performance ✅Stress
 Additional
 23. /backend/src/services/imageService.ts                   ✅Unit ✅Integration ✅Security ✅Performance ✅Stress
 24. /backend/src/services/imageProcessingService.ts         ✅Unit ✅Integration ✅Security ✅Performance ✅Stress
