@@ -1,0 +1,32 @@
+targets:
+  $default:
+    builders:
+      injectable_generator:injectable_builder:
+        enabled: true
+        options:
+          auto_register: true
+          generate_for:
+            - lib/**
+      injectable_generator:injectable_config_builder:
+        enabled: true
+        options:
+          auto_register: true
+          generate_for:
+            - lib/injection/injection.dart
+      json_serializable:
+        options:
+          explicit_to_json: true
+          field_rename: snake
+          include_if_null: false
+      freezed:
+        options:
+          when: true
+          map: true
+          copyWith: true
+          equal: true
+          toString: true
+          
+global_options:
+  freezed:
+    runs_before:
+      - json_serializable

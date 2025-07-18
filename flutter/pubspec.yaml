@@ -51,6 +51,8 @@ dependencies:
   json_annotation: ^4.8.1
   equatable: ^2.0.5
   intl: ^0.18.1
+  dartz: ^0.10.1
+  rxdart: ^0.27.7
   
   # Icons
   cupertino_icons: ^1.0.6
