@@ -18,6 +18,9 @@ pipeline {
                 sh 'git clean -fdx'
                 // Clean npm cache to fix corruption issues
                 sh 'npm cache clean --force || true'
+                // Also clean the npm cache directory if it exists
+                sh 'rm -rf ~/.npm/_cacache || true'
+                sh 'rm -rf ~/.npm/_logs || true'
                 // Check Node.js version
                 sh 'node --version || echo "Node.js not found"'
                 sh 'npm --version || echo "npm not found"'
@@ -29,14 +32,14 @@ pipeline {
                 stage('Frontend Dependencies') {
                     steps {
                         dir('frontend') {
-                            sh 'npm ci'
+                            sh 'npm install --no-save'
                         }
                     }
                 }
                 stage('Shared Dependencies') {
                     steps {
                         dir('shared') {
-                            sh 'npm ci'
+                            sh 'npm install --no-save'
                         }
                     }
                 }
