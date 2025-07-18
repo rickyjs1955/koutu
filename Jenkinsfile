@@ -1,9 +1,10 @@
 pipeline {
     agent any
     
-    tools {
-        nodejs 'Node18'
-    }
+    // Uncomment if Node.js needs to be installed via Jenkins
+    // tools {
+    //     nodejs 'Node18'
+    // }
     
     environment {
         NODE_ENV = 'production'
