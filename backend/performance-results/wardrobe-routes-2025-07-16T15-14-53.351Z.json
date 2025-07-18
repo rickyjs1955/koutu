@@ -1,0 +1,51 @@
+[
+  {
+    "test": "GET /wardrobe throughput",
+    "type": "throughput",
+    "duration": 10.048,
+    "metrics": {
+      "requests": {
+        "total": 700,
+        "average": 69.6656050955414
+      },
+      "throughput": {
+        "average": 69.6656050955414
+      },
+      "latency": {
+        "average": 140.17142857142858,
+        "p99": 190
+      },
+      "errors": 700
+    }
+  },
+  {
+    "test": "Complex filter query",
+    "type": "database_query",
+    "iterations": 50,
+    "metrics": {
+      "avgResponseTime": 5.3,
+      "p95ResponseTime": 9.74
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Statistics aggregation",
+    "type": "database_query",
+    "iterations": 50,
+    "metrics": {
+      "avgResponseTime": 3.58,
+      "p95ResponseTime": 6.17
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Cache performance",
+    "type": "caching",
+    "metrics": {
+      "coldCacheTime": 3.08,
+      "avgWarmCacheTime": 3.66,
+      "improvementPercent": -18.89
+    },
+    "unit": "ms"
+  }
+]

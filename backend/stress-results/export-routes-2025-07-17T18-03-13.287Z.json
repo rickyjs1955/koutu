@@ -1,0 +1,246 @@
+[
+  {
+    "test": "Extreme concurrent export creation",
+    "type": "stress_test",
+    "duration": 15111.651470005512,
+    "totalRequests": 10139,
+    "successfulRequests": 706,
+    "failedRequests": 9433,
+    "errors": {
+      "503_QUEUE_FULL": 9433
+    },
+    "metrics": {
+      "avgResponseTime": 65.31170512280093,
+      "minResponseTime": 0.9779930040240288,
+      "maxResponseTime": 250.33063800632954,
+      "p50ResponseTime": 32.475492000579834,
+      "p95ResponseTime": 197.36946499347687,
+      "p99ResponseTime": 223.7021820023656,
+      "requestsPerSecond": 670.9392431478769,
+      "errorRate": 0.9303678863793273
+    },
+    "resourceUsage": {
+      "peakMemory": 202.65469360351562,
+      "avgMemory": 137.2926108893447
+    }
+  },
+  {
+    "test": "Normal load baseline",
+    "type": "stress_test",
+    "duration": 5100.921311996877,
+    "totalRequests": 1307,
+    "successfulRequests": 1307,
+    "failedRequests": 0,
+    "errors": {},
+    "metrics": {
+      "avgResponseTime": 23.867989834001847,
+      "minResponseTime": 2.473633997142315,
+      "maxResponseTime": 107.66500600427389,
+      "p50ResponseTime": 19.436358004808426,
+      "p95ResponseTime": 58.84482400119305,
+      "p99ResponseTime": 75.4465639963746,
+      "requestsPerSecond": 256.2282223264377,
+      "errorRate": 0
+    },
+    "resourceUsage": {
+      "peakMemory": 221.58889770507812,
+      "avgMemory": 209.44231445935307
+    }
+  },
+  {
+    "test": "Traffic spike",
+    "type": "stress_test",
+    "duration": 5136.708608001471,
+    "totalRequests": 1617,
+    "successfulRequests": 1617,
+    "failedRequests": 0,
+    "errors": {},
+    "metrics": {
+      "avgResponseTime": 231.16238440999425,
+      "minResponseTime": 2.820268005132675,
+      "maxResponseTime": 457.051824003458,
+      "p50ResponseTime": 247.03381600230932,
+      "p95ResponseTime": 391.1672789976001,
+      "p99ResponseTime": 425.0389890000224,
+      "requestsPerSecond": 314.7930169683351,
+      "errorRate": 0
+    },
+    "resourceUsage": {
+      "peakMemory": 222.06009674072266,
+      "avgMemory": 87.42252048693206
+    }
+  },
+  {
+    "test": "Post-spike recovery",
+    "type": "stress_test",
+    "duration": 5084.972146004438,
+    "totalRequests": 1302,
+    "successfulRequests": 1302,
+    "failedRequests": 0,
+    "errors": {},
+    "metrics": {
+      "avgResponseTime": 22.255445706708137,
+      "minResponseTime": 2.34111800044775,
+      "maxResponseTime": 111.45931499451399,
+      "p50ResponseTime": 16.70626099407673,
+      "p95ResponseTime": 61.460643000900745,
+      "p99ResponseTime": 84.70861499756575,
+      "requestsPerSecond": 256.04860019204983,
+      "errorRate": 0
+    },
+    "resourceUsage": {
+      "peakMemory": 97.06600189208984,
+      "avgMemory": 74.59264311498525
+    }
+  },
+  {
+    "test": "Sustained load test",
+    "type": "stress_test",
+    "duration": 20108.537504002452,
+    "totalRequests": 3887,
+    "successfulRequests": 1586,
+    "failedRequests": 2301,
+    "errors": {
+      "403_ACCESS_DENIED": 964,
+      "404_UNKNOWN": 989,
+      "503_QUEUE_FULL": 348
+    },
+    "metrics": {
+      "avgResponseTime": 87.34357185925927,
+      "minResponseTime": 4.482717998325825,
+      "maxResponseTime": 292.2932479977608,
+      "p50ResponseTime": 83.6934019997716,
+      "p95ResponseTime": 176.39284299314022,
+      "p99ResponseTime": 223.67958500236273,
+      "requestsPerSecond": 193.3009797070683,
+      "errorRate": 0.5919732441471572
+    },
+    "resourceUsage": {
+      "peakMemory": 85.5816650390625,
+      "avgMemory": 67.66903236934117
+    }
+  },
+  {
+    "test": "Memory pressure test",
+    "type": "stress_test",
+    "duration": 30091.313114002347,
+    "totalRequests": 6174,
+    "successfulRequests": 991,
+    "failedRequests": 5183,
+    "errors": {
+      "503_QUEUE_FULL": 5183
+    },
+    "metrics": {
+      "avgResponseTime": 21.393411470499284,
+      "minResponseTime": 1.3723279982805252,
+      "maxResponseTime": 146.86073100566864,
+      "p50ResponseTime": 7.000351004302502,
+      "p95ResponseTime": 74.01686599850655,
+      "p99ResponseTime": 100.73542800545692,
+      "requestsPerSecond": 205.1754928942287,
+      "errorRate": 0.8394881762228701
+    },
+    "resourceUsage": {
+      "peakMemory": 211.36742401123047,
+      "avgMemory": 138.55318665177856
+    }
+  },
+  {
+    "test": "Connection pool exhaustion",
+    "type": "stress_test",
+    "duration": 16512.81183999777,
+    "totalRequests": 441,
+    "successfulRequests": 441,
+    "failedRequests": 0,
+    "errors": {},
+    "metrics": {
+      "avgResponseTime": 1761.5597393877822,
+      "minResponseTime": 1449.1377959996462,
+      "maxResponseTime": 2905.552267000079,
+      "p50ResponseTime": 1631.9590089991689,
+      "p95ResponseTime": 2905.4132549986243,
+      "p99ResponseTime": 2905.5349650010467,
+      "requestsPerSecond": 26.706535765871088,
+      "errorRate": 0
+    },
+    "resourceUsage": {
+      "peakMemory": 203.63440704345703,
+      "avgMemory": 169.98527242024738
+    }
+  },
+  {
+    "test": "Cascading failure recovery",
+    "type": "stress_test",
+    "duration": 31238.4884070009,
+    "totalRequests": 2393,
+    "successfulRequests": 2368,
+    "failedRequests": 25,
+    "errors": {
+      "503_QUEUE_FULL": 25
+    },
+    "metrics": {
+      "avgResponseTime": 1029.3946472795387,
+      "minResponseTime": 482.7059329971671,
+      "maxResponseTime": 2162.261095993221,
+      "p50ResponseTime": 931.7051390036941,
+      "p95ResponseTime": 1705.7600940018892,
+      "p99ResponseTime": 2039.5136969983578,
+      "requestsPerSecond": 76.60421877083212,
+      "errorRate": 0.010447137484329294
+    },
+    "resourceUsage": {
+      "peakMemory": 456.5657424926758,
+      "avgMemory": 317.9566934519801
+    }
+  },
+  {
+    "test": "Authentication storm",
+    "type": "stress_test",
+    "duration": 10142.358555004,
+    "totalRequests": 2014,
+    "successfulRequests": 409,
+    "failedRequests": 1605,
+    "errors": {
+      "401_INVALID_TOKEN": 1605
+    },
+    "metrics": {
+      "avgResponseTime": 155.6402791550137,
+      "minResponseTime": 53.533832997083664,
+      "maxResponseTime": 396.80772300064564,
+      "p50ResponseTime": 147.09207899868488,
+      "p95ResponseTime": 264.58368600159883,
+      "p99ResponseTime": 340.62185100466013,
+      "requestsPerSecond": 198.57314145202844,
+      "errorRate": 0.7969215491559086
+    },
+    "resourceUsage": {
+      "peakMemory": 640.7368469238281,
+      "avgMemory": 330.7499676295689
+    }
+  },
+  {
+    "test": "Health monitoring under stress",
+    "type": "stress_test",
+    "duration": 15109.438446998596,
+    "totalRequests": 5083,
+    "successfulRequests": 583,
+    "failedRequests": 4500,
+    "errors": {
+      "503_QUEUE_FULL": 4500
+    },
+    "metrics": {
+      "avgResponseTime": 34.972022676968315,
+      "minResponseTime": 0.9282839968800545,
+      "maxResponseTime": 368.8273990005255,
+      "p50ResponseTime": 23.334944002330303,
+      "p95ResponseTime": 101.15405800193548,
+      "p99ResponseTime": 164.3906969949603,
+      "requestsPerSecond": 336.41223780952026,
+      "errorRate": 0.8853039543576628
+    },
+    "resourceUsage": {
+      "peakMemory": 351.4434509277344,
+      "avgMemory": 316.4283841180463
+    }
+  }
+]

@@ -149,10 +149,10 @@ Medium Priority
 14. /backend/src/routes/imageRoutes.ts                      ✅Unit ✅Integration ✅Security ✅Performance ✅Stress
 15. /backend/src/routes/wardrobeRoutes.ts                   ✅Unit ✅Integration ✅Security ✅Performance ✅Stress
 Low Priority
-16. /shared/src/schemas/index.ts                            ❌Unit ❌Integration ❌Security
-17. /shared/src/schemas/user.ts                             ❌Unit ❌Integration ❌Security
-18. /shared/src/schemas/garment.ts                          ❌Unit ❌Integration ❌Security
-19. /shared/src/schemas/image.ts                            ❌Unit ❌Integration ❌Security
+16. /shared/src/schemas/index.ts                            ✅Unit ✅Integration ✅Security
+17. /shared/src/schemas/user.ts                             ✅Unit ✅Integration ✅Security
+18. /shared/src/schemas/garment.ts                          ✅Unit ✅Integration ✅Security
+19. /shared/src/schemas/image.ts                            ✅Unit ✅Integration ✅Security
 20. /backend/src/routes/authRoutes.ts                       ✅Unit ✅Integration ✅Security ✅Performance ✅Stress
 21. /backend/src/routes/polygonRoutes.ts                    ✅Unit ✅Integration ✅Security ✅Performance ✅Stress
 22. /backend/src/routes/exportRoutes.ts                     ✅Unit ✅Integration ✅Security ✅Performance ✅Stress

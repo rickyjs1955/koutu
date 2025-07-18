@@ -1,0 +1,93 @@
+[
+  {
+    "test": "POST /api/v1/polygons",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 1.95,
+      "min": 1.32,
+      "max": 3.68,
+      "p95": 3.01,
+      "p99": 3.68
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "GET /api/v1/polygons/image/:imageId",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 2.83,
+      "min": 2.16,
+      "max": 5.36,
+      "p95": 4.1,
+      "p99": 5.36
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "GET /api/v1/polygons/:id",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 1.38,
+      "min": 0.99,
+      "max": 4.08,
+      "p95": 2.28,
+      "p99": 4.08
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Concurrent polygon creation",
+    "type": "load_test",
+    "concurrentRequests": 50,
+    "metrics": {
+      "totalTime": 150.43,
+      "avgTime": 3.01,
+      "requestsPerSecond": 332.39
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Large polygon handling",
+    "type": "scalability_test",
+    "results": [
+      {
+        "pointCount": 10,
+        "time": 2.91,
+        "status": 201
+      },
+      {
+        "pointCount": 50,
+        "time": 1.23,
+        "status": 201
+      },
+      {
+        "pointCount": 100,
+        "time": 1.41,
+        "status": 201
+      },
+      {
+        "pointCount": 500,
+        "time": 3.27,
+        "status": 201
+      },
+      {
+        "pointCount": 1000,
+        "time": 4.97,
+        "status": 201
+      }
+    ]
+  },
+  {
+    "test": "Memory usage",
+    "type": "memory_test",
+    "polygonCount": 1000,
+    "memoryIncrease": {
+      "heapUsed": 7.18,
+      "external": -0.21
+    },
+    "unit": "MB"
+  }
+]

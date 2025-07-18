@@ -1,0 +1,195 @@
+[
+  {
+    "test": "GET /wardrobe",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 3.4,
+      "min": 1.7,
+      "max": 11.1,
+      "p95": 8.98,
+      "p99": 11.1
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "GET /wardrobe/:id",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 2.14,
+      "min": 1.48,
+      "max": 5.02,
+      "p95": 3.25,
+      "p99": 5.02
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "POST /wardrobe",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 3.81,
+      "min": 2.8,
+      "max": 23.09,
+      "p95": 4.6,
+      "p99": 23.09
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "PUT /wardrobe/:id",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 2.38,
+      "min": 1.71,
+      "max": 7.2,
+      "p95": 4.23,
+      "p99": 7.2
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "POST /wardrobe/:id/items",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 2.29,
+      "min": 1.53,
+      "max": 7.09,
+      "p95": 3.48,
+      "p99": 7.09
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "GET /wardrobe/:id/stats",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 1.99,
+      "min": 1.36,
+      "max": 5.14,
+      "p95": 3.08,
+      "p99": 5.14
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "DELETE /wardrobe/:id/items/:itemId",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 4.98,
+      "min": 2.85,
+      "max": 13.8,
+      "p95": 9.79,
+      "p99": 13.8
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "PUT /wardrobe/:id/items/reorder",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 2.53,
+      "min": 1.47,
+      "max": 8.7,
+      "p95": 4.68,
+      "p99": 8.7
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "GET /wardrobe throughput",
+    "type": "throughput",
+    "duration": 10.004,
+    "metrics": {
+      "requests": {
+        "total": 7860,
+        "average": 785.6857257097162
+      },
+      "throughput": {
+        "average": 785.6857257097162
+      },
+      "latency": {
+        "average": 9.510432569974554,
+        "p99": 29
+      },
+      "errors": 0
+    }
+  },
+  {
+    "test": "Sustained load test",
+    "type": "load",
+    "connections": 100,
+    "duration": 20.027,
+    "metrics": {
+      "totalRequests": 3900,
+      "avgThroughput": 194.73710490837368,
+      "avgLatency": 290.2971794871795,
+      "p99Latency": 764,
+      "errors": 0,
+      "timeouts": 0
+    }
+  },
+  {
+    "test": "Spike test",
+    "type": "spike",
+    "connections": 200,
+    "duration": 10.756,
+    "metrics": {
+      "totalRequests": 1600,
+      "avgThroughput": 148.75418371141689,
+      "avgLatency": 733.74625,
+      "p99Latency": 1389,
+      "errors": 0,
+      "timeouts": 0
+    }
+  },
+  {
+    "test": "Memory usage under load",
+    "type": "memory",
+    "duration": 20,
+    "metrics": {
+      "avgHeapUsed": 87.78,
+      "maxHeapUsed": 128.49,
+      "minHeapUsed": 63.69,
+      "memoryGrowth": 64.8
+    },
+    "unit": "MB"
+  },
+  {
+    "test": "Wardrobe listing query",
+    "type": "database_query",
+    "iterations": 50,
+    "metrics": {
+      "avgResponseTime": 4.21,
+      "p95ResponseTime": 5.82
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Wardrobe stats aggregation",
+    "type": "database_query",
+    "iterations": 50,
+    "metrics": {
+      "avgResponseTime": 4.21,
+      "p95ResponseTime": 5.86
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Cache performance",
+    "type": "caching",
+    "metrics": {
+      "coldCacheTime": 6.69,
+      "avgWarmCacheTime": 4.5,
+      "improvementPercent": 32.8
+    },
+    "unit": "ms"
+  }
+]

@@ -1,0 +1,27 @@
+[
+  {
+    "test": "Extreme concurrent export creation",
+    "type": "stress_test",
+    "duration": 20196.88264900446,
+    "totalRequests": 11260,
+    "successfulRequests": 955,
+    "failedRequests": 10305,
+    "errors": {
+      "503_QUEUE_FULL": 10305
+    },
+    "metrics": {
+      "avgResponseTime": 195.76450386266447,
+      "minResponseTime": 1.1372810006141663,
+      "maxResponseTime": 651.5493429973722,
+      "p50ResponseTime": 85.64419600367546,
+      "p95ResponseTime": 527.429814003408,
+      "p99ResponseTime": 574.7925909981132,
+      "requestsPerSecond": 557.5117801932184,
+      "errorRate": 0.9151865008880995
+    },
+    "resourceUsage": {
+      "peakMemory": 210.0171890258789,
+      "avgMemory": 119.60168559967525
+    }
+  }
+]

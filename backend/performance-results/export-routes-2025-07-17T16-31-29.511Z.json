@@ -1,0 +1,271 @@
+[
+  {
+    "test": "POST /api/v1/export/ml",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 12.81,
+      "min": 11.22,
+      "max": 15.2,
+      "p95": 14.31,
+      "p99": 15.2
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "GET /api/v1/export/ml/jobs/:jobId",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 2.08,
+      "min": 1.17,
+      "max": 6.87,
+      "p95": 3.6,
+      "p99": 6.87
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "GET /api/v1/export/ml/jobs",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 3.16,
+      "min": 2.06,
+      "max": 6.81,
+      "p95": 5.55,
+      "p99": 6.81
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "GET /api/v1/export/ml/stats",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 8.15,
+      "min": 6.51,
+      "max": 10.44,
+      "p95": 9.47,
+      "p99": 10.44
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "DELETE /api/v1/export/ml/jobs/:jobId",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 1.73,
+      "min": 1.2,
+      "max": 5.89,
+      "p95": 2.59,
+      "p99": 5.89
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Concurrent export job creation",
+    "type": "load_test",
+    "concurrentRequests": 50,
+    "metrics": {
+      "totalTime": 101.35,
+      "avgTime": 2.03,
+      "requestsPerSecond": 493.32
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Large export options handling",
+    "type": "scalability_test",
+    "results": [
+      {
+        "itemCount": 100,
+        "time": 13.55,
+        "status": 202
+      },
+      {
+        "itemCount": 500,
+        "time": 11.54,
+        "status": 202
+      },
+      {
+        "itemCount": 1000,
+        "time": 12.43,
+        "status": 202
+      },
+      {
+        "itemCount": 5000,
+        "time": 11.66,
+        "status": 202
+      },
+      {
+        "itemCount": 10000,
+        "time": 12.04,
+        "status": 202
+      }
+    ]
+  },
+  {
+    "test": "Multi-user concurrent operations",
+    "type": "load_test",
+    "totalOperations": 100,
+    "metrics": {
+      "totalTime": 183.02,
+      "avgTime": 1.83,
+      "operationsPerSecond": 546.39
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Memory usage with many jobs",
+    "type": "memory_test",
+    "jobCount": 1000,
+    "memoryIncrease": {
+      "heapUsed": 10.53,
+      "external": -0.84
+    },
+    "unit": "MB"
+  },
+  {
+    "test": "Job status update propagation",
+    "type": "processing_test",
+    "statusChecks": [
+      {
+        "attempt": 1,
+        "status": "pending",
+        "progress": 0,
+        "checkTime": 2.84,
+        "totalElapsed": 2.9
+      },
+      {
+        "attempt": 2,
+        "status": "pending",
+        "progress": 0,
+        "checkTime": 2.52,
+        "totalElapsed": 15.69
+      },
+      {
+        "attempt": 3,
+        "status": "pending",
+        "progress": 0,
+        "checkTime": 2.98,
+        "totalElapsed": 28.76
+      },
+      {
+        "attempt": 4,
+        "status": "pending",
+        "progress": 0,
+        "checkTime": 3.14,
+        "totalElapsed": 41.96
+      },
+      {
+        "attempt": 5,
+        "status": "processing",
+        "progress": 50,
+        "checkTime": 2.02,
+        "totalElapsed": 54.77
+      },
+      {
+        "attempt": 6,
+        "status": "processing",
+        "progress": 50,
+        "checkTime": 1.37,
+        "totalElapsed": 66.47
+      },
+      {
+        "attempt": 7,
+        "status": "processing",
+        "progress": 50,
+        "checkTime": 2.01,
+        "totalElapsed": 77.9
+      },
+      {
+        "attempt": 8,
+        "status": "processing",
+        "progress": 50,
+        "checkTime": 1.28,
+        "totalElapsed": 89.71
+      },
+      {
+        "attempt": 9,
+        "status": "processing",
+        "progress": 50,
+        "checkTime": 1.5,
+        "totalElapsed": 101.65
+      },
+      {
+        "attempt": 10,
+        "status": "processing",
+        "progress": 50,
+        "checkTime": 5,
+        "totalElapsed": 117.23
+      },
+      {
+        "attempt": 11,
+        "status": "processing",
+        "progress": 50,
+        "checkTime": 3.07,
+        "totalElapsed": 130.43
+      },
+      {
+        "attempt": 12,
+        "status": "processing",
+        "progress": 50,
+        "checkTime": 2.77,
+        "totalElapsed": 143.06
+      },
+      {
+        "attempt": 13,
+        "status": "completed",
+        "progress": 100,
+        "checkTime": 2.59,
+        "totalElapsed": 155.57
+      }
+    ],
+    "totalTime": 155.6,
+    "completed": true
+  },
+  {
+    "test": "Download performance by file size",
+    "type": "download_test",
+    "results": [
+      {
+        "fileSize": "1MB",
+        "downloadTime": 10.48,
+        "throughput": 95.42
+      },
+      {
+        "fileSize": "5MB",
+        "downloadTime": 47.22,
+        "throughput": 105.89
+      },
+      {
+        "fileSize": "10MB",
+        "downloadTime": 72.4,
+        "throughput": 138.12
+      },
+      {
+        "fileSize": "50MB",
+        "downloadTime": 668.13,
+        "throughput": 74.84
+      }
+    ]
+  },
+  {
+    "test": "Statistics calculation performance",
+    "type": "calculation_test",
+    "results": [
+      {
+        "user": "perf-test@example.com",
+        "garmentCount": 1000,
+        "calculationTime": 22.3
+      },
+      {
+        "user": "perf-test-2@example.com",
+        "garmentCount": 500,
+        "calculationTime": 13.58
+      }
+    ]
+  }
+]

@@ -1,0 +1,28 @@
+[
+  {
+    "test": "Authentication storm",
+    "type": "stress_test",
+    "duration": 20160.003696002066,
+    "totalRequests": 11876,
+    "successfulRequests": 1001,
+    "failedRequests": 10875,
+    "errors": {
+      "401_INVALID_TOKEN": 9431,
+      "429_RATE_LIMIT_EXCEEDED": 1444
+    },
+    "metrics": {
+      "avgResponseTime": 237.5820650769741,
+      "minResponseTime": 52.83901900053024,
+      "maxResponseTime": 768.9751750007272,
+      "p50ResponseTime": 126.74277800321579,
+      "p95ResponseTime": 543.9057069942355,
+      "p99ResponseTime": 645.9012959972024,
+      "requestsPerSecond": 589.0871935879225,
+      "errorRate": 0.9157123610643314
+    },
+    "resourceUsage": {
+      "peakMemory": 100.17090606689453,
+      "avgMemory": 77.93452749961664
+    }
+  }
+]

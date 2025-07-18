@@ -1,0 +1,91 @@
+[
+  {
+    "test": "GET /wardrobe throughput",
+    "type": "throughput",
+    "duration": 10.21,
+    "metrics": {
+      "requests": {
+        "total": 350,
+        "average": 34.280117531831536
+      },
+      "throughput": {
+        "average": 34.280117531831536
+      },
+      "latency": {
+        "average": 284.46,
+        "p99": 399
+      },
+      "errors": 350
+    }
+  },
+  {
+    "test": "Sustained load test",
+    "type": "load",
+    "connections": 100,
+    "duration": 30.708,
+    "metrics": {
+      "totalRequests": 1000,
+      "avgThroughput": 32.564803959880166,
+      "avgLatency": 2869.022,
+      "p99Latency": 3321,
+      "errors": 1000,
+      "timeouts": 0
+    }
+  },
+  {
+    "test": "Spike test",
+    "type": "spike",
+    "connections": 200,
+    "duration": 10.059,
+    "metrics": {
+      "totalRequests": 400,
+      "avgThroughput": 39.76538423302515,
+      "avgLatency": 4333.935,
+      "p99Latency": 5233,
+      "errors": 400,
+      "timeouts": 0
+    }
+  },
+  {
+    "test": "Memory usage under load",
+    "type": "memory",
+    "duration": 20,
+    "metrics": {
+      "avgHeapUsed": 94.12,
+      "maxHeapUsed": 122.43,
+      "minHeapUsed": 78.44,
+      "memoryGrowth": 43.99
+    },
+    "unit": "MB"
+  },
+  {
+    "test": "Wardrobe listing query",
+    "type": "database_query",
+    "iterations": 50,
+    "metrics": {
+      "avgResponseTime": 38.86,
+      "p95ResponseTime": 51.85
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Wardrobe stats aggregation",
+    "type": "database_query",
+    "iterations": 50,
+    "metrics": {
+      "avgResponseTime": 25.63,
+      "p95ResponseTime": 37.63
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Cache performance",
+    "type": "caching",
+    "metrics": {
+      "coldCacheTime": 21.48,
+      "avgWarmCacheTime": 21.67,
+      "improvementPercent": -0.86
+    },
+    "unit": "ms"
+  }
+]

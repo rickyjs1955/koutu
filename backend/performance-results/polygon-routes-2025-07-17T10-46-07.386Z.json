@@ -1,0 +1,88 @@
+[
+  {
+    "test": "POST /api/v1/polygons",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 1.67,
+      "min": 1.15,
+      "max": 3.16,
+      "p95": 2.56,
+      "p99": 3.16
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "GET /api/v1/polygons/image/:imageId",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 2.57,
+      "min": 2.01,
+      "max": 9.34,
+      "p95": 3.69,
+      "p99": 9.34
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "GET /api/v1/polygons/:id",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 1.11,
+      "min": 0.93,
+      "max": 3.11,
+      "p95": 1.6,
+      "p99": 3.11
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "PUT /api/v1/polygons/:id",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 1.25,
+      "min": 1.05,
+      "max": 4.79,
+      "p95": 1.95,
+      "p99": 4.79
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "DELETE /api/v1/polygons/:id",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 1.14,
+      "min": 0.89,
+      "max": 3.31,
+      "p95": 1.79,
+      "p99": 3.31
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Concurrent polygon creation",
+    "type": "load_test",
+    "concurrentRequests": 50,
+    "metrics": {
+      "totalTime": 89.15,
+      "avgTime": 1.78,
+      "requestsPerSecond": 560.84
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Memory usage",
+    "type": "memory_test",
+    "polygonCount": 1000,
+    "memoryIncrease": {
+      "heapUsed": 18.79,
+      "external": 0.01
+    },
+    "unit": "MB"
+  }
+]

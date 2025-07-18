@@ -1,0 +1,74 @@
+[
+  {
+    "test": "Create polygon with 1000 points",
+    "pointCount": 1000,
+    "responseTime": 157.93,
+    "memoryIncrease": {
+      "heapUsed": -14.46,
+      "external": 0.16999999999999993
+    }
+  },
+  {
+    "test": "Create polygon with 5000 points",
+    "pointCount": 5000,
+    "responseTime": 142.36
+  },
+  {
+    "test": "Bulk create 100 polygons",
+    "count": 100,
+    "responseTime": 25.66,
+    "avgTimePerPolygon": 0.26
+  },
+  {
+    "test": "Bulk create 500 polygons",
+    "count": 500,
+    "responseTime": 33.92
+  },
+  {
+    "test": "Bulk delete 200 polygons",
+    "count": 200,
+    "responseTime": 8.81
+  },
+  {
+    "test": "Create polygon with deep metadata",
+    "metadataDepth": 10,
+    "status": "success"
+  },
+  {
+    "test": "Concurrent creation stress",
+    "concurrentRequests": 100,
+    "successCount": 100,
+    "totalTime": 323.77,
+    "avgTimePerRequest": 3.24
+  },
+  {
+    "test": "Rapid sequential requests",
+    "requestCount": 50,
+    "totalTime": 177.47,
+    "requestsPerSecond": 281.74
+  },
+  {
+    "test": "Pagination with 100 items",
+    "pageSize": 100,
+    "totalItems": 1000,
+    "responseTime": 3.77
+  },
+  {
+    "test": "Pagination with 250 items",
+    "pageSize": 250,
+    "totalItems": 1000,
+    "responseTime": 3.71
+  },
+  {
+    "test": "Pagination with 500 items",
+    "pageSize": 500,
+    "totalItems": 1000,
+    "responseTime": 5.15
+  },
+  {
+    "test": "Partial bulk operation",
+    "total": 60,
+    "succeeded": 50,
+    "failed": 10
+  }
+]

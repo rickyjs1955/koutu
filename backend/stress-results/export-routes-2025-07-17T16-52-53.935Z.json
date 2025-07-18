@@ -1,0 +1,27 @@
+[
+  {
+    "test": "Cascading failure recovery",
+    "type": "stress_test",
+    "duration": 30123.736970998347,
+    "totalRequests": 12516,
+    "successfulRequests": 9743,
+    "failedRequests": 2773,
+    "errors": {
+      "503_QUEUE_FULL": 2773
+    },
+    "metrics": {
+      "avgResponseTime": 154.66223945845718,
+      "minResponseTime": 22.499052993953228,
+      "maxResponseTime": 638.2009250000119,
+      "p50ResponseTime": 95.39036100357771,
+      "p95ResponseTime": 366.27472600340843,
+      "p99ResponseTime": 492.31310600042343,
+      "requestsPerSecond": 415.4862994604484,
+      "errorRate": 0.22155640779801852
+    },
+    "resourceUsage": {
+      "peakMemory": 228.43680572509766,
+      "avgMemory": 158.09786228015662
+    }
+  }
+]

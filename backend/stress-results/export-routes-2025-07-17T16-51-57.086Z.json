@@ -1,0 +1,30 @@
+[
+  {
+    "test": "Sustained load test",
+    "type": "stress_test",
+    "duration": 120236.39568100125,
+    "totalRequests": 36728,
+    "successfulRequests": 12740,
+    "failedRequests": 23988,
+    "errors": {
+      "404_JOB_NOT_FOUND": 26,
+      "404_UNKNOWN": 9118,
+      "403_ACCESS_DENIED": 9081,
+      "503_QUEUE_FULL": 5763
+    },
+    "metrics": {
+      "avgResponseTime": 219.24968739768093,
+      "minResponseTime": 9.029059998691082,
+      "maxResponseTime": 2565.06628100574,
+      "p50ResponseTime": 176.60647899657488,
+      "p95ResponseTime": 578.4074819982052,
+      "p99ResponseTime": 1230.9342349991202,
+      "requestsPerSecond": 305.46491178463907,
+      "errorRate": 0.6531256806795905
+    },
+    "resourceUsage": {
+      "peakMemory": 242.02881622314453,
+      "avgMemory": 128.06264292097234
+    }
+  }
+]

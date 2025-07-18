@@ -1,0 +1,71 @@
+[
+  {
+    "test": "Normal load baseline",
+    "type": "stress_test",
+    "duration": 10110.637123003602,
+    "totalRequests": 3048,
+    "successfulRequests": 3048,
+    "failedRequests": 0,
+    "errors": {},
+    "metrics": {
+      "avgResponseTime": 95.64745973136394,
+      "minResponseTime": 4.204600997269154,
+      "maxResponseTime": 290.227434001863,
+      "p50ResponseTime": 91.49526199698448,
+      "p95ResponseTime": 166.06927700340748,
+      "p99ResponseTime": 230.733712002635,
+      "requestsPerSecond": 301.4646814952172,
+      "errorRate": 0
+    },
+    "resourceUsage": {
+      "peakMemory": 161.15216827392578,
+      "avgMemory": 107.96446791149322
+    }
+  },
+  {
+    "test": "Traffic spike",
+    "type": "stress_test",
+    "duration": 11069.928541004658,
+    "totalRequests": 1882,
+    "successfulRequests": 1882,
+    "failedRequests": 0,
+    "errors": {},
+    "metrics": {
+      "avgResponseTime": 502.1068860063929,
+      "minResponseTime": 9.509554997086525,
+      "maxResponseTime": 1005.3273999989033,
+      "p50ResponseTime": 512.1519079953432,
+      "p95ResponseTime": 851.2570939958096,
+      "p99ResponseTime": 931.7277219966054,
+      "requestsPerSecond": 170.01013087200997,
+      "errorRate": 0
+    },
+    "resourceUsage": {
+      "peakMemory": 218.21682739257812,
+      "avgMemory": 157.50308829859682
+    }
+  },
+  {
+    "test": "Post-spike recovery",
+    "type": "stress_test",
+    "duration": 10104.301589004695,
+    "totalRequests": 7111,
+    "successfulRequests": 7111,
+    "failedRequests": 0,
+    "errors": {},
+    "metrics": {
+      "avgResponseTime": 16.112798356473228,
+      "minResponseTime": 0.6056250035762787,
+      "maxResponseTime": 282.6654280051589,
+      "p50ResponseTime": 5.419826000928879,
+      "p95ResponseTime": 70.6844339966774,
+      "p99ResponseTime": 210.822509996593,
+      "requestsPerSecond": 703.7596747644639,
+      "errorRate": 0
+    },
+    "resourceUsage": {
+      "peakMemory": 207.34700775146484,
+      "avgMemory": 109.56947127632473
+    }
+  }
+]

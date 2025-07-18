@@ -1,0 +1,91 @@
+[
+  {
+    "test": "GET /wardrobe throughput",
+    "type": "throughput",
+    "duration": 10.11,
+    "metrics": {
+      "requests": {
+        "total": 780,
+        "average": 77.15133531157271
+      },
+      "throughput": {
+        "average": 77.15133531157271
+      },
+      "latency": {
+        "average": 126.76666666666667,
+        "p99": 229
+      },
+      "errors": 780
+    }
+  },
+  {
+    "test": "Sustained load test",
+    "type": "load",
+    "connections": 100,
+    "duration": 30.501,
+    "metrics": {
+      "totalRequests": 2300,
+      "avgThroughput": 75.40736369299367,
+      "avgLatency": 1288.5,
+      "p99Latency": 1541,
+      "errors": 2300,
+      "timeouts": 0
+    }
+  },
+  {
+    "test": "Spike test",
+    "type": "spike",
+    "connections": 200,
+    "duration": 12.324,
+    "metrics": {
+      "totalRequests": 800,
+      "avgThroughput": 64.91398896462188,
+      "avgLatency": 2981.3925,
+      "p99Latency": 3339,
+      "errors": 800,
+      "timeouts": 0
+    }
+  },
+  {
+    "test": "Memory usage under load",
+    "type": "memory",
+    "duration": 20,
+    "metrics": {
+      "avgHeapUsed": 92.68,
+      "maxHeapUsed": 108.07,
+      "minHeapUsed": 73.47,
+      "memoryGrowth": 34.59
+    },
+    "unit": "MB"
+  },
+  {
+    "test": "Complex filter query",
+    "type": "database_query",
+    "iterations": 50,
+    "metrics": {
+      "avgResponseTime": 4.39,
+      "p95ResponseTime": 6.73
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Statistics aggregation",
+    "type": "database_query",
+    "iterations": 50,
+    "metrics": {
+      "avgResponseTime": 2.52,
+      "p95ResponseTime": 3.72
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Cache performance",
+    "type": "caching",
+    "metrics": {
+      "coldCacheTime": 2.77,
+      "avgWarmCacheTime": 2.44,
+      "improvementPercent": 11.79
+    },
+    "unit": "ms"
+  }
+]

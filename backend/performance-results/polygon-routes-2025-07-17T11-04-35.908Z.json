@@ -1,0 +1,119 @@
+[
+  {
+    "test": "POST /api/v1/polygons",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 1.55,
+      "min": 1.14,
+      "max": 7.89,
+      "p95": 2.36,
+      "p99": 7.89
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "GET /api/v1/polygons/image/:imageId",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 2.46,
+      "min": 2.03,
+      "max": 6.16,
+      "p95": 3.29,
+      "p99": 6.16
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "GET /api/v1/polygons/:id",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 1.3,
+      "min": 0.96,
+      "max": 5.64,
+      "p95": 2.41,
+      "p99": 5.64
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "PUT /api/v1/polygons/:id",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 1.47,
+      "min": 1.06,
+      "max": 9.18,
+      "p95": 2.94,
+      "p99": 9.18
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "DELETE /api/v1/polygons/:id",
+    "type": "response_time",
+    "iterations": 100,
+    "metrics": {
+      "avg": 1.25,
+      "min": 0.92,
+      "max": 4.45,
+      "p95": 2.75,
+      "p99": 4.45
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Concurrent polygon creation",
+    "type": "load_test",
+    "concurrentRequests": 50,
+    "metrics": {
+      "totalTime": 93.74,
+      "avgTime": 1.87,
+      "requestsPerSecond": 533.41
+    },
+    "unit": "ms"
+  },
+  {
+    "test": "Large polygon handling",
+    "type": "scalability_test",
+    "results": [
+      {
+        "pointCount": 10,
+        "time": 3.58,
+        "status": 201
+      },
+      {
+        "pointCount": 50,
+        "time": 1.83,
+        "status": 201
+      },
+      {
+        "pointCount": 100,
+        "time": 1.48,
+        "status": 201
+      },
+      {
+        "pointCount": 500,
+        "time": 2.75,
+        "status": 201
+      },
+      {
+        "pointCount": 1000,
+        "time": 4.77,
+        "status": 201
+      }
+    ]
+  },
+  {
+    "test": "Memory usage",
+    "type": "memory_test",
+    "polygonCount": 1000,
+    "memoryIncrease": {
+      "heapUsed": 18.05,
+      "external": 0.01
+    },
+    "unit": "MB"
+  }
+]
