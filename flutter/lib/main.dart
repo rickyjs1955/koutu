@@ -6,6 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:koutu/app.dart';
 import 'package:koutu/injection/injection.dart';
 import 'package:koutu/core/utils/logger.dart';
+import 'package:koutu/services/search/search_history_manager.dart';
+import 'dart:async';
 
 void main() async {
   // Ensure Flutter bindings are initialized
@@ -23,6 +25,9 @@ void main() async {
 
   // Configure dependency injection
   await configureDependencies();
+
+  // Initialize search history manager
+  await SearchHistoryManager.initialize();
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([

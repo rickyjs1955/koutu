@@ -13,11 +13,21 @@ import 'package:koutu/presentation/widgets/animations/app_fade_animation.dart';
 import 'package:koutu/presentation/widgets/animations/app_animated_list_item.dart';
 import 'package:koutu/presentation/widgets/common/app_badge.dart';
 import 'package:koutu/presentation/widgets/dialogs/app_dialog.dart';
+import 'package:koutu/presentation/widgets/search/intelligent_search_bar.dart';
+import 'package:koutu/presentation/widgets/search/color_filter_widget.dart';
+import 'package:koutu/presentation/widgets/search/tag_search_widget.dart';
+import 'package:koutu/presentation/widgets/search/visual_similarity_widget.dart';
 import 'package:koutu/presentation/router/route_paths.dart';
 import 'package:koutu/data/models/garment/garment_model.dart';
+import 'package:koutu/services/search/fuzzy_search_service.dart';
+import 'package:koutu/services/search/search_history_manager.dart';
+import 'package:koutu/services/search/tag_search_service.dart';
+import 'package:koutu/services/color/color_palette_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 enum GarmentSortOption { name, date, brand, category, wearCount }
+
+enum SearchMode { intelligent, tag, visual }
 
 class GarmentListScreen extends StatefulWidget {
   const GarmentListScreen({super.key});
@@ -27,7 +37,6 @@ class GarmentListScreen extends StatefulWidget {
 }
 
 class _GarmentListScreenState extends State<GarmentListScreen> {
-  final _searchController = TextEditingController();
   String _searchQuery = '';
   GarmentSortOption _sortOption = GarmentSortOption.date;
   bool _isAscending = false;
@@ -43,20 +52,126 @@ class _GarmentListScreenState extends State<GarmentListScreen> {
   final Set<String> _selectedGarmentIds = {};
   bool _isSelectionMode = false;
 
+  // Search state
+  List<GarmentSearchResult> _searchResults = [];
+  List<String> _recentSearches = [];
+  bool _useIntelligentSearch = false;
+  SearchMode _searchMode = SearchMode.intelligent;
+  
+  // Tag search state
+  List<String> _selectedTags = [];
+  List<TagSearchResult> _tagSearchResults = [];
+  
+  // Visual similarity state
+  GarmentModel? _similarityTarget;
+
   @override
   void initState() {
     super.initState();
     _loadGarments();
+    _loadRecentSearches();
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
     super.dispose();
   }
 
   void _loadGarments() {
     context.read<GarmentBloc>().add(const LoadGarments());
+  }
+
+  void _loadRecentSearches() async {
+    final recentSearches = await SearchHistoryManager.getRecentSearches(limit: 10);
+    setState(() {
+      _recentSearches = recentSearches;
+    });
+  }
+
+  void _onSearchQueryChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+    
+    if (query.isNotEmpty) {
+      SearchHistoryManager.addSearchQuery(query);
+      _loadRecentSearches();
+    }
+    
+    _performSearch();
+  }
+
+  void _onGarmentSelected(GarmentSearchResult result) {
+    _navigateToGarmentDetail(result.garment);
+  }
+
+  void _onRecentSearchSelected(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+    _performSearch();
+  }
+
+  void _performSearch() {
+    if (_useIntelligentSearch && _searchQuery.isNotEmpty) {
+      final results = FuzzySearchService.searchGarments(
+        context.read<GarmentBloc>().state.garments,
+        _searchQuery,
+        maxResults: 50,
+      );
+      
+      setState(() {
+        _searchResults = results;
+      });
+    } else {
+      setState(() {
+        _searchResults.clear();
+      });
+    }
+  }
+
+  void _showColorFilter() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ColorFilterWidget(
+        garments: context.read<GarmentBloc>().state.garments,
+        selectedColors: _selectedColor != null ? [_selectedColor!] : [],
+        onColorsChanged: (colors) {
+          setState(() {
+            _selectedColor = colors.isNotEmpty ? colors.first : null;
+          });
+        },
+      ),
+    );
+  }
+  
+  void _onTagSearchResults(List<TagSearchResult> results) {
+    setState(() {
+      _tagSearchResults = results;
+    });
+  }
+  
+  void _onTagsChanged(List<String> tags) {
+    setState(() {
+      _selectedTags = tags;
+    });
+  }
+  
+  void _onSimilarityTargetChanged(GarmentModel? target) {
+    setState(() {
+      _similarityTarget = target;
+    });
+  }
+  
+  void _onCompareGarments(List<GarmentModel> garments) {
+    // TODO: Implement garment comparison dialog
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Comparing ${garments.length} garments'),
+      ),
+    );
   }
 
   @override
@@ -73,8 +188,130 @@ class _GarmentListScreenState extends State<GarmentListScreen> {
         appBar: _isSelectionMode ? _buildSelectionAppBar() : _buildNormalAppBar(),
         body: Column(
           children: [
-            // Search bar
-            _buildSearchBar(),
+            // Search mode selector
+            Container(
+              padding: const EdgeInsets.all(AppDimensions.paddingM),
+              child: Row(
+                children: [
+                  Text(
+                    'Search:',
+                    style: AppTextStyles.labelMedium,
+                  ),
+                  const SizedBox(width: AppDimensions.paddingS),
+                  ...SearchMode.values.map((mode) => Padding(
+                    padding: const EdgeInsets.only(right: AppDimensions.paddingS),
+                    child: FilterChip(
+                      label: Text(_getSearchModeLabel(mode)),
+                      selected: _searchMode == mode,
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _searchMode = mode;
+                          });
+                        }
+                      },
+                    ),
+                  )).toList(),
+                ],
+              ),
+            ),
+            
+            // Search interface based on mode
+            BlocBuilder<GarmentBloc, GarmentState>(
+              builder: (context, state) {
+                switch (_searchMode) {
+                  case SearchMode.intelligent:
+                    return IntelligentSearchBar(
+                      hintText: 'Search garments with AI...',
+                      garments: state.garments,
+                      onQueryChanged: _onSearchQueryChanged,
+                      onGarmentSelected: _onGarmentSelected,
+                      recentSearches: _recentSearches,
+                      onRecentSearchSelected: _onRecentSearchSelected,
+                    );
+                  case SearchMode.tag:
+                    return TagSearchWidget(
+                      garments: state.garments,
+                      onSearchResults: _onTagSearchResults,
+                      onTagsChanged: _onTagsChanged,
+                      hintText: 'Search by tags...',
+                    );
+                  case SearchMode.visual:
+                    return Container(
+                      padding: const EdgeInsets.all(AppDimensions.paddingM),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _similarityTarget != null
+                                  ? 'Finding items similar to: ${_similarityTarget!.name}'
+                                  : 'Select a garment to find similar items',
+                              style: AppTextStyles.bodyMedium,
+                            ),
+                          ),
+                          if (_similarityTarget != null)
+                            TextButton(
+                              onPressed: () => _onSimilarityTargetChanged(null),
+                              child: const Text('Clear'),
+                            ),
+                        ],
+                      ),
+                    );
+                }
+              },
+            ),
+            
+            // Search/Filter toggle and controls
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: AppDimensions.paddingM),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(
+                          _useIntelligentSearch ? Icons.psychology : Icons.search,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: AppDimensions.paddingS),
+                        Text(
+                          _useIntelligentSearch ? 'Smart Search' : 'Basic Search',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Color filter button
+                  IconButton(
+                    icon: Icon(
+                      Icons.palette,
+                      color: _selectedColor != null 
+                          ? AppColors.primary 
+                          : AppColors.textSecondary,
+                    ),
+                    onPressed: _showColorFilter,
+                  ),
+                  
+                  // AI toggle
+                  Switch(
+                    value: _useIntelligentSearch,
+                    onChanged: (value) {
+                      setState(() {
+                        _useIntelligentSearch = value;
+                      });
+                      if (_searchQuery.isNotEmpty) {
+                        _performSearch();
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            
             // Content
             Expanded(
               child: BlocBuilder<GarmentBloc, GarmentState>(
@@ -91,7 +328,25 @@ class _GarmentListScreenState extends State<GarmentListScreen> {
                     );
                   }
 
-                  final garments = _filterAndSortGarments(state.garments);
+                  // Handle different search modes
+                  if (_searchMode == SearchMode.visual && _similarityTarget != null) {
+                    return VisualSimilarityWidget(
+                      targetGarment: _similarityTarget!,
+                      allGarments: state.garments,
+                      onGarmentTap: _navigateToGarmentDetail,
+                      onCompareGarments: _onCompareGarments,
+                    );
+                  }
+                  
+                  List<GarmentModel> garments;
+                  
+                  if (_searchMode == SearchMode.intelligent && _useIntelligentSearch && _searchQuery.isNotEmpty) {
+                    garments = _searchResults.map((r) => r.garment).toList();
+                  } else if (_searchMode == SearchMode.tag && _tagSearchResults.isNotEmpty) {
+                    garments = _tagSearchResults.map((r) => r.garment).toList();
+                  } else {
+                    garments = _filterAndSortGarments(state.garments);
+                  }
 
                   if (garments.isEmpty) {
                     return _buildEmptyState();
@@ -190,40 +445,6 @@ class _GarmentListScreenState extends State<GarmentListScreen> {
     );
   }
 
-  Widget _buildSearchBar() {
-    return Container(
-      padding: const EdgeInsets.all(AppDimensions.paddingM),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Search garments...',
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    setState(() {
-                      _searchController.clear();
-                      _searchQuery = '';
-                    });
-                  },
-                )
-              : null,
-          border: OutlineInputBorder(
-            borderRadius: AppDimensions.radiusL,
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: AppColors.backgroundSecondary,
-        ),
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-          });
-        },
-      ),
-    );
-  }
 
   Widget _buildLoadingState() {
     return AppGridSkeleton(
@@ -333,9 +554,40 @@ class _GarmentListScreenState extends State<GarmentListScreen> {
       if (_selectedBrand != null && garment.brand != _selectedBrand) {
         return false;
       }
-      if (_selectedColor != null && !garment.colors.contains(_selectedColor)) {
-        return false;
+      
+      // Enhanced color filtering with intelligent matching
+      if (_selectedColor != null) {
+        bool hasMatchingColor = false;
+        
+        // Direct color name match
+        if (garment.colors.contains(_selectedColor)) {
+          hasMatchingColor = true;
+        } else {
+          // Intelligent color matching using ColorPaletteService
+          final targetColor = ColorPaletteService.getColorFromName(_selectedColor!);
+          if (targetColor != null) {
+            for (final colorName in garment.colors) {
+              final garmentColor = ColorPaletteService.getColorFromName(colorName);
+              if (garmentColor != null) {
+                final matchingColors = ColorPaletteService.findMatchingColors(
+                  targetColor,
+                  maxResults: 5,
+                  maxDistance: 60, // Stricter matching for filtering
+                );
+                if (matchingColors.any((match) => match.name == colorName)) {
+                  hasMatchingColor = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+        
+        if (!hasMatchingColor) {
+          return false;
+        }
       }
+      
       if (_selectedSize != null && garment.size != _selectedSize) {
         return false;
       }
@@ -393,13 +645,13 @@ class _GarmentListScreenState extends State<GarmentListScreen> {
 
   void _clearFilters() {
     setState(() {
-      _searchController.clear();
       _searchQuery = '';
       _selectedCategory = null;
       _selectedBrand = null;
       _selectedColor = null;
       _selectedSize = null;
       _selectedTags.clear();
+      _searchResults.clear();
     });
   }
 
@@ -604,7 +856,24 @@ class _GarmentListScreenState extends State<GarmentListScreen> {
   }
 
   void _navigateToGarmentDetail(GarmentModel garment) {
+    // For visual similarity mode, set as target
+    if (_searchMode == SearchMode.visual && _similarityTarget == null) {
+      _onSimilarityTargetChanged(garment);
+      return;
+    }
+    
     context.push(RoutePaths.garmentDetail(garment.id));
+  }
+  
+  String _getSearchModeLabel(SearchMode mode) {
+    switch (mode) {
+      case SearchMode.intelligent:
+        return 'Smart';
+      case SearchMode.tag:
+        return 'Tags';
+      case SearchMode.visual:
+        return 'Visual';
+    }
   }
 }
 
