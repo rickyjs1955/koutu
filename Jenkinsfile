@@ -16,6 +16,11 @@ pipeline {
             steps {
                 checkout scm
                 sh 'git clean -fdx'
+                // Clean npm cache to fix corruption issues
+                sh 'npm cache clean --force || true'
+                // Check Node.js version
+                sh 'node --version || echo "Node.js not found"'
+                sh 'npm --version || echo "npm not found"'
             }
         }
         
