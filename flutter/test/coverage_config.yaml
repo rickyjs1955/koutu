@@ -1,0 +1,45 @@
+# Test Coverage Configuration
+# This file configures code coverage collection and reporting
+
+coverage:
+  # Minimum coverage thresholds
+  minimum_coverage:
+    line: 80
+    branch: 70
+    function: 85
+    
+  # Coverage collection settings
+  collection:
+    include:
+      - 'lib/**/*.dart'
+    exclude:
+      - 'lib/**/*.g.dart'
+      - 'lib/**/*.freezed.dart'
+      - 'lib/**/*.config.dart'
+      - 'lib/main.dart'
+      - 'lib/injection/injection.dart'
+      - 'lib/env/env.dart'
+      
+  # Report generation settings
+  reports:
+    html:
+      output_directory: 'coverage/html'
+      generate: true
+    lcov:
+      output_file: 'coverage/lcov.info'
+      generate: true
+    json:
+      output_file: 'coverage/coverage.json'
+      generate: true
+      
+  # Test execution settings
+  test_execution:
+    concurrent_jobs: 4
+    timeout: 30s
+    retry_failed: 1
+    
+  # Quality gates
+  quality_gates:
+    fail_on_coverage_decrease: true
+    fail_on_uncovered_new_code: true
+    coverage_decrease_threshold: 5

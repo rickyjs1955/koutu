@@ -68,14 +68,14 @@ export declare const FileMetadataSchema: z.ZodObject<{
     size: z.ZodNumber;
     uploadedAt: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
 }, "strip", z.ZodTypeAny, {
+    size: number;
     filename: string;
     mimetype: string;
-    size: number;
     uploadedAt?: string | Date | undefined;
 }, {
+    size: number;
     filename: string;
     mimetype: string;
-    size: number;
     uploadedAt?: string | Date | undefined;
 }>;
 export declare const ImageMetadataSchema: z.ZodObject<{
@@ -93,9 +93,9 @@ export declare const ImageMetadataSchema: z.ZodObject<{
     channels: z.ZodOptional<z.ZodNumber>;
     space: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
+    size: number;
     filename: string;
     mimetype: string;
-    size: number;
     width?: number | undefined;
     height?: number | undefined;
     format?: string | undefined;
@@ -106,9 +106,9 @@ export declare const ImageMetadataSchema: z.ZodObject<{
     channels?: number | undefined;
     space?: string | undefined;
 }, {
+    size: number;
     filename: string;
     mimetype: string;
-    size: number;
     width?: number | undefined;
     height?: number | undefined;
     format?: string | undefined;

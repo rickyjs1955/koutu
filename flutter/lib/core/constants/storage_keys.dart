@@ -16,6 +16,7 @@ class StorageKeys {
   static const String languageCode = 'language_code';
   static const String lastSyncTime = 'last_sync_time';
   static const String offlineMode = 'offline_mode';
+  static const String rememberMe = 'remember_me';
   
   // Cache keys
   static const String cachedUserProfile = 'cached_user_profile';

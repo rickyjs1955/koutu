@@ -1,0 +1,459 @@
+name: App Store Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Target platform'
+        required: true
+        type: choice
+        options:
+          - android
+          - ios
+          - both
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      release_notes:
+        description: 'Release notes'
+        required: false
+        type: string
+
+env:
+  FLUTTER_VERSION: '3.22.0'
+  JAVA_VERSION: '17'
+  XCODE_VERSION: '15.0'
+
+jobs:
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_number: ${{ steps.version.outputs.build_number }}
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          
+      - name: Install dependencies
+        run: |
+          cd flutter
+          flutter pub get
+          
+      - name: Install cider for version management
+        run: |
+          cd flutter
+          dart pub global activate cider
+          
+      - name: Bump version
+        id: version
+        run: |
+          cd flutter
+          cider bump ${{ github.event.inputs.version_bump }}
+          
+          # Get the new version
+          VERSION=$(cider version)
+          BUILD_NUMBER=$(date +%Y%m%d%H%M%S)
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          
+          # Update pubspec.yaml with build number
+          sed -i "s/version: .*/version: $VERSION+$BUILD_NUMBER/" pubspec.yaml
+          
+      - name: Commit version bump
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add flutter/pubspec.yaml flutter/CHANGELOG.md
+          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}" || exit 0
+          git push
+
+  deploy-android:
+    name: Deploy Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: prepare-release
+    if: github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both'
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          
+      - name: Install dependencies
+        run: |
+          cd flutter
+          flutter pub get
+          
+      - name: Setup Android signing
+        run: |
+          cd flutter/android
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+          
+          cat > key.properties << EOF
+          storeFile=keystore.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+          
+      - name: Build Android App Bundle
+        run: |
+          cd flutter
+          flutter build appbundle --release --build-number=${{ needs.prepare-release.outputs.build_number }}
+          
+      - name: Upload to Google Play Store (Internal Testing)
+        if: github.event.inputs.environment == 'staging'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.koutu.app
+          releaseFiles: flutter/build/app/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
+          inAppUpdatePriority: 2
+          releaseNotes: |
+            Version: ${{ needs.prepare-release.outputs.version }}
+            Build: ${{ needs.prepare-release.outputs.build_number }}
+            
+            ${{ github.event.inputs.release_notes }}
+          changesNotSentForReview: true
+          
+      - name: Upload to Google Play Store (Production)
+        if: github.event.inputs.environment == 'production'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.koutu.app
+          releaseFiles: flutter/build/app/outputs/bundle/release/app-release.aab
+          track: production
+          status: completed
+          inAppUpdatePriority: 2
+          releaseNotes: |
+            Version: ${{ needs.prepare-release.outputs.version }}
+            Build: ${{ needs.prepare-release.outputs.build_number }}
+            
+            ${{ github.event.inputs.release_notes }}
+          changesNotSentForReview: false
+          
+      - name: Save APK for testing
+        run: |
+          cd flutter
+          flutter build apk --release --build-number=${{ needs.prepare-release.outputs.build_number }}
+          
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-release-apk
+          path: flutter/build/app/outputs/flutter-apk/app-release.apk
+
+  deploy-ios:
+    name: Deploy iOS
+    runs-on: macos-latest
+    timeout-minutes: 90
+    needs: prepare-release
+    if: github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both'
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          
+      - name: Install dependencies
+        run: |
+          cd flutter
+          flutter pub get
+          
+      - name: Setup iOS signing
+        run: |
+          cd flutter/ios
+          
+          # Create keychain
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security set-keychain-settings -t 3600 -l build.keychain
+          
+          # Install certificate
+          echo "${{ secrets.IOS_CERTIFICATE_BASE64 }}" | base64 -d > certificate.p12
+          security import certificate.p12 -k build.keychain -P "${{ secrets.IOS_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
+          
+          # Install provisioning profile
+          echo "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 -d > profile.mobileprovision
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+          
+      - name: Build iOS
+        run: |
+          cd flutter
+          flutter build ios --release --build-number=${{ needs.prepare-release.outputs.build_number }}
+          
+      - name: Archive iOS App
+        run: |
+          cd flutter/ios
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -destination generic/platform=iOS \
+            -archivePath build/Runner.xcarchive \
+            archive
+            
+      - name: Create ExportOptions.plist
+        run: |
+          cd flutter/ios
+          cat > ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>compileBitcode</key>
+            <false/>
+            <key>destination</key>
+            <string>export</string>
+            <key>method</key>
+            <string>app-store</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.koutu.app</key>
+              <string>Koutu App Store Profile</string>
+            </dict>
+            <key>signingCertificate</key>
+            <string>iOS Distribution</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>teamID</key>
+            <string>${{ secrets.IOS_TEAM_ID }}</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+          
+      - name: Export IPA
+        run: |
+          cd flutter/ios
+          xcodebuild -exportArchive \
+            -archivePath build/Runner.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath build/
+            
+      - name: Upload to TestFlight
+        if: github.event.inputs.environment == 'staging'
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: flutter/ios/build/Runner.ipa
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          
+      - name: Upload to App Store
+        if: github.event.inputs.environment == 'production'
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: flutter/ios/build/Runner.ipa
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ios-release-ipa
+          path: flutter/ios/build/Runner.ipa
+
+  create-github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [prepare-release, deploy-android, deploy-ios]
+    if: always() && (needs.deploy-android.result == 'success' || needs.deploy-ios.result == 'success')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Download Android artifact
+        if: needs.deploy-android.result == 'success'
+        uses: actions/download-artifact@v3
+        with:
+          name: android-release-apk
+          path: ./releases/
+          
+      - name: Download iOS artifact
+        if: needs.deploy-ios.result == 'success'
+        uses: actions/download-artifact@v3
+        with:
+          name: ios-release-ipa
+          path: ./releases/
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.prepare-release.outputs.version }}
+          name: Release v${{ needs.prepare-release.outputs.version }}
+          body: |
+            ## 📱 Koutu App Release v${{ needs.prepare-release.outputs.version }}
+            
+            **Build Number:** ${{ needs.prepare-release.outputs.build_number }}
+            **Environment:** ${{ github.event.inputs.environment }}
+            **Platform:** ${{ github.event.inputs.platform }}
+            
+            ### 📝 Release Notes
+            ${{ github.event.inputs.release_notes }}
+            
+            ### 🚀 Deployment Status
+            - Android: ${{ needs.deploy-android.result == 'success' && '✅ Deployed' || '❌ Not deployed' }}
+            - iOS: ${{ needs.deploy-ios.result == 'success' && '✅ Deployed' || '❌ Not deployed' }}
+            
+            ### 📦 Downloads
+            - Android APK: Available in release assets
+            - iOS IPA: Distributed via TestFlight/App Store
+            
+            ---
+            
+            Generated by GitHub Actions on ${{ github.run_id }}
+          files: |
+            releases/app-release.apk
+            releases/Runner.ipa
+          draft: false
+          prerelease: ${{ github.event.inputs.environment == 'staging' }}
+          generate_release_notes: true
+
+  notify-team:
+    name: Notify Team
+    runs-on: ubuntu-latest
+    needs: [prepare-release, deploy-android, deploy-ios, create-github-release]
+    if: always()
+    
+    steps:
+      - name: Send Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              attachments: [{
+                color: '${{ (needs.deploy-android.result == 'success' || needs.deploy-ios.result == 'success') && 'good' || 'danger' }}',
+                blocks: [
+                  {
+                    type: 'header',
+                    text: {
+                      type: 'plain_text',
+                      text: '📱 Koutu App Deployment'
+                    }
+                  },
+                  {
+                    type: 'section',
+                    fields: [
+                      {
+                        type: 'mrkdwn',
+                        text: `*Version:* v${{ needs.prepare-release.outputs.version }}`
+                      },
+                      {
+                        type: 'mrkdwn',
+                        text: `*Build:* ${{ needs.prepare-release.outputs.build_number }}`
+                      },
+                      {
+                        type: 'mrkdwn',
+                        text: `*Environment:* ${{ github.event.inputs.environment }}`
+                      },
+                      {
+                        type: 'mrkdwn',
+                        text: `*Platform:* ${{ github.event.inputs.platform }}`
+                      }
+                    ]
+                  },
+                  {
+                    type: 'section',
+                    fields: [
+                      {
+                        type: 'mrkdwn',
+                        text: `*Android:* ${{ needs.deploy-android.result == 'success' && '✅ Deployed' || '❌ Failed' }}`
+                      },
+                      {
+                        type: 'mrkdwn',
+                        text: `*iOS:* ${{ needs.deploy-ios.result == 'success' && '✅ Deployed' || '❌ Failed' }}`
+                      }
+                    ]
+                  },
+                  {
+                    type: 'actions',
+                    elements: [
+                      {
+                        type: 'button',
+                        text: {
+                          type: 'plain_text',
+                          text: 'View Release'
+                        },
+                        url: 'https://github.com/${{ github.repository }}/releases/tag/v${{ needs.prepare-release.outputs.version }}'
+                      },
+                      {
+                        type: 'button',
+                        text: {
+                          type: 'plain_text',
+                          text: 'View Workflow'
+                        },
+                        url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+                      }
+                    ]
+                  }
+                ]
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

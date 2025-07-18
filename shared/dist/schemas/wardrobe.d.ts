@@ -64,15 +64,15 @@ export declare const WardrobeResponseSchema: z.ZodObject<{
     id?: string | undefined;
     created_at?: Date | undefined;
     updated_at?: Date | undefined;
-    description?: string | undefined;
     garments?: any[] | undefined;
+    description?: string | undefined;
 }, {
     name: string;
     id?: string | undefined;
     created_at?: Date | undefined;
     updated_at?: Date | undefined;
-    description?: string | undefined;
     garments?: any[] | undefined;
+    description?: string | undefined;
 }>;
 export type Wardrobe = z.infer<typeof WardrobeSchema>;
 export type CreateWardrobeInput = z.infer<typeof CreateWardrobeSchema>;

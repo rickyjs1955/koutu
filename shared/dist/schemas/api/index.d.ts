@@ -154,9 +154,9 @@ export declare const ImageSchema: z.ZodObject<{
         channels: z.ZodOptional<z.ZodNumber>;
         space: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
+        size: number;
         filename: string;
         mimetype: string;
-        size: number;
         width?: number | undefined;
         height?: number | undefined;
         format?: string | undefined;
@@ -167,9 +167,9 @@ export declare const ImageSchema: z.ZodObject<{
         channels?: number | undefined;
         space?: string | undefined;
     }, {
+        size: number;
         filename: string;
         mimetype: string;
-        size: number;
         width?: number | undefined;
         height?: number | undefined;
         format?: string | undefined;
@@ -192,9 +192,9 @@ export declare const ImageSchema: z.ZodObject<{
     created_at?: string | Date | undefined;
     updated_at?: string | Date | undefined;
     original_metadata?: {
+        size: number;
         filename: string;
         mimetype: string;
-        size: number;
         width?: number | undefined;
         height?: number | undefined;
         format?: string | undefined;
@@ -214,9 +214,9 @@ export declare const ImageSchema: z.ZodObject<{
     created_at?: string | Date | undefined;
     updated_at?: string | Date | undefined;
     original_metadata?: {
+        size: number;
         filename: string;
         mimetype: string;
-        size: number;
         width?: number | undefined;
         height?: number | undefined;
         format?: string | undefined;
@@ -272,9 +272,9 @@ export declare const ImageResponseSchema: z.ZodObject<Omit<{
         channels: z.ZodOptional<z.ZodNumber>;
         space: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
+        size: number;
         filename: string;
         mimetype: string;
-        size: number;
         width?: number | undefined;
         height?: number | undefined;
         format?: string | undefined;
@@ -285,9 +285,9 @@ export declare const ImageResponseSchema: z.ZodObject<Omit<{
         channels?: number | undefined;
         space?: string | undefined;
     }, {
+        size: number;
         filename: string;
         mimetype: string;
-        size: number;
         width?: number | undefined;
         height?: number | undefined;
         format?: string | undefined;
@@ -309,9 +309,9 @@ export declare const ImageResponseSchema: z.ZodObject<Omit<{
     created_at?: string | Date | undefined;
     updated_at?: string | Date | undefined;
     original_metadata?: {
+        size: number;
         filename: string;
         mimetype: string;
-        size: number;
         width?: number | undefined;
         height?: number | undefined;
         format?: string | undefined;
@@ -330,9 +330,9 @@ export declare const ImageResponseSchema: z.ZodObject<Omit<{
     created_at?: string | Date | undefined;
     updated_at?: string | Date | undefined;
     original_metadata?: {
+        size: number;
         filename: string;
         mimetype: string;
-        size: number;
         width?: number | undefined;
         height?: number | undefined;
         format?: string | undefined;
@@ -361,15 +361,15 @@ export declare const PolygonMetadataSchema: z.ZodObject<{
     source: z.ZodOptional<z.ZodString>;
     notes: z.ZodOptional<z.ZodString>;
 }, "strict", z.ZodTypeAny, {
+    notes?: string | undefined;
     label?: string | undefined;
     confidence?: number | undefined;
     source?: string | undefined;
-    notes?: string | undefined;
 }, {
+    notes?: string | undefined;
     label?: string | undefined;
     confidence?: number | undefined;
     source?: string | undefined;
-    notes?: string | undefined;
 }>;
 export declare const PolygonSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
@@ -392,15 +392,15 @@ export declare const PolygonSchema: z.ZodObject<{
         source: z.ZodOptional<z.ZodString>;
         notes: z.ZodOptional<z.ZodString>;
     }, "strict", z.ZodTypeAny, {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     }, {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     }>>;
     created_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
     updated_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
@@ -413,10 +413,10 @@ export declare const PolygonSchema: z.ZodObject<{
     id?: string | undefined;
     user_id?: string | undefined;
     metadata?: {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     } | undefined;
     created_at?: string | Date | undefined;
     updated_at?: string | Date | undefined;
@@ -430,10 +430,10 @@ export declare const PolygonSchema: z.ZodObject<{
     id?: string | undefined;
     user_id?: string | undefined;
     metadata?: {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     } | undefined;
     created_at?: string | Date | undefined;
     updated_at?: string | Date | undefined;
@@ -458,15 +458,15 @@ export declare const CreatePolygonSchema: z.ZodObject<{
         source: z.ZodOptional<z.ZodString>;
         notes: z.ZodOptional<z.ZodString>;
     }, "strict", z.ZodTypeAny, {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     }, {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     }>>;
 }, "strip", z.ZodTypeAny, {
     original_image_id: string;
@@ -475,10 +475,10 @@ export declare const CreatePolygonSchema: z.ZodObject<{
         y: number;
     }[];
     metadata?: {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     } | undefined;
     label?: string | undefined;
 }, {
@@ -488,10 +488,10 @@ export declare const CreatePolygonSchema: z.ZodObject<{
         y: number;
     }[];
     metadata?: {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     } | undefined;
     label?: string | undefined;
 }>;
@@ -513,22 +513,22 @@ export declare const UpdatePolygonSchema: z.ZodObject<{
         source: z.ZodOptional<z.ZodString>;
         notes: z.ZodOptional<z.ZodString>;
     }, "strict", z.ZodTypeAny, {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     }, {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     }>>;
 }, "strip", z.ZodTypeAny, {
     metadata?: {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     } | undefined;
     points?: {
         x: number;
@@ -537,10 +537,10 @@ export declare const UpdatePolygonSchema: z.ZodObject<{
     label?: string | undefined;
 }, {
     metadata?: {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     } | undefined;
     points?: {
         x: number;
@@ -569,15 +569,15 @@ export declare const PolygonResponseSchema: z.ZodObject<Omit<{
         source: z.ZodOptional<z.ZodString>;
         notes: z.ZodOptional<z.ZodString>;
     }, "strict", z.ZodTypeAny, {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     }, {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     }>>;
     created_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
     updated_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
@@ -589,10 +589,10 @@ export declare const PolygonResponseSchema: z.ZodObject<Omit<{
     }[];
     id?: string | undefined;
     metadata?: {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     } | undefined;
     created_at?: string | Date | undefined;
     updated_at?: string | Date | undefined;
@@ -605,10 +605,10 @@ export declare const PolygonResponseSchema: z.ZodObject<Omit<{
     }[];
     id?: string | undefined;
     metadata?: {
+        notes?: string | undefined;
         label?: string | undefined;
         confidence?: number | undefined;
         source?: string | undefined;
-        notes?: string | undefined;
     } | undefined;
     created_at?: string | Date | undefined;
     updated_at?: string | Date | undefined;
@@ -650,18 +650,18 @@ export declare const GarmentMetadataSchema: z.ZodObject<{
     pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
     season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
     brand?: string | undefined;
-    tags?: string[] | undefined;
     size?: string | undefined;
     material?: string | undefined;
+    tags?: string[] | undefined;
 }, {
     type: "shirt" | "pants" | "dress" | "jacket" | "skirt" | "other";
     color: string;
     pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
     season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
     brand?: string | undefined;
-    tags?: string[] | undefined;
     size?: string | undefined;
     material?: string | undefined;
+    tags?: string[] | undefined;
 }>;
 export declare const GarmentSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
@@ -684,18 +684,18 @@ export declare const GarmentSchema: z.ZodObject<{
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     }, {
         type: "shirt" | "pants" | "dress" | "jacket" | "skirt" | "other";
         color: string;
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     }>;
     created_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
     updated_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
@@ -710,9 +710,9 @@ export declare const GarmentSchema: z.ZodObject<{
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     };
     id?: string | undefined;
     user_id?: string | undefined;
@@ -729,9 +729,9 @@ export declare const GarmentSchema: z.ZodObject<{
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     };
     id?: string | undefined;
     user_id?: string | undefined;
@@ -777,18 +777,18 @@ export declare const CreateGarmentSchema: z.ZodObject<{
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     }, {
         type: "shirt" | "pants" | "dress" | "jacket" | "skirt" | "other";
         color: string;
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     }>>;
 }, "strip", z.ZodTypeAny, {
     original_image_id: string;
@@ -803,9 +803,9 @@ export declare const CreateGarmentSchema: z.ZodObject<{
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     } | undefined;
 }, {
     original_image_id: string;
@@ -820,9 +820,9 @@ export declare const CreateGarmentSchema: z.ZodObject<{
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     } | undefined;
 }>;
 export declare const UpdateGarmentMetadataSchema: z.ZodObject<{
@@ -841,18 +841,18 @@ export declare const UpdateGarmentMetadataSchema: z.ZodObject<{
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     }, {
         type: "shirt" | "pants" | "dress" | "jacket" | "skirt" | "other";
         color: string;
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     }>;
 }, "strip", z.ZodTypeAny, {
     metadata: {
@@ -861,9 +861,9 @@ export declare const UpdateGarmentMetadataSchema: z.ZodObject<{
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     };
 }, {
     metadata: {
@@ -872,9 +872,9 @@ export declare const UpdateGarmentMetadataSchema: z.ZodObject<{
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     };
 }>;
 export declare const GarmentQuerySchema: z.ZodObject<{
@@ -918,18 +918,18 @@ export declare const GarmentResponseSchema: z.ZodObject<Omit<{
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     }, {
         type: "shirt" | "pants" | "dress" | "jacket" | "skirt" | "other";
         color: string;
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     }>;
     created_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
     updated_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
@@ -944,9 +944,9 @@ export declare const GarmentResponseSchema: z.ZodObject<Omit<{
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     };
     id?: string | undefined;
     created_at?: string | Date | undefined;
@@ -962,9 +962,9 @@ export declare const GarmentResponseSchema: z.ZodObject<Omit<{
         pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
         season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
         brand?: string | undefined;
-        tags?: string[] | undefined;
         size?: string | undefined;
         material?: string | undefined;
+        tags?: string[] | undefined;
     };
     id?: string | undefined;
     created_at?: string | Date | undefined;
@@ -1052,18 +1052,18 @@ export declare const WardrobeResponseSchema: z.ZodObject<Omit<{
             pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
             season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
             brand?: string | undefined;
-            tags?: string[] | undefined;
             size?: string | undefined;
             material?: string | undefined;
+            tags?: string[] | undefined;
         }, {
             type: "shirt" | "pants" | "dress" | "jacket" | "skirt" | "other";
             color: string;
             pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
             season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
             brand?: string | undefined;
-            tags?: string[] | undefined;
             size?: string | undefined;
             material?: string | undefined;
+            tags?: string[] | undefined;
         }>;
         created_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
         updated_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
@@ -1078,9 +1078,9 @@ export declare const WardrobeResponseSchema: z.ZodObject<Omit<{
             pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
             season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
             brand?: string | undefined;
-            tags?: string[] | undefined;
             size?: string | undefined;
             material?: string | undefined;
+            tags?: string[] | undefined;
         };
         id?: string | undefined;
         created_at?: string | Date | undefined;
@@ -1096,9 +1096,9 @@ export declare const WardrobeResponseSchema: z.ZodObject<Omit<{
             pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
             season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
             brand?: string | undefined;
-            tags?: string[] | undefined;
             size?: string | undefined;
             material?: string | undefined;
+            tags?: string[] | undefined;
         };
         id?: string | undefined;
         created_at?: string | Date | undefined;
@@ -1110,7 +1110,6 @@ export declare const WardrobeResponseSchema: z.ZodObject<Omit<{
     id?: string | undefined;
     created_at?: string | Date | undefined;
     updated_at?: string | Date | undefined;
-    description?: string | undefined;
     garments?: {
         original_image_id: string;
         file_path: string;
@@ -1121,21 +1120,21 @@ export declare const WardrobeResponseSchema: z.ZodObject<Omit<{
             pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
             season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
             brand?: string | undefined;
-            tags?: string[] | undefined;
             size?: string | undefined;
             material?: string | undefined;
+            tags?: string[] | undefined;
         };
         id?: string | undefined;
         created_at?: string | Date | undefined;
         updated_at?: string | Date | undefined;
         data_version?: number | undefined;
     }[] | undefined;
+    description?: string | undefined;
 }, {
     name: string;
     id?: string | undefined;
     created_at?: string | Date | undefined;
     updated_at?: string | Date | undefined;
-    description?: string | undefined;
     garments?: {
         original_image_id: string;
         file_path: string;
@@ -1146,15 +1145,16 @@ export declare const WardrobeResponseSchema: z.ZodObject<Omit<{
             pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
             season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
             brand?: string | undefined;
-            tags?: string[] | undefined;
             size?: string | undefined;
             material?: string | undefined;
+            tags?: string[] | undefined;
         };
         id?: string | undefined;
         created_at?: string | Date | undefined;
         updated_at?: string | Date | undefined;
         data_version?: number | undefined;
     }[] | undefined;
+    description?: string | undefined;
 }>;
 export declare const MLExportOptionsSchema: z.ZodObject<{
     format: z.ZodEnum<["coco", "yolo", "pascal_voc", "csv", "raw_json"]>;
@@ -1592,9 +1592,9 @@ export declare const ImageListResponseSchema: z.ZodObject<{
                 channels: z.ZodOptional<z.ZodNumber>;
                 space: z.ZodOptional<z.ZodString>;
             }, "strip", z.ZodTypeAny, {
+                size: number;
                 filename: string;
                 mimetype: string;
-                size: number;
                 width?: number | undefined;
                 height?: number | undefined;
                 format?: string | undefined;
@@ -1605,9 +1605,9 @@ export declare const ImageListResponseSchema: z.ZodObject<{
                 channels?: number | undefined;
                 space?: string | undefined;
             }, {
+                size: number;
                 filename: string;
                 mimetype: string;
-                size: number;
                 width?: number | undefined;
                 height?: number | undefined;
                 format?: string | undefined;
@@ -1629,9 +1629,9 @@ export declare const ImageListResponseSchema: z.ZodObject<{
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
             original_metadata?: {
+                size: number;
                 filename: string;
                 mimetype: string;
-                size: number;
                 width?: number | undefined;
                 height?: number | undefined;
                 format?: string | undefined;
@@ -1650,9 +1650,9 @@ export declare const ImageListResponseSchema: z.ZodObject<{
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
             original_metadata?: {
+                size: number;
                 filename: string;
                 mimetype: string;
-                size: number;
                 width?: number | undefined;
                 height?: number | undefined;
                 format?: string | undefined;
@@ -1687,9 +1687,9 @@ export declare const ImageListResponseSchema: z.ZodObject<{
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
             original_metadata?: {
+                size: number;
                 filename: string;
                 mimetype: string;
-                size: number;
                 width?: number | undefined;
                 height?: number | undefined;
                 format?: string | undefined;
@@ -1716,9 +1716,9 @@ export declare const ImageListResponseSchema: z.ZodObject<{
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
             original_metadata?: {
+                size: number;
                 filename: string;
                 mimetype: string;
-                size: number;
                 width?: number | undefined;
                 height?: number | undefined;
                 format?: string | undefined;
@@ -1751,9 +1751,9 @@ export declare const ImageListResponseSchema: z.ZodObject<{
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
             original_metadata?: {
+                size: number;
                 filename: string;
                 mimetype: string;
-                size: number;
                 width?: number | undefined;
                 height?: number | undefined;
                 format?: string | undefined;
@@ -1786,9 +1786,9 @@ export declare const ImageListResponseSchema: z.ZodObject<{
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
             original_metadata?: {
+                size: number;
                 filename: string;
                 mimetype: string;
-                size: number;
                 width?: number | undefined;
                 height?: number | undefined;
                 format?: string | undefined;
@@ -1836,15 +1836,15 @@ export declare const PolygonListResponseSchema: z.ZodObject<{
                 source: z.ZodOptional<z.ZodString>;
                 notes: z.ZodOptional<z.ZodString>;
             }, "strict", z.ZodTypeAny, {
+                notes?: string | undefined;
                 label?: string | undefined;
                 confidence?: number | undefined;
                 source?: string | undefined;
-                notes?: string | undefined;
             }, {
+                notes?: string | undefined;
                 label?: string | undefined;
                 confidence?: number | undefined;
                 source?: string | undefined;
-                notes?: string | undefined;
             }>>;
             created_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
             updated_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
@@ -1856,10 +1856,10 @@ export declare const PolygonListResponseSchema: z.ZodObject<{
             }[];
             id?: string | undefined;
             metadata?: {
+                notes?: string | undefined;
                 label?: string | undefined;
                 confidence?: number | undefined;
                 source?: string | undefined;
-                notes?: string | undefined;
             } | undefined;
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
@@ -1872,10 +1872,10 @@ export declare const PolygonListResponseSchema: z.ZodObject<{
             }[];
             id?: string | undefined;
             metadata?: {
+                notes?: string | undefined;
                 label?: string | undefined;
                 confidence?: number | undefined;
                 source?: string | undefined;
-                notes?: string | undefined;
             } | undefined;
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
@@ -1894,10 +1894,10 @@ export declare const PolygonListResponseSchema: z.ZodObject<{
             }[];
             id?: string | undefined;
             metadata?: {
+                notes?: string | undefined;
                 label?: string | undefined;
                 confidence?: number | undefined;
                 source?: string | undefined;
-                notes?: string | undefined;
             } | undefined;
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
@@ -1914,10 +1914,10 @@ export declare const PolygonListResponseSchema: z.ZodObject<{
             }[];
             id?: string | undefined;
             metadata?: {
+                notes?: string | undefined;
                 label?: string | undefined;
                 confidence?: number | undefined;
                 source?: string | undefined;
-                notes?: string | undefined;
             } | undefined;
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
@@ -1940,10 +1940,10 @@ export declare const PolygonListResponseSchema: z.ZodObject<{
             }[];
             id?: string | undefined;
             metadata?: {
+                notes?: string | undefined;
                 label?: string | undefined;
                 confidence?: number | undefined;
                 source?: string | undefined;
-                notes?: string | undefined;
             } | undefined;
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
@@ -1966,10 +1966,10 @@ export declare const PolygonListResponseSchema: z.ZodObject<{
             }[];
             id?: string | undefined;
             metadata?: {
+                notes?: string | undefined;
                 label?: string | undefined;
                 confidence?: number | undefined;
                 source?: string | undefined;
-                notes?: string | undefined;
             } | undefined;
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
@@ -2004,18 +2004,18 @@ export declare const GarmentListResponseSchema: z.ZodObject<{
                 pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                 season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                 brand?: string | undefined;
-                tags?: string[] | undefined;
                 size?: string | undefined;
                 material?: string | undefined;
+                tags?: string[] | undefined;
             }, {
                 type: "shirt" | "pants" | "dress" | "jacket" | "skirt" | "other";
                 color: string;
                 pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                 season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                 brand?: string | undefined;
-                tags?: string[] | undefined;
                 size?: string | undefined;
                 material?: string | undefined;
+                tags?: string[] | undefined;
             }>;
             created_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
             updated_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
@@ -2030,9 +2030,9 @@ export declare const GarmentListResponseSchema: z.ZodObject<{
                 pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                 season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                 brand?: string | undefined;
-                tags?: string[] | undefined;
                 size?: string | undefined;
                 material?: string | undefined;
+                tags?: string[] | undefined;
             };
             id?: string | undefined;
             created_at?: string | Date | undefined;
@@ -2048,9 +2048,9 @@ export declare const GarmentListResponseSchema: z.ZodObject<{
                 pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                 season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                 brand?: string | undefined;
-                tags?: string[] | undefined;
                 size?: string | undefined;
                 material?: string | undefined;
+                tags?: string[] | undefined;
             };
             id?: string | undefined;
             created_at?: string | Date | undefined;
@@ -2082,9 +2082,9 @@ export declare const GarmentListResponseSchema: z.ZodObject<{
                 pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                 season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                 brand?: string | undefined;
-                tags?: string[] | undefined;
                 size?: string | undefined;
                 material?: string | undefined;
+                tags?: string[] | undefined;
             };
             id?: string | undefined;
             created_at?: string | Date | undefined;
@@ -2108,9 +2108,9 @@ export declare const GarmentListResponseSchema: z.ZodObject<{
                 pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                 season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                 brand?: string | undefined;
-                tags?: string[] | undefined;
                 size?: string | undefined;
                 material?: string | undefined;
+                tags?: string[] | undefined;
             };
             id?: string | undefined;
             created_at?: string | Date | undefined;
@@ -2140,9 +2140,9 @@ export declare const GarmentListResponseSchema: z.ZodObject<{
                 pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                 season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                 brand?: string | undefined;
-                tags?: string[] | undefined;
                 size?: string | undefined;
                 material?: string | undefined;
+                tags?: string[] | undefined;
             };
             id?: string | undefined;
             created_at?: string | Date | undefined;
@@ -2172,9 +2172,9 @@ export declare const GarmentListResponseSchema: z.ZodObject<{
                 pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                 season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                 brand?: string | undefined;
-                tags?: string[] | undefined;
                 size?: string | undefined;
                 material?: string | undefined;
+                tags?: string[] | undefined;
             };
             id?: string | undefined;
             created_at?: string | Date | undefined;
@@ -2224,18 +2224,18 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
                     pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                     season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                     brand?: string | undefined;
-                    tags?: string[] | undefined;
                     size?: string | undefined;
                     material?: string | undefined;
+                    tags?: string[] | undefined;
                 }, {
                     type: "shirt" | "pants" | "dress" | "jacket" | "skirt" | "other";
                     color: string;
                     pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                     season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                     brand?: string | undefined;
-                    tags?: string[] | undefined;
                     size?: string | undefined;
                     material?: string | undefined;
+                    tags?: string[] | undefined;
                 }>;
                 created_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
                 updated_at: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodDate]>>;
@@ -2250,9 +2250,9 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
                     pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                     season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                     brand?: string | undefined;
-                    tags?: string[] | undefined;
                     size?: string | undefined;
                     material?: string | undefined;
+                    tags?: string[] | undefined;
                 };
                 id?: string | undefined;
                 created_at?: string | Date | undefined;
@@ -2268,9 +2268,9 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
                     pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                     season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                     brand?: string | undefined;
-                    tags?: string[] | undefined;
                     size?: string | undefined;
                     material?: string | undefined;
+                    tags?: string[] | undefined;
                 };
                 id?: string | undefined;
                 created_at?: string | Date | undefined;
@@ -2282,7 +2282,6 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
             id?: string | undefined;
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
-            description?: string | undefined;
             garments?: {
                 original_image_id: string;
                 file_path: string;
@@ -2293,21 +2292,21 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
                     pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                     season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                     brand?: string | undefined;
-                    tags?: string[] | undefined;
                     size?: string | undefined;
                     material?: string | undefined;
+                    tags?: string[] | undefined;
                 };
                 id?: string | undefined;
                 created_at?: string | Date | undefined;
                 updated_at?: string | Date | undefined;
                 data_version?: number | undefined;
             }[] | undefined;
+            description?: string | undefined;
         }, {
             name: string;
             id?: string | undefined;
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
-            description?: string | undefined;
             garments?: {
                 original_image_id: string;
                 file_path: string;
@@ -2318,15 +2317,16 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
                     pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                     season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                     brand?: string | undefined;
-                    tags?: string[] | undefined;
                     size?: string | undefined;
                     material?: string | undefined;
+                    tags?: string[] | undefined;
                 };
                 id?: string | undefined;
                 created_at?: string | Date | undefined;
                 updated_at?: string | Date | undefined;
                 data_version?: number | undefined;
             }[] | undefined;
+            description?: string | undefined;
         }>, "many">;
         count: z.ZodNumber;
     }, "strip", z.ZodTypeAny, {
@@ -2336,7 +2336,6 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
             id?: string | undefined;
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
-            description?: string | undefined;
             garments?: {
                 original_image_id: string;
                 file_path: string;
@@ -2347,15 +2346,16 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
                     pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                     season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                     brand?: string | undefined;
-                    tags?: string[] | undefined;
                     size?: string | undefined;
                     material?: string | undefined;
+                    tags?: string[] | undefined;
                 };
                 id?: string | undefined;
                 created_at?: string | Date | undefined;
                 updated_at?: string | Date | undefined;
                 data_version?: number | undefined;
             }[] | undefined;
+            description?: string | undefined;
         }[];
     }, {
         count: number;
@@ -2364,7 +2364,6 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
             id?: string | undefined;
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
-            description?: string | undefined;
             garments?: {
                 original_image_id: string;
                 file_path: string;
@@ -2375,15 +2374,16 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
                     pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                     season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                     brand?: string | undefined;
-                    tags?: string[] | undefined;
                     size?: string | undefined;
                     material?: string | undefined;
+                    tags?: string[] | undefined;
                 };
                 id?: string | undefined;
                 created_at?: string | Date | undefined;
                 updated_at?: string | Date | undefined;
                 data_version?: number | undefined;
             }[] | undefined;
+            description?: string | undefined;
         }[];
     }>;
     message: z.ZodOptional<z.ZodString>;
@@ -2398,7 +2398,6 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
             id?: string | undefined;
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
-            description?: string | undefined;
             garments?: {
                 original_image_id: string;
                 file_path: string;
@@ -2409,15 +2408,16 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
                     pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                     season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                     brand?: string | undefined;
-                    tags?: string[] | undefined;
                     size?: string | undefined;
                     material?: string | undefined;
+                    tags?: string[] | undefined;
                 };
                 id?: string | undefined;
                 created_at?: string | Date | undefined;
                 updated_at?: string | Date | undefined;
                 data_version?: number | undefined;
             }[] | undefined;
+            description?: string | undefined;
         }[];
     };
     message?: string | undefined;
@@ -2432,7 +2432,6 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
             id?: string | undefined;
             created_at?: string | Date | undefined;
             updated_at?: string | Date | undefined;
-            description?: string | undefined;
             garments?: {
                 original_image_id: string;
                 file_path: string;
@@ -2443,15 +2442,16 @@ export declare const WardrobeListResponseSchema: z.ZodObject<{
                     pattern?: "other" | "solid" | "striped" | "plaid" | "floral" | "geometric" | undefined;
                     season?: "spring" | "summer" | "fall" | "winter" | "all" | undefined;
                     brand?: string | undefined;
-                    tags?: string[] | undefined;
                     size?: string | undefined;
                     material?: string | undefined;
+                    tags?: string[] | undefined;
                 };
                 id?: string | undefined;
                 created_at?: string | Date | undefined;
                 updated_at?: string | Date | undefined;
                 data_version?: number | undefined;
             }[] | undefined;
+            description?: string | undefined;
         }[];
     };
     message?: string | undefined;

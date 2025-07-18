@@ -1,0 +1,426 @@
+name: Flutter CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'flutter/**'
+      - '.github/workflows/flutter-ci-cd.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'flutter/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  FLUTTER_VERSION: '3.22.0'
+  JAVA_VERSION: '17'
+  XCODE_VERSION: '15.0'
+
+jobs:
+  analyze:
+    name: Code Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          
+      - name: Install dependencies
+        run: |
+          cd flutter
+          flutter pub get
+          
+      - name: Verify Flutter installation
+        run: flutter doctor -v
+        
+      - name: Run code analysis
+        run: |
+          cd flutter
+          flutter analyze --fatal-infos
+          
+      - name: Check formatting
+        run: |
+          cd flutter
+          dart format --set-exit-if-changed .
+          
+      - name: Run custom lints
+        run: |
+          cd flutter
+          flutter analyze --fatal-warnings
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: analyze
+    
+    strategy:
+      matrix:
+        test-type: [unit, widget, integration]
+        
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          
+      - name: Install dependencies
+        run: |
+          cd flutter
+          flutter pub get
+          
+      - name: Run unit tests
+        if: matrix.test-type == 'unit'
+        run: |
+          cd flutter
+          flutter test test/unit/ --coverage --reporter=json > test_report.json
+          
+      - name: Run widget tests
+        if: matrix.test-type == 'widget'
+        run: |
+          cd flutter
+          flutter test test/widget/ --coverage --reporter=json > widget_test_report.json
+          
+      - name: Run integration tests
+        if: matrix.test-type == 'integration'
+        run: |
+          cd flutter
+          flutter test test/integration/ --coverage --reporter=json > integration_test_report.json
+          
+      - name: Upload coverage to Codecov
+        if: matrix.test-type == 'unit'
+        uses: codecov/codecov-action@v3
+        with:
+          file: flutter/coverage/lcov.info
+          flags: flutter
+          name: flutter-${{ matrix.test-type }}
+          fail_ci_if_error: true
+          
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.test-type }}
+          path: |
+            flutter/*_test_report.json
+            flutter/coverage/
+
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    strategy:
+      matrix:
+        build-type: [debug, release]
+        
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          
+      - name: Install dependencies
+        run: |
+          cd flutter
+          flutter pub get
+          
+      - name: Setup Android signing
+        if: matrix.build-type == 'release'
+        run: |
+          cd flutter/android
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+          echo "storeFile=keystore.jks" >> key.properties
+          echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> key.properties
+          echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> key.properties
+          echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> key.properties
+          
+      - name: Build Android APK (Debug)
+        if: matrix.build-type == 'debug'
+        run: |
+          cd flutter
+          flutter build apk --debug --flavor dev
+          
+      - name: Build Android APK (Release)
+        if: matrix.build-type == 'release'
+        run: |
+          cd flutter
+          flutter build apk --release --flavor prod
+          
+      - name: Build Android App Bundle (Release)
+        if: matrix.build-type == 'release'
+        run: |
+          cd flutter
+          flutter build appbundle --release --flavor prod
+          
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-apk-${{ matrix.build-type }}
+          path: flutter/build/app/outputs/flutter-apk/*.apk
+          
+      - name: Upload App Bundle
+        if: matrix.build-type == 'release'
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-appbundle-${{ matrix.build-type }}
+          path: flutter/build/app/outputs/bundle/prodRelease/*.aab
+
+  build-ios:
+    name: Build iOS
+    runs-on: macos-latest
+    timeout-minutes: 60
+    needs: test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    strategy:
+      matrix:
+        build-type: [debug, release]
+        
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          
+      - name: Install dependencies
+        run: |
+          cd flutter
+          flutter pub get
+          
+      - name: Setup iOS signing
+        if: matrix.build-type == 'release'
+        run: |
+          cd flutter/ios
+          echo "${{ secrets.IOS_CERTIFICATE_BASE64 }}" | base64 -d > certificate.p12
+          echo "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 -d > profile.mobileprovision
+          
+          # Install certificate and provisioning profile
+          security create-keychain -p "" build.keychain
+          security import certificate.p12 -k build.keychain -P "${{ secrets.IOS_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
+          security list-keychains -d user -s build.keychain
+          security default-keychain -s build.keychain
+          
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+          
+      - name: Build iOS (Debug)
+        if: matrix.build-type == 'debug'
+        run: |
+          cd flutter
+          flutter build ios --debug --no-codesign --flavor dev
+          
+      - name: Build iOS (Release)
+        if: matrix.build-type == 'release'
+        run: |
+          cd flutter
+          flutter build ios --release --flavor prod
+          
+      - name: Archive iOS App
+        if: matrix.build-type == 'release'
+        run: |
+          cd flutter/ios
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -archivePath build/Runner.xcarchive archive
+          
+      - name: Export IPA
+        if: matrix.build-type == 'release'
+        run: |
+          cd flutter/ios
+          xcodebuild -exportArchive -archivePath build/Runner.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath build/
+          
+      - name: Upload iOS build
+        uses: actions/upload-artifact@v3
+        with:
+          name: ios-build-${{ matrix.build-type }}
+          path: |
+            flutter/build/ios/
+            flutter/ios/build/*.ipa
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: analyze
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          
+      - name: Install dependencies
+        run: |
+          cd flutter
+          flutter pub get
+          
+      - name: Run security analysis
+        run: |
+          cd flutter
+          flutter pub deps --json > dependencies.json
+          
+      - name: Check for known vulnerabilities
+        run: |
+          cd flutter
+          flutter pub audit
+          
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-scan-results
+          path: flutter/dependencies.json
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [build-android, build-ios, security-scan]
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment: staging
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Download Android build
+        uses: actions/download-artifact@v3
+        with:
+          name: android-apk-debug
+          path: ./builds/android/
+          
+      - name: Download iOS build
+        uses: actions/download-artifact@v3
+        with:
+          name: ios-build-debug
+          path: ./builds/ios/
+          
+      - name: Deploy to Firebase App Distribution
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_APP_ID_STAGING }}
+          token: ${{ secrets.FIREBASE_TOKEN }}
+          groups: testers
+          file: ./builds/android/app-debug.apk
+          releaseNotes: |
+            Staging deployment from commit: ${{ github.sha }}
+            Branch: ${{ github.ref_name }}
+            
+      - name: Deploy to TestFlight (iOS)
+        if: runner.os == 'macOS'
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: ./builds/ios/Runner.ipa
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [build-android, build-ios, security-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Download Android build
+        uses: actions/download-artifact@v3
+        with:
+          name: android-appbundle-release
+          path: ./builds/android/
+          
+      - name: Download iOS build
+        uses: actions/download-artifact@v3
+        with:
+          name: ios-build-release
+          path: ./builds/ios/
+          
+      - name: Deploy to Google Play Store
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.koutu.app
+          releaseFiles: ./builds/android/app-prod-release.aab
+          track: production
+          status: completed
+          
+      - name: Deploy to App Store
+        if: runner.os == 'macOS'
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: ./builds/ios/Runner.ipa
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+  notify:
+    name: Notify Team
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always()
+    
+    steps:
+      - name: Notify on success
+        if: needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#mobile-deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          
+      - name: Notify on failure
+        if: needs.deploy-staging.result == 'failure' || needs.deploy-production.result == 'failure'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#mobile-deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
