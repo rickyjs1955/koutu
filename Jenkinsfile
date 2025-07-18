@@ -32,14 +32,14 @@ pipeline {
                 stage('Frontend Dependencies') {
                     steps {
                         dir('frontend') {
-                            sh 'npm install --no-save'
+                            sh 'npm ci'
                         }
                     }
                 }
                 stage('Shared Dependencies') {
                     steps {
                         dir('shared') {
-                            sh 'npm install --no-save'
+                            sh 'npm ci'
                         }
                     }
                 }
@@ -93,7 +93,10 @@ pipeline {
             steps {
                 script {
                     echo 'Deploying to staging...'
-                    // Add your staging deployment commands here
+                    // Example: Deploy to a staging server
+                    // sh 'rsync -avz frontend/dist/ user@staging-server:/var/www/koutu-staging/'
+                    // Or: Deploy to S3
+                    // sh 'aws s3 sync frontend/dist/ s3://koutu-staging-bucket/'
                 }
             }
         }
@@ -105,7 +108,11 @@ pipeline {
             steps {
                 script {
                     echo 'Deploying to production...'
-                    // Add your production deployment commands here
+                    // Example: Deploy to production server
+                    // sh 'rsync -avz frontend/dist/ user@prod-server:/var/www/koutu/'
+                    // Or: Deploy to S3 with CloudFront invalidation
+                    // sh 'aws s3 sync frontend/dist/ s3://koutu-prod-bucket/'
+                    // sh 'aws cloudfront create-invalidation --distribution-id YOUR_ID --paths "/*"'
                 }
             }
         }
