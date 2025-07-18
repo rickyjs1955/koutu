@@ -64,6 +64,13 @@ dependencies:
   qr_flutter: ^4.1.0
   smooth_page_indicator: ^1.1.0
   
+  # Security & Encryption
+  crypto: ^3.0.3
+  encrypt: ^5.0.3
+  
+  # File Operations
+  file_picker: ^6.1.1
+  
   # Icons
   cupertino_icons: ^1.0.6
 
