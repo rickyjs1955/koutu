@@ -157,5 +157,44 @@ export const storageService = {
     };
     
     return contentTypeMap[fileExtension.toLowerCase()] || 'application/octet-stream';
+  },
+
+  /**
+   * Read a file from storage
+   * @param filePath The relative path of the file to read
+   * @returns A promise that resolves to the file buffer
+   */
+  async getFile(filePath: string): Promise<Buffer> {
+    try {
+      if (config.storageMode === 'firebase') {
+        // Firebase Storage implementation
+        const file = bucket.file(filePath);
+        
+        // Check if file exists
+        const [exists] = await file.exists();
+        if (!exists) {
+          throw new Error(`File not found: ${filePath}`);
+        }
+        
+        // Download the file
+        const [buffer] = await file.download();
+        return buffer;
+      } else {
+        // Local storage implementation
+        const absolutePath = path.join(__dirname, '../../..', filePath);
+        
+        // Check if file exists
+        if (!fs.existsSync(absolutePath)) {
+          throw new Error(`File not found: ${filePath}`);
+        }
+        
+        // Read the file
+        const buffer = await fs.promises.readFile(absolutePath);
+        return buffer;
+      }
+    } catch (error) {
+      console.error('Error reading file:', error);
+      throw error;
+    }
   }
 };

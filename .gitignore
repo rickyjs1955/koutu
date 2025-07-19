@@ -42,3 +42,6 @@ firebase-debug.log
 
 # TypeScript
 *.tsbuildinfoSuperClaude/
+
+# Uploads directory (contains test/temporary files)
+uploads/

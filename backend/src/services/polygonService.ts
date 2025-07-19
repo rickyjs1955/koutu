@@ -5,6 +5,7 @@ import { storageService } from './storageService';
 import { ApiError } from '../utils/ApiError';
 import { UpdatePolygonInput, Polygon } from '../../../shared/src/schemas/polygon';
 import { PolygonServiceUtils } from '../utils/PolygonServiceUtils';
+import { polygonProcessor } from '../utils/polygonProcessor';
 
 interface CreatePolygonParams {
   userId: string;
@@ -602,6 +603,168 @@ export const polygonService = {
             }
             console.error('Error simplifying polygon:', error);
             throw ApiError.internal('Failed to simplify polygon');
+        }
+    },
+
+    /**
+     * Generate AI-assisted polygon suggestions for an image
+     */
+    async suggestPolygons(
+        imageId: string,
+        userId: string,
+        options?: {
+            maxPolygons?: number;
+            minArea?: number;
+            simplificationTolerance?: number;
+        }
+    ): Promise<Array<{ points: Array<{ x: number; y: number }>; confidence: number; label?: string }>> {
+        try {
+            // Verify image ownership and get image data
+            const image = await imageModel.findById(imageId);
+            if (!image) {
+                throw ApiError.notFound('Image not found');
+            }
+
+            if (image.user_id !== userId) {
+                throw ApiError.authorization(
+                    'You do not have permission to generate polygons for this image',
+                    'image',
+                    'polygon_suggest'
+                );
+            }
+
+            // Get image file from storage
+            const imageBuffer = await storageService.getFile(image.file_path);
+            
+            // Get image metadata
+            const metadata = {
+                width: image.original_metadata?.width || 0,
+                height: image.original_metadata?.height || 0,
+                channels: 4 // Assuming RGBA
+            };
+
+            // Use polygon processor to suggest polygons
+            const suggestions = await polygonProcessor.suggestPolygons(imageBuffer, metadata, options);
+            
+            // Format suggestions for API response
+            return suggestions.map((suggestion, index) => ({
+                points: suggestion.simplified,
+                confidence: suggestion.confidence,
+                label: `suggested_${index + 1}`
+            }));
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            console.error('Error suggesting polygons:', error);
+            throw ApiError.internal('Failed to generate polygon suggestions');
+        }
+    },
+
+    /**
+     * Enhance existing polygon using AI assistance
+     */
+    async enhancePolygon(
+        polygonId: string,
+        userId: string
+    ): Promise<Polygon> {
+        try {
+            // Get polygon and verify ownership
+            const polygon = await this.getPolygonById(polygonId, userId);
+            
+            // Get associated image
+            const image = await imageModel.findById(polygon.original_image_id);
+            if (!image) {
+                throw ApiError.notFound('Associated image not found');
+            }
+
+            // Get image file from storage
+            const imageBuffer = await storageService.getFile(image.file_path);
+            
+            // Get image metadata
+            const metadata = {
+                width: image.original_metadata?.width || 0,
+                height: image.original_metadata?.height || 0,
+                channels: 4 // Assuming RGBA
+            };
+
+            // Parse points if needed
+            const points = Array.isArray(polygon.points) 
+                ? polygon.points 
+                : JSON.parse(polygon.points || '[]');
+
+            // Use polygon processor to enhance the polygon
+            const enhanced = await polygonProcessor.enhancePolygon(points, imageBuffer, metadata);
+            
+            // Update polygon with enhanced points
+            const updatedPolygon = await this.updatePolygon({
+                polygonId,
+                userId,
+                updates: { 
+                    points: enhanced.simplified,
+                    metadata: {
+                        ...polygon.metadata,
+                        enhanced: true,
+                        enhancementConfidence: enhanced.confidence,
+                        originalPoints: points
+                    }
+                }
+            });
+
+            return updatedPolygon;
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            console.error('Error enhancing polygon:', error);
+            throw ApiError.internal('Failed to enhance polygon');
+        }
+    },
+
+    /**
+     * Get edge detection visualization for an image
+     */
+    async getEdgeDetection(
+        imageId: string,
+        userId: string,
+        threshold1: number = 100,
+        threshold2: number = 200
+    ): Promise<Buffer> {
+        try {
+            // Verify image ownership
+            const image = await imageModel.findById(imageId);
+            if (!image) {
+                throw ApiError.notFound('Image not found');
+            }
+
+            if (image.user_id !== userId) {
+                throw ApiError.authorization(
+                    'You do not have permission to process this image',
+                    'image',
+                    'edge_detection'
+                );
+            }
+
+            // Get image file from storage
+            const imageBuffer = await storageService.getFile(image.file_path);
+            
+            // Get image metadata
+            const metadata = {
+                width: image.original_metadata?.width || 0,
+                height: image.original_metadata?.height || 0,
+                channels: 4 // Assuming RGBA
+            };
+
+            // Detect edges using polygon processor
+            const edgeBuffer = await polygonProcessor.detectEdges(imageBuffer, metadata, threshold1, threshold2);
+            
+            return edgeBuffer;
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            console.error('Error detecting edges:', error);
+            throw ApiError.internal('Failed to detect edges');
         }
     }
 };
