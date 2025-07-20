@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koutu Fashion AI - Flutter App Preview</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 40px 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: -20px -20px 40px -20px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 48px;
+            font-weight: 700;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 20px;
+            opacity: 0.9;
+        }
+        .info-box {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .info-box h2 {
+            color: #333;
+            margin-top: 0;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .feature-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+        }
+        .feature-card h3 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        .icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            margin: 20px 0;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .status.ready {
+            background: #4ade80;
+            color: white;
+        }
+        .status.pending {
+            background: #fbbf24;
+            color: #78350f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>KOUTU</h1>
+            <p>Your Digital Fashion Assistant</p>
+        </div>
+
+        <div class="info-box">
+            <h2>🚀 Flutter App Ready for Deployment</h2>
+            <p>The Koutu Fashion AI app is built and ready to run. Since Flutter requires specific tooling to run web builds, please use the following commands on your Windows machine:</p>
+            
+            <div class="code-block">
+cd C:\Users\monmo\koutu\flutter<br>
+flutter run -d chrome --web-port=5000
+            </div>
+            
+            <p>Or use the batch file:</p>
+            <div class="code-block">
+cd C:\Users\monmo\koutu\flutter<br>
+run_app.bat
+            </div>
+        </div>
+
+        <div class="info-box">
+            <h2>✨ New Enhanced Splash Screen</h2>
+            <p>We've just created a stunning splash screen with:</p>
+            <ul>
+                <li><strong>3D Wardrobe Opening Animation</strong> - Realistic wooden doors that open towards the user</li>
+                <li><strong>Animated Logo</strong> - KOUTU logo with pulsing glow effect</li>
+                <li><strong>Smooth Transitions</strong> - Professional animations lasting ~5 seconds</li>
+                <li><strong>Tagline Animation</strong> - "Your Digital Fashion Assistant" slides in elegantly</li>
+            </ul>
+            <span class="status ready">Ready to View</span>
+        </div>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="icon">📸</div>
+                <h3>Garment Capture</h3>
+                <p>Advanced polygon drawing system to identify and capture garments from photos with precision.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="icon">👗</div>
+                <h3>Digital Wardrobe</h3>
+                <p>Organize and manage your entire clothing collection digitally with smart categorization.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="icon">🤖</div>
+                <h3>AI Outfit Builder</h3>
+                <p>Get personalized outfit recommendations powered by artificial intelligence.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="icon">🎨</div>
+                <h3>Style Analytics</h3>
+                <p>Track your fashion choices and discover your personal style patterns.</p>
+            </div>
+        </div>
+
+        <div class="info-box" style="margin-top: 40px;">
+            <h2>📋 App Structure</h2>
+            <p>The Flutter app includes:</p>
+            <ul>
+                <li><strong>Main Navigation</strong> - Bottom navigation with 4 main sections</li>
+                <li><strong>Splash Screen</strong> - Enhanced 3D wardrobe animation</li>
+                <li><strong>Home Screen</strong> - Dashboard with stats and features</li>
+                <li><strong>Capture Screen</strong> - Polygon-based garment identification</li>
+                <li><strong>Wardrobe Screen</strong> - Digital closet management</li>
+                <li><strong>AI Outfit Screen</strong> - Smart outfit recommendations</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Add some interactive elements
+        document.querySelectorAll('.feature-card').forEach(card => {
+            card.addEventListener('click', () => {
+                card.style.transform = 'scale(1.05)';
+                setTimeout(() => {
+                    card.style.transform = 'translateY(-5px)';
+                }, 200);
+            });
+        });
+    </script>
+</body>
+</html>

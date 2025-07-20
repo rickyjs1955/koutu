@@ -3,7 +3,7 @@ import 'package:koutu/presentation/screens/home/home_screen.dart';
 import 'package:koutu/presentation/screens/garment/garment_capture_screen.dart';
 import 'package:koutu/presentation/screens/wardrobe/digital_wardrobe_screen.dart';
 import 'package:koutu/presentation/screens/outfit/ai_outfit_builder_screen.dart';
-import 'package:koutu/presentation/screens/splash/simple_splash_screen.dart';
+import 'package:koutu/presentation/screens/splash/enhanced_splash_screen.dart';
 import 'package:koutu/core/constants/app_colors.dart';
 import 'package:koutu/core/theme/app_theme.dart';
 
@@ -20,7 +20,7 @@ class SimpleKoutuApp extends StatelessWidget {
       title: 'Koutu Fashion AI',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const SimpleSplashScreen(),
+      home: const EnhancedSplashScreen(),
       routes: {
         '/home': (context) => const SimpleNavigationScreen(),
       },
