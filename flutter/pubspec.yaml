@@ -96,19 +96,17 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   
-  # Assets
   assets:
+    - assets/
+    - assets/images/
     - assets/images/logo/
     - assets/images/onboarding/
     - assets/images/placeholders/
     - assets/animations/
-    
-  # Fonts
-  fonts:
-    - family: Montserrat
-      fonts:
-        - asset: assets/fonts/Montserrat-Regular.ttf
-        - asset: assets/fonts/Montserrat-Bold.ttf
-          weight: 700
-        - asset: assets/fonts/Montserrat-Light.ttf
-          weight: 300
+    - assets/fonts/
+  
+  # fonts:
+  #   - family: Montserrat
+  #     fonts:
+  #       - asset: assets/fonts/Montserrat-Regular.ttf
+          weight: 400
