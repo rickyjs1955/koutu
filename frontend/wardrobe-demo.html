@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koutu - Wardrobe Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        .floating-menu {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 50;
+        }
+        
+        .floating-menu-options {
+            position: absolute;
+            bottom: 4rem;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: flex-end;
+        }
+        
+        .floating-menu-options.hidden {
+            display: none;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+        
+        .card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .badge-secondary {
+            background-color: #f3f4f6;
+            color: #374151;
+        }
+        
+        .badge-outline {
+            border: 1px solid #d1d5db;
+            background-color: transparent;
+            color: #6b7280;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        
+        .btn-outline {
+            border: 1px solid #d1d5db;
+            background-color: white;
+            color: #374151;
+        }
+        
+        .btn-outline:hover {
+            background-color: #f9fafb;
+        }
+        
+        .btn-ghost {
+            background-color: transparent;
+            color: #6b7280;
+        }
+        
+        .btn-ghost:hover {
+            background-color: #f3f4f6;
+        }
+        
+        .btn-icon {
+            padding: 0.5rem;
+            width: 2.5rem;
+            height: 2.5rem;
+        }
+        
+        .btn-fab {
+            width: 3.5rem;
+            height: 3.5rem;
+            border-radius: 50%;
+            background-color: #3b82f6;
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-fab:hover {
+            background-color: #2563eb;
+        }
+        
+        .input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+        
+        .input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .select {
+            padding: 0.25rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            background-color: white;
+        }
+        
+        .heart-filled {
+            fill: #ef4444;
+            color: #ef4444;
+        }
+        
+        .star-filled {
+            fill: #fbbf24;
+            color: #fbbf24;
+        }
+        
+        .backdrop-blur {
+            backdrop-filter: blur(12px);
+        }
+        
+        .opacity-0 {
+            opacity: 0;
+        }
+        
+        .group:hover .group-hover\\:opacity-100 {
+            opacity: 1;
+        }
+        
+        .transition-opacity {
+            transition: opacity 0.2s;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="sticky top-0 z-40 w-full border-b bg-white/95 backdrop-blur">
+        <div class="container mx-auto flex h-16 items-center justify-between px-4">
+            <div class="flex items-center gap-4">
+                <button class="btn btn-ghost btn-icon md:hidden">
+                    <i data-lucide="menu" class="h-5 w-5"></i>
+                </button>
+                <div class="flex items-center gap-2">
+                    <i data-lucide="shirt" class="h-6 w-6 text-blue-600"></i>
+                    <h1 class="text-xl font-semibold">My Wardrobe</h1>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="relative w-64 hidden sm:block">
+                    <i data-lucide="search" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"></i>
+                    <input
+                        type="text"
+                        placeholder="Search your wardrobe..."
+                        class="input pl-9"
+                        id="searchInput"
+                    />
+                </div>
+                <button class="btn btn-outline btn-icon">
+                    <i data-lucide="filter" class="h-4 w-4"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Filter Bar -->
+    <div class="border-b bg-white p-4">
+        <div class="container mx-auto">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex flex-wrap items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium">Category:</span>
+                        <select class="select">
+                            <option>All</option>
+                            <option>Shirts</option>
+                            <option>Pants</option>
+                            <option>Dresses</option>
+                            <option>Jackets</option>
+                            <option>Shoes</option>
+                            <option>Accessories</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium">Color:</span>
+                        <select class="select">
+                            <option>All</option>
+                            <option>Black</option>
+                            <option>White</option>
+                            <option>Blue</option>
+                            <option>Red</option>
+                            <option>Green</option>
+                            <option>Gray</option>
+                            <option>Brown</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium">Season:</span>
+                        <select class="select">
+                            <option>All</option>
+                            <option>Spring</option>
+                            <option>Summer</option>
+                            <option>Fall</option>
+                            <option>Winter</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button class="btn btn-primary btn-icon" id="gridViewBtn">
+                        <i data-lucide="grid-3x3" class="h-4 w-4"></i>
+                    </button>
+                    <button class="btn btn-outline btn-icon" id="listViewBtn">
+                        <i data-lucide="list" class="h-4 w-4"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="container mx-auto py-6 px-4">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h2 class="text-2xl font-semibold">Your Collection</h2>
+                <p class="text-gray-600">6 items found</p>
+            </div>
+        </div>
+
+        <!-- Mobile Search -->
+        <div class="sm:hidden mb-4">
+            <div class="relative">
+                <i data-lucide="search" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"></i>
+                <input
+                    type="text"
+                    placeholder="Search your wardrobe..."
+                    class="input pl-9"
+                />
+            </div>
+        </div>
+
+        <!-- Items Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" id="itemsGrid">
+            <!-- Item 1 -->
+            <div class="card group">
+                <div class="aspect-square bg-gray-100 relative">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <i data-lucide="shirt" class="h-16 w-16 text-gray-400"></i>
+                    </div>
+                    <button class="btn btn-ghost btn-icon absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <i data-lucide="heart" class="h-4 w-4 heart-filled"></i>
+                    </button>
+                </div>
+                <div class="p-4">
+                    <h3 class="font-medium truncate">Classic White Shirt</h3>
+                    <div class="flex items-center justify-between mt-1">
+                        <span class="badge badge-secondary">Shirts</span>
+                        <div class="flex items-center gap-1">
+                            <i data-lucide="star" class="h-3 w-3 star-filled"></i>
+                            <span class="text-xs text-gray-600">4.5</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 mt-2 text-sm text-gray-600">
+                        <span>Uniqlo</span>
+                        <span>•</span>
+                        <span>White</span>
+                    </div>
+                    <div class="flex flex-wrap gap-1 mt-2">
+                        <span class="badge badge-outline">formal</span>
+                        <span class="badge badge-outline">work</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item 2 -->
+            <div class="card group">
+                <div class="aspect-square bg-gray-100 relative">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <i data-lucide="shirt" class="h-16 w-16 text-gray-400"></i>
+                    </div>
+                    <button class="btn btn-ghost btn-icon absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <i data-lucide="heart" class="h-4 w-4"></i>
+                    </button>
+                </div>
+                <div class="p-4">
+                    <h3 class="font-medium truncate">Blue Denim Jeans</h3>
+                    <div class="flex items-center justify-between mt-1">
+                        <span class="badge badge-secondary">Pants</span>
+                        <div class="flex items-center gap-1">
+                            <i data-lucide="star" class="h-3 w-3 star-filled"></i>
+                            <span class="text-xs text-gray-600">4.8</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 mt-2 text-sm text-gray-600">
+                        <span>Levi's</span>
+                        <span>•</span>
+                        <span>Blue</span>
+                    </div>
+                    <div class="flex flex-wrap gap-1 mt-2">
+                        <span class="badge badge-outline">casual</span>
+                        <span class="badge badge-outline">weekend</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item 3 -->
+            <div class="card group">
+                <div class="aspect-square bg-gray-100 relative">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <i data-lucide="shirt" class="h-16 w-16 text-gray-400"></i>
+                    </div>
+                    <button class="btn btn-ghost btn-icon absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <i data-lucide="heart" class="h-4 w-4 heart-filled"></i>
+                    </button>
+                </div>
+                <div class="p-4">
+                    <h3 class="font-medium truncate">Black Blazer</h3>
+                    <div class="flex items-center justify-between mt-1">
+                        <span class="badge badge-secondary">Jackets</span>
+                        <div class="flex items-center gap-1">
+                            <i data-lucide="star" class="h-3 w-3 star-filled"></i>
+                            <span class="text-xs text-gray-600">4.2</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 mt-2 text-sm text-gray-600">
+                        <span>Zara</span>
+                        <span>•</span>
+                        <span>Black</span>
+                    </div>
+                    <div class="flex flex-wrap gap-1 mt-2">
+                        <span class="badge badge-outline">formal</span>
+                        <span class="badge badge-outline">business</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item 4 -->
+            <div class="card group">
+                <div class="aspect-square bg-gray-100 relative">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <i data-lucide="shirt" class="h-16 w-16 text-gray-400"></i>
+                    </div>
+                    <button class="btn btn-ghost btn-icon absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <i data-lucide="heart" class="h-4 w-4"></i>
+                    </button>
+                </div>
+                <div class="p-4">
+                    <h3 class="font-medium truncate">Summer Dress</h3>
+                    <div class="flex items-center justify-between mt-1">
+                        <span class="badge badge-secondary">Dresses</span>
+                        <div class="flex items-center gap-1">
+                            <i data-lucide="star" class="h-3 w-3 star-filled"></i>
+                            <span class="text-xs text-gray-600">4.0</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 mt-2 text-sm text-gray-600">
+                        <span>H&M</span>
+                        <span>•</span>
+                        <span>Red</span>
+                    </div>
+                    <div class="flex flex-wrap gap-1 mt-2">
+                        <span class="badge badge-outline">casual</span>
+                        <span class="badge badge-outline">party</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item 5 -->
+            <div class="card group">
+                <div class="aspect-square bg-gray-100 relative">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <i data-lucide="shirt" class="h-16 w-16 text-gray-400"></i>
+                    </div>
+                    <button class="btn btn-ghost btn-icon absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <i data-lucide="heart" class="h-4 w-4 heart-filled"></i>
+                    </button>
+                </div>
+                <div class="p-4">
+                    <h3 class="font-medium truncate">Running Shoes</h3>
+                    <div class="flex items-center justify-between mt-1">
+                        <span class="badge badge-secondary">Shoes</span>
+                        <div class="flex items-center gap-1">
+                            <i data-lucide="star" class="h-3 w-3 star-filled"></i>
+                            <span class="text-xs text-gray-600">4.7</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 mt-2 text-sm text-gray-600">
+                        <span>Nike</span>
+                        <span>•</span>
+                        <span>Gray</span>
+                    </div>
+                    <div class="flex flex-wrap gap-1 mt-2">
+                        <span class="badge badge-outline">sport</span>
+                        <span class="badge badge-outline">casual</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item 6 -->
+            <div class="card group">
+                <div class="aspect-square bg-gray-100 relative">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <i data-lucide="shirt" class="h-16 w-16 text-gray-400"></i>
+                    </div>
+                    <button class="btn btn-ghost btn-icon absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <i data-lucide="heart" class="h-4 w-4"></i>
+                    </button>
+                </div>
+                <div class="p-4">
+                    <h3 class="font-medium truncate">Leather Handbag</h3>
+                    <div class="flex items-center justify-between mt-1">
+                        <span class="badge badge-secondary">Accessories</span>
+                        <div class="flex items-center gap-1">
+                            <i data-lucide="star" class="h-3 w-3 star-filled"></i>
+                            <span class="text-xs text-gray-600">4.3</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 mt-2 text-sm text-gray-600">
+                        <span>Coach</span>
+                        <span>•</span>
+                        <span>Brown</span>
+                    </div>
+                    <div class="flex flex-wrap gap-1 mt-2">
+                        <span class="badge badge-outline">formal</span>
+                        <span class="badge badge-outline">work</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Floating Action Button -->
+    <div class="floating-menu">
+        <button class="btn btn-fab" id="fabButton">
+            <i data-lucide="plus" class="h-6 w-6" id="fabIcon"></i>
+        </button>
+        
+        <div class="floating-menu-options hidden" id="floatingOptions">
+            <button class="btn btn-outline flex items-center gap-2 bg-white shadow-lg border rounded-xl backdrop-blur">
+                <i data-lucide="shirt" class="w-4 h-4"></i>
+                <span>Add Garment</span>
+            </button>
+            <button class="btn btn-outline flex items-center gap-2 bg-white shadow-lg border rounded-xl backdrop-blur">
+                <i data-lucide="tag" class="w-4 h-4"></i>
+                <span>Scan Barcode</span>
+            </button>
+            <button class="btn btn-outline flex items-center gap-2 bg-white shadow-lg border rounded-xl backdrop-blur">
+                <i data-lucide="palette" class="w-4 h-4"></i>
+                <span>Create Outfit</span>
+            </button>
+            <button class="btn btn-outline flex items-center gap-2 bg-white shadow-lg border rounded-xl backdrop-blur">
+                <i data-lucide="calendar" class="w-4 h-4"></i>
+                <span>Plan Outfits</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Floating Action Button functionality
+        const fabButton = document.getElementById('fabButton');
+        const fabIcon = document.getElementById('fabIcon');
+        const floatingOptions = document.getElementById('floatingOptions');
+        let isMenuOpen = false;
+
+        fabButton.addEventListener('click', () => {
+            isMenuOpen = !isMenuOpen;
+            
+            if (isMenuOpen) {
+                floatingOptions.classList.remove('hidden');
+                fabIcon.style.transform = 'rotate(45deg)';
+            } else {
+                floatingOptions.classList.add('hidden');
+                fabIcon.style.transform = 'rotate(0deg)';
+            }
+        });
+
+        // View mode toggle
+        const gridViewBtn = document.getElementById('gridViewBtn');
+        const listViewBtn = document.getElementById('listViewBtn');
+        const itemsGrid = document.getElementById('itemsGrid');
+
+        gridViewBtn.addEventListener('click', () => {
+            gridViewBtn.classList.add('btn-primary');
+            gridViewBtn.classList.remove('btn-outline');
+            listViewBtn.classList.add('btn-outline');
+            listViewBtn.classList.remove('btn-primary');
+            itemsGrid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4';
+        });
+
+        listViewBtn.addEventListener('click', () => {
+            listViewBtn.classList.add('btn-primary');
+            listViewBtn.classList.remove('btn-outline');
+            gridViewBtn.classList.add('btn-outline');
+            gridViewBtn.classList.remove('btn-primary');
+            itemsGrid.className = 'space-y-4';
+        });
+
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                console.log('Search:', e.target.value);
+                // Add search logic here
+            });
+        }
+    </script>
+</body>
+</html>

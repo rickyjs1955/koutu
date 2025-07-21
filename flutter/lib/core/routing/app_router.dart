@@ -7,6 +7,10 @@ import 'package:koutu/presentation/screens/auth/login_screen.dart';
 import 'package:koutu/presentation/screens/auth/register_screen.dart';
 import 'package:koutu/presentation/screens/auth/forgot_password_screen.dart';
 import 'package:koutu/presentation/screens/home/home_screen.dart';
+import 'package:koutu/presentation/screens/garment/garment_capture_screen.dart';
+import 'package:koutu/presentation/screens/wardrobe/digital_wardrobe_screen.dart';
+import 'package:koutu/presentation/screens/outfit/ai_outfit_builder_screen.dart';
+import 'package:koutu/presentation/screens/analytics/wardrobe_analytics_dashboard.dart';
 
 @singleton
 class AppRouter {
@@ -41,7 +45,30 @@ class AppRouter {
           name: RoutePaths.home,
           builder: (context, state) => const HomeScreen(),
         ),
-        // Additional routes will be added here
+        // Garment routes
+        GoRoute(
+          path: '/garment/capture',
+          name: 'garment-capture',
+          builder: (context, state) => const GarmentCaptureScreen(),
+        ),
+        // Wardrobe routes
+        GoRoute(
+          path: '/wardrobe',
+          name: 'wardrobe',
+          builder: (context, state) => const DigitalWardrobeScreen(),
+        ),
+        // Outfit routes
+        GoRoute(
+          path: '/outfit/ai-builder',
+          name: 'ai-outfit-builder',
+          builder: (context, state) => const AIOutfitBuilderScreen(),
+        ),
+        // Analytics routes
+        GoRoute(
+          path: '/analytics',
+          name: 'analytics',
+          builder: (context, state) => const WardrobeAnalyticsDashboard(),
+        ),
       ],
       errorBuilder: (context, state) => Scaffold(
         body: Center(

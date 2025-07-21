@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'presentation/screens/splash/enhanced_splash_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -28,18 +29,30 @@ class MyHomePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Flutter Web Test'),
       ),
-      body: const Center(
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            Text(
+            const Text(
               'Hello, Flutter Web!',
               style: TextStyle(fontSize: 24),
             ),
-            SizedBox(height: 20),
-            Text(
+            const SizedBox(height: 20),
+            const Text(
               'If you can see this, Flutter web is working!',
               style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 40),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const EnhancedSplashScreen(),
+                  ),
+                );
+              },
+              child: const Text('View Splash Screen'),
             ),
           ],
         ),

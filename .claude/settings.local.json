@@ -30,7 +30,9 @@
       "Bash(JWT_SECRET=test-secret NODE_ENV=test npm test -- --no-coverage src/tests/security/wardrobeRoutes.security.test.ts --testNamePattern=\"should handle Flutter refresh token\" --verbose)",
       "Bash(ls:*)",
       "Bash(NODE_ENV=test npm test -- src/tests/integration/polygonRoutes.int.test.ts -t \"should reject polygon creation for image owned by different user\" --verbose)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(claude mcp remove:*)"
     ],
     "deny": []
   }

@@ -18,11 +18,18 @@ enum AppButtonSize {
   large,
 }
 
+enum AppButtonVariant {
+  filled,
+  outlined,
+  text,
+}
+
 class AppButton extends StatelessWidget {
   final String text;
   final VoidCallback? onPressed;
   final AppButtonType type;
   final AppButtonSize size;
+  final AppButtonVariant? variant;
   final bool isLoading;
   final bool isFullWidth;
   final IconData? icon;
@@ -35,6 +42,7 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.type = AppButtonType.primary,
     this.size = AppButtonSize.large,
+    this.variant,
     this.isLoading = false,
     this.isFullWidth = true,
     this.icon,
@@ -50,36 +58,69 @@ class AppButton extends StatelessWidget {
 
     Widget button;
 
-    switch (type) {
-      case AppButtonType.primary:
-      case AppButtonType.danger:
-        button = ElevatedButton(
-          onPressed: isLoading ? null : onPressed,
-          style: buttonStyle.copyWith(
-            minimumSize: MaterialStateProperty.all(minimumSize),
-          ),
-          child: buttonChild,
-        );
-        break;
-      case AppButtonType.secondary:
-      case AppButtonType.outline:
-        button = OutlinedButton(
-          onPressed: isLoading ? null : onPressed,
-          style: buttonStyle.copyWith(
-            minimumSize: MaterialStateProperty.all(minimumSize),
-          ),
-          child: buttonChild,
-        );
-        break;
-      case AppButtonType.text:
-        button = TextButton(
-          onPressed: isLoading ? null : onPressed,
-          style: buttonStyle.copyWith(
-            minimumSize: MaterialStateProperty.all(minimumSize),
-          ),
-          child: buttonChild,
-        );
-        break;
+    // Handle variant if provided, otherwise use type
+    if (variant != null) {
+      switch (variant) {
+        case AppButtonVariant.filled:
+          button = ElevatedButton(
+            onPressed: isLoading ? null : onPressed,
+            style: buttonStyle.copyWith(
+              minimumSize: MaterialStateProperty.all(minimumSize),
+            ),
+            child: buttonChild,
+          );
+          break;
+        case AppButtonVariant.outlined:
+          button = OutlinedButton(
+            onPressed: isLoading ? null : onPressed,
+            style: buttonStyle.copyWith(
+              minimumSize: MaterialStateProperty.all(minimumSize),
+            ),
+            child: buttonChild,
+          );
+          break;
+        case AppButtonVariant.text:
+          button = TextButton(
+            onPressed: isLoading ? null : onPressed,
+            style: buttonStyle.copyWith(
+              minimumSize: MaterialStateProperty.all(minimumSize),
+            ),
+            child: buttonChild,
+          );
+          break;
+      }
+    } else {
+      switch (type) {
+        case AppButtonType.primary:
+        case AppButtonType.danger:
+          button = ElevatedButton(
+            onPressed: isLoading ? null : onPressed,
+            style: buttonStyle.copyWith(
+              minimumSize: MaterialStateProperty.all(minimumSize),
+            ),
+            child: buttonChild,
+          );
+          break;
+        case AppButtonType.secondary:
+        case AppButtonType.outline:
+          button = OutlinedButton(
+            onPressed: isLoading ? null : onPressed,
+            style: buttonStyle.copyWith(
+              minimumSize: MaterialStateProperty.all(minimumSize),
+            ),
+            child: buttonChild,
+          );
+          break;
+        case AppButtonType.text:
+          button = TextButton(
+            onPressed: isLoading ? null : onPressed,
+            style: buttonStyle.copyWith(
+              minimumSize: MaterialStateProperty.all(minimumSize),
+            ),
+            child: buttonChild,
+          );
+          break;
+      }
     }
 
     if (isFullWidth) {
