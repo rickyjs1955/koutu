@@ -84,19 +84,19 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
       curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
     ));
 
-    // Left door opens with 3D rotation
+    // Left door opens outward with 3D rotation
     _leftDoorAnimation = Tween<double>(
       begin: 0.0,
-      end: -75.0, // Degrees
+      end: 75.0, // Positive degrees for outward
     ).animate(CurvedAnimation(
       parent: _wardrobeController,
       curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
     ));
 
-    // Right door opens with 3D rotation
+    // Right door opens outward with 3D rotation
     _rightDoorAnimation = Tween<double>(
       begin: 0.0,
-      end: 75.0, // Degrees
+      end: -75.0, // Negative degrees for outward
     ).animate(CurvedAnimation(
       parent: _wardrobeController,
       curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
