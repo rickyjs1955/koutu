@@ -181,8 +181,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
                   )
                 : SizedBox(
-                    width: isMobile ? size.width * 0.9 : size.width * 0.8,
-                    height: isMobile ? size.height * 0.5 : size.height * 0.6,
+                    width: size.width * 0.9,
+                    height: size.height * 0.7,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
@@ -196,8 +196,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 doorOpenProgress: _doorController.value,
                               ),
                               size: Size(
-                                isMobile ? size.width * 0.8 : size.width * 0.7,
-                                isMobile ? size.height * 0.4 : size.height * 0.5,
+                                size.width * 0.85,
+                                size.height * 0.65,
                               ),
                             );
                           },
@@ -208,8 +208,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                           animation: _glowAnimation,
                           builder: (context, child) {
                             return Container(
-                              width: isMobile ? size.width * 0.8 : size.width * 0.7,
-                              height: isMobile ? size.height * 0.4 : size.height * 0.5,
+                              width: size.width * 0.85,
+                              height: size.height * 0.65,
                               decoration: BoxDecoration(
                                 gradient: RadialGradient(
                                   colors: [
@@ -242,7 +242,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                         Text(
                                           'KOUTU',
                                           style: TextStyle(
-                                            fontSize: isMobile ? 45 : 70,
+                                            fontSize: isMobile ? 55 : 80,
                                             fontWeight: FontWeight.bold,
                                             color: const Color(0xFFFFD700), // Gold color
                                             letterSpacing: isMobile ? 6 : 8,
@@ -264,7 +264,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                         Text(
                                           'Your Digital Wardrobe',
                                           style: TextStyle(
-                                            fontSize: isMobile ? 16 : 20,
+                                            fontSize: isMobile ? 18 : 24,
                                             color: const Color(0xFFFFE57F), // Light gold
                                             letterSpacing: isMobile ? 1 : 2,
                                             shadows: [
@@ -294,8 +294,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 // Left door
                                 ClipRect(
                                   child: Container(
-                                    width: isMobile ? size.width * 0.4 : size.width * 0.35,
-                                    height: isMobile ? size.height * 0.4 : size.height * 0.5,
+                                    width: size.width * 0.425,
+                                    height: size.height * 0.65,
                                     alignment: Alignment.centerRight,
                                     child: Transform(
                                       alignment: Alignment.centerLeft,
@@ -303,8 +303,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                         ..setEntry(3, 2, 0.001)
                                         ..rotateY(-_leftDoorAnimation.value * math.pi / 3),
                                       child: Container(
-                                        width: isMobile ? size.width * 0.4 : size.width * 0.35,
-                                        height: isMobile ? size.height * 0.4 : size.height * 0.5,
+                                        width: size.width * 0.425,
+                                        height: size.height * 0.65,
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             begin: Alignment.topLeft,
@@ -339,8 +339,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 // Right door
                                 ClipRect(
                                   child: Container(
-                                    width: isMobile ? size.width * 0.4 : size.width * 0.35,
-                                    height: isMobile ? size.height * 0.4 : size.height * 0.5,
+                                    width: size.width * 0.425,
+                                    height: size.height * 0.65,
                                     alignment: Alignment.centerLeft,
                                     child: Transform(
                                       alignment: Alignment.centerRight,
@@ -348,8 +348,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                         ..setEntry(3, 2, 0.001)
                                         ..rotateY(-_rightDoorAnimation.value * math.pi / 3),
                                       child: Container(
-                                        width: isMobile ? size.width * 0.4 : size.width * 0.35,
-                                        height: isMobile ? size.height * 0.4 : size.height * 0.5,
+                                        width: size.width * 0.425,
+                                        height: size.height * 0.65,
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             begin: Alignment.topLeft,
