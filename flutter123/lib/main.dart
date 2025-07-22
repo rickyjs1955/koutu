@@ -157,9 +157,30 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
     final bool isMobile = size.width < 600;
     
     return Scaffold(
-      backgroundColor: const Color(0xFF1a1614), // Dark warm background
       body: Stack(
         children: [
+          // Home interior background
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xFFF5E6D3), // Warm cream ceiling
+                  const Color(0xFFE8D5C4), // Light beige wall
+                  const Color(0xFFD4C4B0), // Darker beige floor area
+                ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+            ),
+          ),
+          
+          // Wall texture and home elements
+          CustomPaint(
+            painter: HomeBackgroundPainter(),
+            size: size,
+          ),
+          
           // Particle effects background
           AnimatedBuilder(
             animation: _particleController,
@@ -244,7 +265,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                           style: TextStyle(
                                             fontSize: isMobile ? 55 : 80,
                                             fontWeight: FontWeight.bold,
-                                            color: const Color(0xFFFFD700), // Gold color
+                                            color: const Color(0xFF8B6F47), // Rich brown
                                             letterSpacing: isMobile ? 6 : 8,
                                             shadows: [
                                               Shadow(
@@ -265,7 +286,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                           'Your Digital Wardrobe',
                                           style: TextStyle(
                                             fontSize: isMobile ? 18 : 24,
-                                            color: const Color(0xFFFFE57F), // Light gold
+                                            color: const Color(0xFF5D4037), // Dark brown
                                             letterSpacing: isMobile ? 1 : 2,
                                             shadows: [
                                               Shadow(
@@ -434,6 +455,81 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
+}
+
+// Custom painter for home background elements
+class HomeBackgroundPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint();
+    
+    // Draw floor line
+    paint
+      ..color = const Color(0xFFB89968).withOpacity(0.3)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    
+    final floorY = size.height * 0.85;
+    canvas.drawLine(
+      Offset(0, floorY),
+      Offset(size.width, floorY),
+      paint,
+    );
+    
+    // Draw baseboards
+    paint
+      ..color = const Color(0xFF8B6F47).withOpacity(0.2)
+      ..style = PaintingStyle.fill;
+    
+    canvas.drawRect(
+      Rect.fromLTWH(0, floorY, size.width, size.height * 0.05),
+      paint,
+    );
+    
+    // Draw subtle wall pattern/texture
+    paint
+      ..color = const Color(0xFFD4A574).withOpacity(0.05)
+      ..strokeWidth = 1;
+    
+    // Vertical subtle lines for wallpaper effect
+    for (int i = 0; i < size.width; i += 50) {
+      canvas.drawLine(
+        Offset(i.toDouble(), 0),
+        Offset(i.toDouble(), floorY),
+        paint,
+      );
+    }
+    
+    // Add crown molding at top
+    paint
+      ..color = const Color(0xFFE8D5C4).withOpacity(0.3)
+      ..style = PaintingStyle.fill;
+    
+    final molding = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height * 0.03)
+      ..quadraticBezierTo(size.width, size.height * 0.05, size.width - 10, size.height * 0.05)
+      ..lineTo(10, size.height * 0.05)
+      ..quadraticBezierTo(0, size.height * 0.05, 0, size.height * 0.03)
+      ..close();
+    
+    canvas.drawPath(molding, paint);
+    
+    // Add subtle shadows for depth
+    paint
+      ..color = Colors.black.withOpacity(0.05)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+    
+    // Shadow under crown molding
+    canvas.drawRect(
+      Rect.fromLTWH(0, size.height * 0.05, size.width, 5),
+      paint,
+    );
+  }
+  
+  @override
+  bool shouldRepaint(covariant HomeBackgroundPainter oldDelegate) => false;
 }
 
 // Custom painter for treasure light beams
