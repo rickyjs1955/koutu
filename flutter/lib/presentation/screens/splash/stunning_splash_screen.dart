@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'dart:math';
 import 'dart:ui' as ui;
+import 'dart:async';
 import 'package:koutu/core/constants/app_colors.dart';
 
 /// Ultra-stunning splash screen with advanced visual effects
