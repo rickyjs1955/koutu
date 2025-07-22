@@ -6,6 +6,7 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Hello App">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="hello_app">
   <title>Hello App</title>
@@ -53,17 +54,27 @@
   </div>
   <script>
     window.addEventListener('load', function(ev) {
+      // Set the build configuration required by Flutter
+      _flutter.buildConfig = {
+        engineRevision: 'b8f7f1f9869bb2d116aa6a70dbeac61000b52849',
+        builds: [{
+          compileTarget: 'dartdevc',
+          renderer: 'html',
+          mainJsPath: 'main.dart.js',
+        }]
+      };
+      
       // Download main.dart.js
       _flutter.loader.load({
-        serviceWorker: {
+        config: _flutter.buildConfig,
+        serviceWorkerSettings: {
           serviceWorkerVersion: serviceWorkerVersion,
         },
-        onEntrypointLoaded: function(engineInitializer) {
-          engineInitializer.initializeEngine().then(function(appRunner) {
-            // Hide the loading indicator when Flutter starts
-            document.getElementById('loading').style.display = 'none';
-            appRunner.runApp();
-          });
+        onEntrypointLoaded: async function(engineInitializer) {
+          const appRunner = await engineInitializer.initializeEngine();
+          // Hide the loading indicator when Flutter starts
+          document.getElementById('loading').style.display = 'none';
+          await appRunner.runApp();
         }
       });
     });
