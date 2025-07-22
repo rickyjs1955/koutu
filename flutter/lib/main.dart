@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import 'splash_screen_demo1.dart';
+import 'simple_splash_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -14,7 +14,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Red Door Demo',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: HelloSplashScreen(onAnimationComplete: () {
+      home: SimpleSplashScreen(onAnimationComplete: () {
         // Animation complete callback
       }),
     );
