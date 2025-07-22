@@ -33,10 +33,12 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    print('HelloSplashScreen initState called');
     
     _controller = AnimationController(
       duration: const Duration(seconds: 2),
@@ -59,14 +61,25 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
       curve: Curves.elasticOut,
     ));
 
-    _controller.forward().then((_) {
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomePage()),
-          );
-        }
-      });
+    // Start animation after a brief delay to ensure widget is built
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        print('Starting animation');
+        _controller.forward().then((_) {
+          print('Animation completed');
+          Future.delayed(const Duration(seconds: 1), () {
+            if (mounted) {
+              print('Navigating to HomePage');
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (context) => const HomePage()),
+              );
+            }
+          });
+        });
+      }
     });
   }
 
@@ -78,57 +91,76 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    print('Building HelloSplashScreen, isLoading: $_isLoading');
+    
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.blue.shade100,
       body: Center(
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return Opacity(
-              opacity: _fadeAnimation.value,
-              child: Transform.scale(
-                scale: _scaleAnimation.value,
-                child: Container(
-                  padding: const EdgeInsets.all(40),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blue.withOpacity(0.3),
-                        blurRadius: 20,
-                        spreadRadius: 5,
-                      ),
-                    ],
+        child: _isLoading
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade700),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'HELLO',
-                        style: TextStyle(
-                          fontSize: 80,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade900,
-                          letterSpacing: 10,
+                  const SizedBox(height: 20),
+                  Text(
+                    'Loading...',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ],
+              )
+            : AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  return Opacity(
+                    opacity: _fadeAnimation.value,
+                    child: Transform.scale(
+                      scale: _scaleAnimation.value,
+                      child: Container(
+                        padding: const EdgeInsets.all(40),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.blue.withOpacity(0.3),
+                              blurRadius: 20,
+                              spreadRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'HELLO',
+                              style: TextStyle(
+                                fontSize: 80,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade900,
+                                letterSpacing: 10,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              'Welcome to the App',
+                              style: TextStyle(
+                                fontSize: 20,
+                                color: Colors.blue.shade700,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Welcome to the App',
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: Colors.blue.shade700,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        ),
       ),
     );
   }

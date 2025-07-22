@@ -20,11 +20,37 @@
     body {
       margin: 0;
       padding: 0;
-      background-color: #ffffff;
+      background-color: #BBDEFB;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    
+    .loading-indicator {
+      text-align: center;
+      font-family: Arial, sans-serif;
+    }
+    
+    .loading-indicator h1 {
+      color: #0D47A1;
+      font-size: 60px;
+      letter-spacing: 10px;
+      margin: 0;
+    }
+    
+    .loading-indicator p {
+      color: #1565C0;
+      font-size: 18px;
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
+  <div class="loading-indicator" id="loading">
+    <h1>HELLO</h1>
+    <p>Loading...</p>
+  </div>
   <script>
     window.addEventListener('load', function(ev) {
       // Download main.dart.js
@@ -34,6 +60,8 @@
         },
         onEntrypointLoaded: function(engineInitializer) {
           engineInitializer.initializeEngine().then(function(appRunner) {
+            // Hide the loading indicator when Flutter starts
+            document.getElementById('loading').style.display = 'none';
             appRunner.runApp();
           });
         }
