@@ -236,17 +236,6 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                   scale: _contentScaleAnimation.value,
                                   child: Container(
                                     padding: EdgeInsets.all(isMobile ? 20 : 40),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.9),
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.blue.withOpacity(0.5),
-                                          blurRadius: 30,
-                                          spreadRadius: 10,
-                                        ),
-                                      ],
-                                    ),
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -255,13 +244,18 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                           style: TextStyle(
                                             fontSize: isMobile ? 45 : 70,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.blue.shade900,
+                                            color: const Color(0xFFFFD700), // Gold color
                                             letterSpacing: isMobile ? 6 : 8,
                                             shadows: [
                                               Shadow(
-                                                color: Colors.blue.withOpacity(0.3),
+                                                color: Colors.black.withOpacity(0.5),
                                                 blurRadius: 10,
-                                                offset: const Offset(0, 5),
+                                                offset: const Offset(0, 3),
+                                              ),
+                                              Shadow(
+                                                color: const Color(0xFFFFD700).withOpacity(0.5),
+                                                blurRadius: 20,
+                                                offset: const Offset(0, 0),
                                               ),
                                             ],
                                           ),
@@ -271,8 +265,15 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                           'Your Digital Wardrobe',
                                           style: TextStyle(
                                             fontSize: isMobile ? 16 : 20,
-                                            color: Colors.blue.shade700,
+                                            color: const Color(0xFFFFE57F), // Light gold
                                             letterSpacing: isMobile ? 1 : 2,
+                                            shadows: [
+                                              Shadow(
+                                                color: Colors.black.withOpacity(0.7),
+                                                blurRadius: 5,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
