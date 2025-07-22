@@ -69,11 +69,11 @@ class _NewEnhancedSplashScreenState extends State<NewEnhancedSplashScreen>
   late Animation<double> _shakeAnimation;
   
   // Premium color palette
-  final Color _obsidian = const Color(0xFF0A0E27);
+  final Color _obsidian = const Color(0xFF1A1E37);  // Lighter background
   final Color _royalPurple = const Color(0xFF6B5B95);
   final Color _champagneGold = const Color(0xFFD4AF37);
   final Color _roseGold = const Color(0xFFE8B4B8);
-  final Color _midnight = const Color(0xFF191970);
+  final Color _midnight = const Color(0xFF2929A0);  // Lighter midnight
   
   // Particle systems
   final List<Particle> _backgroundParticles = [];
@@ -687,17 +687,17 @@ class _NewEnhancedSplashScreenState extends State<NewEnhancedSplashScreen>
       height: height,
       child: Stack(
         children: [
-          // Base door with enhanced gradient
+          // Base door with enhanced gradient - BRIGHT RED FOR VISIBILITY
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: isLeft ? Alignment.centerRight : Alignment.centerLeft,
                 end: isLeft ? Alignment.centerLeft : Alignment.centerRight,
                 colors: const [
-                  Color(0xFF3a3a5e),
-                  Color(0xFF36416e),
-                  Color(0xFF2f4480),
-                  Color(0xFF26315e),
+                  Color(0xFFFF0000),  // Bright red
+                  Color(0xFFCC0000),  // Darker red
+                  Color(0xFF990000),  // Even darker red
+                  Color(0xFF660000),  // Deep red
                 ],
               ),
               borderRadius: BorderRadius.only(
@@ -705,6 +705,10 @@ class _NewEnhancedSplashScreenState extends State<NewEnhancedSplashScreen>
                 topRight: !isLeft ? const Radius.circular(20) : Radius.zero,
                 bottomLeft: isLeft ? const Radius.circular(20) : Radius.zero,
                 bottomRight: !isLeft ? const Radius.circular(20) : Radius.zero,
+              ),
+              border: Border.all(
+                color: Colors.white,
+                width: 3,
               ),
               boxShadow: [
                 BoxShadow(
