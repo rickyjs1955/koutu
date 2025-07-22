@@ -4,16 +4,16 @@ import 'package:rive/rive.dart';
 
 /// Splash screen featuring an animated wardrobe opening sequence
 /// with particle effects and elegant typography
-class KoutuSplashScreen extends StatefulWidget {
+class HelloSplashScreen extends StatefulWidget {
   final VoidCallback onAnimationComplete;
 
-  const KoutuSplashScreen({super.key, required this.onAnimationComplete});
+  const HelloSplashScreen({super.key, required this.onAnimationComplete});
 
   @override
-  State<KoutuSplashScreen> createState() => _KoutuSplashScreenState();
+  State<HelloSplashScreen> createState() => _HelloSplashScreenState();
 }
 
-class _KoutuSplashScreenState extends State<KoutuSplashScreen> 
+class _HelloSplashScreenState extends State<HelloSplashScreen> 
     with SingleTickerProviderStateMixin {
   // Animation controller to orchestrate all animations
   late AnimationController _controller;
@@ -139,7 +139,7 @@ class _KoutuSplashScreenState extends State<KoutuSplashScreen>
                 children: [
                   // Main title with custom styling
                   Text(
-                    'KOUTU',
+                    'HELLO',
                     style: TextStyle(
                       fontSize: 42,
                       fontWeight: FontWeight.w800,
