@@ -41,7 +41,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
     print('HelloSplashScreen initState called');
     
     _controller = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 3),
       vsync: this,
     );
 
@@ -62,7 +62,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
     ));
 
     // Start animation after a brief delay to ensure widget is built
-    Future.delayed(const Duration(milliseconds: 100), () {
+    Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -70,7 +70,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
         print('Starting animation');
         _controller.forward().then((_) {
           print('Animation completed');
-          Future.delayed(const Duration(seconds: 1), () {
+          Future.delayed(const Duration(seconds: 2), () {
             if (mounted) {
               print('Navigating to HomePage');
               Navigator.of(context).pushReplacement(
