@@ -13,7 +13,9 @@ class MyApp extends StatelessWidget {
       title: 'Hello App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        useMaterial3: true,
       ),
+      debugShowCheckedModeBanner: false,
       home: const HelloSplashScreen(),
     );
   }
@@ -57,7 +59,15 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
       curve: Curves.elasticOut,
     ));
 
-    _controller.forward();
+    _controller.forward().then((_) {
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomePage()),
+          );
+        }
+      });
+    });
   }
 
   @override
@@ -118,6 +128,49 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class HomePage extends StatelessWidget {
+  const HomePage({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Home'),
+        backgroundColor: Colors.blue.shade700,
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.home,
+              size: 100,
+              color: Colors.blue.shade700,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Welcome Home!',
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue.shade900,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'The splash screen has completed',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.blue.shade600,
+              ),
+            ),
+          ],
         ),
       ),
     );
