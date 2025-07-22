@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="KOUTU - Your Digital Wardrobe">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="KOUTU">
+  <title>KOUTU - Your Digital Wardrobe</title>
+  <link rel="manifest" href="manifest.json">
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: linear-gradient(to bottom, #F5E6D3, #E8D5C4, #D4C4B0);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    #loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      background: inherit;
+      transition: opacity 0.5s ease-out;
+    }
+    
+    .loading-content {
+      text-align: center;
+      animation: fadeIn 1s ease-out;
+    }
+    
+    .loading-logo {
+      font-size: 60px;
+      font-weight: bold;
+      color: #8B6F47;
+      letter-spacing: 10px;
+      margin-bottom: 20px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      margin: 20px auto;
+      border: 3px solid rgba(139, 111, 71, 0.2);
+      border-top-color: #8B6F47;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .loading-text {
+      color: #5D4037;
+      font-size: 16px;
+      margin-top: 20px;
+      opacity: 0.8;
+    }
+    
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      .loading-logo {
+        font-size: 40px;
+        letter-spacing: 6px;
+      }
+      
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+      }
+      
+      .loading-text {
+        font-size: 14px;
+      }
+    }
+    
+    /* Ensure smooth rendering on mobile */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+    }
+    
+    /* Performance optimizations */
+    .loading-spinner {
+      will-change: transform;
+    }
+    
+    #loading-screen {
+      will-change: opacity;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading-screen">
+    <div class="loading-content">
+      <div class="loading-logo">KOUTU</div>
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Preparing your wardrobe...</div>
+    </div>
+  </div>
+
+  <script>
+    // Performance monitoring
+    const startTime = performance.now();
+    console.log('KOUTU: Page load started');
+    
+    // Add loading class for CSS control
+    document.body.classList.add('loading');
+    
+    // Update loading text after a few seconds
+    setTimeout(function() {
+      const loadingText = document.querySelector('.loading-text');
+      if (loadingText && document.body.classList.contains('loading')) {
+        loadingText.textContent = 'Almost ready...';
+      }
+    }, 3000);
+    
+    // Hide loading screen when Flutter is ready
+    function hideLoadingScreen() {
+      const loadTime = performance.now() - startTime;
+      console.log('KOUTU: App loaded in', Math.round(loadTime), 'ms');
+      
+      const loadingScreen = document.getElementById('loading-screen');
+      if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        setTimeout(function() {
+          loadingScreen.style.display = 'none';
+          document.body.classList.remove('loading');
+        }, 500);
+      }
+    }
+    
+    // Listen for Flutter ready event
+    window.addEventListener('flutter-first-frame', function() {
+      console.log('KOUTU: Flutter first frame rendered');
+      hideLoadingScreen();
+    });
+    
+    // Fallback hide after maximum wait time
+    setTimeout(function() {
+      if (document.body.classList.contains('loading')) {
+        console.log('KOUTU: Fallback hide loading screen');
+        hideLoadingScreen();
+      }
+    }, 10000);
+  </script>
+
+  <!-- Flutter bootstrap -->
+  <script src="flutter.js" defer></script>
+  <script>
+    window.addEventListener('load', function(ev) {
+      console.log('KOUTU: Initializing Flutter...');
+      
+      // Flutter initialization with error handling
+      _flutter.loader.loadEntrypoint({
+        serviceWorker: {
+          serviceWorkerVersion: serviceWorkerVersion,
+        },
+        onEntrypointLoaded: function(engineInitializer) {
+          console.log('KOUTU: Entrypoint loaded, initializing engine...');
+          
+          engineInitializer.initializeEngine({
+            // Enable performance overlay in debug mode
+            debugShowCheckedModeBanner: false,
+          }).then(function(appRunner) {
+            console.log('KOUTU: Engine initialized, running app...');
+            return appRunner.runApp();
+          }).catch(function(error) {
+            console.error('KOUTU: Failed to run app:', error);
+            document.querySelector('.loading-text').textContent = 'Error loading app. Please refresh.';
+          });
+        }
+      });
+    });
+  </script>
+  
+  <script>
+    // Service worker registration
+    var serviceWorkerVersion = null;
+    var scriptLoaded = false;
+    function loadMainDartJs() {
+      if (scriptLoaded) {
+        return;
+      }
+      scriptLoaded = true;
+      var scriptTag = document.createElement('script');
+      scriptTag.src = 'main.dart.js';
+      scriptTag.type = 'application/javascript';
+      document.body.append(scriptTag);
+    }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('flutter-first-frame', function () {
+        navigator.serviceWorker.register('flutter_service_worker.js');
+      });
+    }
+  </script>
+</body>
+</html>
