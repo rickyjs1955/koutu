@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'dart:math';
 import 'package:koutu/core/constants/app_colors.dart';
 
+/// Splash screen featuring an animated wardrobe opening sequence
+/// with particle effects and elegant typography
 class EnhancedSplashScreen extends StatefulWidget {
   const EnhancedSplashScreen({super.key});
 
@@ -10,263 +13,215 @@ class EnhancedSplashScreen extends StatefulWidget {
 }
 
 class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _wardrobeController;
-  late AnimationController _logoController;
-  late AnimationController _taglineController;
-  late AnimationController _pulseController;
+    with SingleTickerProviderStateMixin {
+  // Animation controller to orchestrate all animations
+  late AnimationController _controller;
   
-  late Animation<double> _wardrobeScaleAnimation;
+  // Wardrobe door animations
   late Animation<double> _leftDoorAnimation;
   late Animation<double> _rightDoorAnimation;
-  late Animation<double> _perspectiveAnimation;
-  late Animation<double> _logoScaleAnimation;
-  late Animation<double> _logoFadeAnimation;
-  late Animation<double> _taglineFadeAnimation;
-  late Animation<double> _taglineSlideAnimation;
-  late Animation<double> _pulseAnimation;
-  late Animation<double> _glowAnimation;
+  
+  // Fade-in animation for text elements
+  late Animation<double> _opacityAnimation;
+  
+  // Slide-up animation for title
+  late Animation<Offset> _titleSlideAnimation;
+  
+  // Wardrobe scale animation
+  late Animation<double> _wardrobeScaleAnimation;
+
+  // Color palette constants
+  final Color _ivory = const Color(0xFFF5EFE7);  // Primary light color
+  final Color _navy = const Color(0xFF213555);   // Primary dark color
+  final Color _goldAccent = const Color(0xFFD4AF37); // Accent color
 
   @override
   void initState() {
     super.initState();
-    _initAnimations();
-    _startAnimationSequence();
-  }
-
-  void _initAnimations() {
-    // Wardrobe animation controller
-    _wardrobeController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
+    
+    // Main animation controller (2200ms duration)
+    _controller = AnimationController(
       vsync: this,
+      duration: const Duration(milliseconds: 2200),
     );
 
-    // Logo animation controller
-    _logoController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
+    // Configure animation curves for smooth easing
+    final curvedAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, 0.8, curve: Curves.easeOutQuint),
     );
 
-    // Tagline animation controller
-    _taglineController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
-      vsync: this,
-    );
-
-    // Pulse animation controller
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    // Wardrobe scale animation (starts small, grows to full size)
+    // Wardrobe scale animation
     _wardrobeScaleAnimation = Tween<double>(
-      begin: 0.8,
+      begin: 0.9,
       end: 1.0,
     ).animate(CurvedAnimation(
-      parent: _wardrobeController,
-      curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
+      parent: _controller,
+      curve: const Interval(0.0, 0.4, curve: Curves.easeOut),
     ));
 
-    // 3D perspective animation for depth effect
-    _perspectiveAnimation = Tween<double>(
-      begin: 0.0,
-      end: 0.002,
-    ).animate(CurvedAnimation(
-      parent: _wardrobeController,
-      curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
-    ));
-
-    // Left door opens with 3D rotation
+    // Left door opens with smooth rotation
     _leftDoorAnimation = Tween<double>(
       begin: 0.0,
-      end: -75.0, // Degrees
+      end: -85.0, // Degrees
     ).animate(CurvedAnimation(
-      parent: _wardrobeController,
-      curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
+      parent: _controller,
+      curve: const Interval(0.2, 0.8, curve: Curves.easeInOut),
     ));
 
-    // Right door opens with 3D rotation
+    // Right door opens with smooth rotation
     _rightDoorAnimation = Tween<double>(
       begin: 0.0,
-      end: 75.0, // Degrees
+      end: 85.0, // Degrees
     ).animate(CurvedAnimation(
-      parent: _wardrobeController,
-      curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
+      parent: _controller,
+      curve: const Interval(0.2, 0.8, curve: Curves.easeInOut),
     ));
 
-    // Logo animations
-    _logoScaleAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _logoController,
-      curve: Curves.elasticOut,
-    ));
+    // Text fade-in animation (delayed start)
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.6, 1.0, curve: Curves.easeIn),
+      ),
+    );
 
-    _logoFadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _logoController,
-      curve: Curves.easeIn,
-    ));
+    // Title slide-up animation from bottom
+    _titleSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),  // Start 30% down from final position
+      end: Offset.zero,
+    ).animate(curvedAnimation);
 
-    // Tagline animations
-    _taglineFadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _taglineController,
-      curve: Curves.easeIn,
-    ));
-
-    _taglineSlideAnimation = Tween<double>(
-      begin: 20.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _taglineController,
-      curve: Curves.easeOut,
-    ));
-
-    // Glow animation
-    _glowAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _logoController,
-      curve: Curves.easeInOut,
-    ));
-
-    // Pulse animation
-    _pulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.1,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
-  }
-
-  void _startAnimationSequence() async {
-    // Start wardrobe animation
-    await _wardrobeController.forward();
-    
-    // Small delay before logo appears
-    await Future.delayed(const Duration(milliseconds: 300));
-    
-    // Start logo animation
-    _logoController.forward();
-    
-    // Delay before tagline
-    await Future.delayed(const Duration(milliseconds: 600));
-    
-    // Start tagline animation
-    await _taglineController.forward();
-    
-    // Wait before navigating
-    await Future.delayed(const Duration(milliseconds: 2000));
-    
-    // Navigate to home
-    if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
-    }
+    // Start animation sequence and trigger navigation
+    _controller.forward().then((_) async {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
+    });
   }
 
   @override
   void dispose() {
-    _wardrobeController.dispose();
-    _logoController.dispose();
-    _taglineController.dispose();
-    _pulseController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final size = MediaQuery.of(context).size;
-    final wardrobeWidth = size.width * 0.85;
-    final wardrobeHeight = size.height * 0.65;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: isDarkMode ? _navy : _ivory,
       body: Stack(
         children: [
-          // Animated background gradient
-          AnimatedBuilder(
-            animation: _wardrobeController,
-            builder: (context, child) {
-              return Container(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment.center,
-                    radius: 1.5,
-                    colors: [
-                      AppColors.primary.withOpacity(0.15 * _wardrobeController.value),
-                      AppColors.background,
-                      AppColors.secondary.withOpacity(0.1),
-                    ],
-                  ),
-                ),
-              );
-            },
+          // Background particle effect layer
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  return CustomPaint(
+                    painter: _ParticlePainter(
+                      color: _goldAccent.withOpacity(0.2),
+                      animation: _controller,
+                    ),
+                  );
+                },
+              ),
+            ),
           ),
-          
-          // Main content
+
+          // Central wardrobe animation
           Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // 3D Wardrobe Container
-                AnimatedBuilder(
-                  animation: _wardrobeController,
-                  builder: (context, child) {
-                    return Transform(
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _wardrobeScaleAnimation.value,
+                  child: SizedBox(
+                    width: size.width * 0.7,  // Responsive width
+                    height: size.height * 0.5, // Responsive height
+                    child: Stack(
                       alignment: Alignment.center,
-                      transform: Matrix4.identity()
-                        ..setEntry(3, 2, _perspectiveAnimation.value)
-                        ..scale(_wardrobeScaleAnimation.value),
-                      child: SizedBox(
-                        width: wardrobeWidth,
-                        height: wardrobeHeight,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Logo and content behind doors
-                            _buildLogoContent(),
-                            
-                            // 3D Wardrobe doors
-                            _build3DWardrobeDoors(wardrobeWidth, wardrobeHeight),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                
-                // Tagline
-                const SizedBox(height: 40),
-                AnimatedBuilder(
-                  animation: _taglineController,
-                  builder: (context, child) {
-                    return Transform.translate(
-                      offset: Offset(0, _taglineSlideAnimation.value),
-                      child: Opacity(
-                        opacity: _taglineFadeAnimation.value,
-                        child: Text(
-                          'Your Digital Fashion Assistant',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w300,
-                            color: AppColors.textPrimary,
-                            letterSpacing: 1.2,
+                      children: [
+                        // Logo content behind doors
+                        _buildLogoContent(isDarkMode),
+                        
+                        // Wardrobe doors
+                        _buildWardrobeDoors(size.width * 0.7, size.height * 0.5),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Text content overlay (animated)
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                return Opacity(
+                  opacity: _opacityAnimation.value,
+                  child: SlideTransition(
+                    position: _titleSlideAnimation,
+                    child: child!,
+                  ),
+                );
+              },
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // Main title with custom styling
+                  Text(
+                    'KOUTU',
+                    style: TextStyle(
+                      fontSize: 42,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 4,  // Increased letter spacing for elegance
+                      color: isDarkMode ? _ivory : _navy,
+                    ),
+                  ),
+                  
+                  // Animated decorative line
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        return CustomPaint(
+                          painter: _LinePainter(
+                            color: _goldAccent,
+                            lengthFactor: _controller.value.clamp(0.7, 1.0),
                           ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
+                          size: const Size(100, 1),
+                        );
+                      },
+                    ),
+                  ),
+                  
+                  // Subtitle with dynamic letter spacing
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 40),
+                    child: AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        return Text(
+                          'Your Digital Wardrobe',
+                          style: TextStyle(
+                            fontSize: 16,
+                            letterSpacing: _controller.value * 2 + 1, // Animated spacing
+                            color: isDarkMode ? _ivory.withOpacity(0.8) : _navy.withOpacity(0.8),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -274,92 +229,34 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
     );
   }
 
-  Widget _buildLogoContent() {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_logoController, _pulseController]),
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _logoScaleAnimation.value * _pulseAnimation.value,
-          child: Opacity(
-            opacity: _logoFadeAnimation.value,
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(_glowAnimation.value * 0.3),
-                    blurRadius: 60,
-                    spreadRadius: 30,
-                  ),
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(_glowAnimation.value * 0.2),
-                    blurRadius: 100,
-                    spreadRadius: 50,
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppColors.primary,
-                          AppColors.primary.withOpacity(0.8),
-                        ],
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withOpacity(0.4),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.checkroom,
-                      size: 60,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  // Koutu text
-                  ShaderMask(
-                    shaderCallback: (bounds) => LinearGradient(
-                      colors: [
-                        AppColors.primary,
-                        AppColors.secondary,
-                      ],
-                    ).createShader(bounds),
-                    child: const Text(
-                      'KOUTU',
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+  Widget _buildLogoContent(bool isDarkMode) {
+    return FadeTransition(
+      opacity: _opacityAnimation,
+      child: Container(
+        width: 180,
+        height: 180,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [
+              _goldAccent.withOpacity(0.3),
+              _goldAccent.withOpacity(0.1),
+              Colors.transparent,
+            ],
           ),
-        );
-      },
+        ),
+        child: Center(
+          child: Icon(
+            Icons.checkroom,
+            size: 80,
+            color: isDarkMode ? _ivory : _navy,
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _build3DWardrobeDoors(double wardrobeWidth, double wardrobeHeight) {
+  Widget _buildWardrobeDoors(double wardrobeWidth, double wardrobeHeight) {
     return Stack(
       children: [
         // Left door with 3D rotation
@@ -373,7 +270,7 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
                 transform: Matrix4.identity()
                   ..setEntry(3, 2, 0.001)
                   ..rotateY(_leftDoorAnimation.value * (math.pi / 180)),
-                child: _build3DDoor(
+                child: _buildElegantDoor(
                   width: wardrobeWidth / 2,
                   height: wardrobeHeight,
                   isLeft: true,
@@ -394,7 +291,7 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
                 transform: Matrix4.identity()
                   ..setEntry(3, 2, 0.001)
                   ..rotateY(_rightDoorAnimation.value * (math.pi / 180)),
-                child: _build3DDoor(
+                child: _buildElegantDoor(
                   width: wardrobeWidth / 2,
                   height: wardrobeHeight,
                   isLeft: false,
@@ -407,7 +304,7 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
     );
   }
 
-  Widget _build3DDoor({
+  Widget _buildElegantDoor({
     required double width,
     required double height,
     required bool isLeft,
@@ -420,97 +317,64 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
           begin: isLeft ? Alignment.centerLeft : Alignment.centerRight,
           end: isLeft ? Alignment.centerRight : Alignment.centerLeft,
           colors: [
-            const Color(0xFF4A3628),
-            const Color(0xFF6B4E3D),
-            const Color(0xFF8B6B47),
+            const Color(0xFF3A2F2A),
+            const Color(0xFF4A3F3A),
+            const Color(0xFF5A4F4A),
           ],
         ),
         borderRadius: BorderRadius.only(
-          topLeft: isLeft ? const Radius.circular(12) : Radius.zero,
-          topRight: !isLeft ? const Radius.circular(12) : Radius.zero,
-          bottomLeft: isLeft ? const Radius.circular(12) : Radius.zero,
-          bottomRight: !isLeft ? const Radius.circular(12) : Radius.zero,
+          topLeft: isLeft ? const Radius.circular(8) : Radius.zero,
+          topRight: !isLeft ? const Radius.circular(8) : Radius.zero,
+          bottomLeft: isLeft ? const Radius.circular(8) : Radius.zero,
+          bottomRight: !isLeft ? const Radius.circular(8) : Radius.zero,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.4),
-            blurRadius: 20,
-            offset: Offset(isLeft ? -5 : 5, 5),
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 15,
+            offset: Offset(isLeft ? -3 : 3, 3),
           ),
         ],
       ),
       child: Stack(
         children: [
-          // Wood texture pattern
+          // Wood grain effect
           CustomPaint(
             size: Size(width, height),
-            painter: WoodTexturePainter(isLeft: isLeft),
+            painter: _WoodGrainPainter(isLeft: isLeft),
           ),
           
-          // Door panels
-          Positioned(
-            top: 20,
-            left: isLeft ? 20 : 10,
-            right: isLeft ? 10 : 20,
-            bottom: 20,
+          // Elegant panel design
+          Padding(
+            padding: const EdgeInsets.all(15),
             child: Container(
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: const Color(0xFF3A2818),
-                  width: 3,
+                  color: _goldAccent.withOpacity(0.3),
+                  width: 1,
                 ),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(4),
               ),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF5A4334).withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(4),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 5,
-                            offset: const Offset(0, 2),
-                            inset: true,
-                          ),
-                        ],
-                      ),
-                    ),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF5A4334).withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(4),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 5,
-                            offset: const Offset(0, 2),
-                            inset: true,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
           
           // Door handle
           Positioned(
-            top: height / 2 - 40,
-            left: isLeft ? null : 25,
-            right: isLeft ? 25 : null,
+            top: height / 2 - 30,
+            left: isLeft ? null : 20,
+            right: isLeft ? 20 : null,
             child: Container(
-              width: 12,
-              height: 80,
+              width: 8,
+              height: 60,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   begin: Alignment.topCenter,
@@ -521,12 +385,12 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
                     Color(0xFFE4C441),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(4),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
@@ -538,29 +402,100 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
   }
 }
 
-// Custom painter for wood texture
-class WoodTexturePainter extends CustomPainter {
+/// Custom painter for background particle effects
+class _ParticlePainter extends CustomPainter {
+  final Color color;
+  final Animation<double> animation;
+
+  _ParticlePainter({required this.color, required this.animation}) : super(repaint: animation);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    // Dynamic particle count based on animation progress
+    final progress = animation.value;
+    final particleCount = (progress * 50).toInt();
+
+    // Draw randomized particles
+    for (int i = 0; i < particleCount; i++) {
+      final offset = Offset(
+        size.width * _noise(i, 0, progress),  // Randomized X position
+        size.height * _noise(i, 1, progress), // Randomized Y position
+      );
+      final radius = 2 * _noise(i, 2, progress) + 0.5; // Randomized size
+      canvas.drawCircle(offset, radius, paint);
+    }
+  }
+
+  /// Pseudo-random number generator for particle positioning
+  double _noise(int seed, int dimension, double progress) {
+    final random = Random(seed * 1000 + dimension);
+    return random.nextDouble() * progress;  // Progress affects visibility
+  }
+
+  @override
+  bool shouldRepaint(covariant _ParticlePainter oldDelegate) {
+    return oldDelegate.animation.value != animation.value;
+  }
+}
+
+/// Custom painter for animated decorative line
+class _LinePainter extends CustomPainter {
+  final Color color;
+  final double lengthFactor;  // Animation progress (0.0 to 1.0)
+
+  _LinePainter({required this.color, required this.lengthFactor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 0.8  // Hairline thickness
+      ..strokeCap = StrokeCap.round;  // Rounded ends
+
+    // Calculate line length based on animation
+    final lineLength = size.width * lengthFactor;
+    final startX = (size.width - lineLength) / 2;  // Centered
+
+    canvas.drawLine(
+      Offset(startX, size.height / 2),
+      Offset(startX + lineLength, size.height / 2),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _LinePainter oldDelegate) {
+    return oldDelegate.lengthFactor != lengthFactor;
+  }
+}
+
+/// Custom painter for wood grain effect
+class _WoodGrainPainter extends CustomPainter {
   final bool isLeft;
 
-  WoodTexturePainter({required this.isLeft});
+  _WoodGrainPainter({required this.isLeft});
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.5;
+      ..strokeWidth = 0.3;
 
-    // Draw wood grain lines
-    for (int i = 0; i < 20; i++) {
-      paint.color = const Color(0xFF3A2818).withOpacity(0.3);
-      final y = (size.height / 20) * i;
+    // Draw subtle wood grain lines
+    for (int i = 0; i < 15; i++) {
+      paint.color = const Color(0xFF2A1F1A).withOpacity(0.2);
+      final y = (size.height / 15) * i;
       
       final path = Path();
       path.moveTo(0, y);
       
       // Create wavy wood grain effect
-      for (double x = 0; x <= size.width; x += 10) {
-        final waveY = y + math.sin(x * 0.02) * 2;
+      for (double x = 0; x <= size.width; x += 15) {
+        final waveY = y + math.sin(x * 0.02) * 1.5;
         path.lineTo(x, waveY);
       }
       
