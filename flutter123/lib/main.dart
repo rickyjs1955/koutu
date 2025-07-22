@@ -221,7 +221,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
-                                          'HELLO',
+                                          'KOUTU',
                                           style: TextStyle(
                                             fontSize: 70,
                                             fontWeight: FontWeight.bold,
@@ -257,76 +257,100 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                         AnimatedBuilder(
                           animation: Listenable.merge([_leftDoorAnimation, _rightDoorAnimation]),
                           builder: (context, child) {
-                            return Stack(
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 // Left door
-                                Transform(
-                                  alignment: Alignment.centerRight,
-                                  transform: Matrix4.identity()
-                                    ..setEntry(3, 2, 0.001)
-                                    ..rotateY(_leftDoorAnimation.value * math.pi / 3),
+                                ClipRect(
                                   child: Container(
                                     width: size.width * 0.35,
                                     height: size.height * 0.5,
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          const Color(0xFF2d3561),
-                                          const Color(0xFF0f3460),
-                                        ],
-                                      ),
-                                      borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(10),
-                                        bottomLeft: Radius.circular(10),
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.5),
-                                          blurRadius: 10,
-                                          offset: const Offset(-5, 0),
+                                    alignment: Alignment.centerRight,
+                                    child: Transform(
+                                      alignment: Alignment.centerRight,
+                                      transform: Matrix4.identity()
+                                        ..setEntry(3, 2, 0.001)
+                                        ..rotateY(_leftDoorAnimation.value * math.pi / 3),
+                                      child: Container(
+                                        width: size.width * 0.35,
+                                        height: size.height * 0.5,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              const Color(0xFF2d3561),
+                                              const Color(0xFF0f3460),
+                                            ],
+                                          ),
+                                          border: Border(
+                                            left: BorderSide(color: Colors.black.withOpacity(0.3), width: 2),
+                                            top: BorderSide(color: Colors.black.withOpacity(0.3), width: 2),
+                                            bottom: BorderSide(color: Colors.black.withOpacity(0.3), width: 2),
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.5),
+                                              blurRadius: 10,
+                                              offset: const Offset(-5, 0),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                    child: CustomPaint(
-                                      painter: DoorDetailPainter(isLeft: true),
+                                        child: CustomPaint(
+                                          painter: DoorDetailPainter(isLeft: true),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
                                 
+                                // Gap between doors
+                                Container(
+                                  width: 4,
+                                  height: size.height * 0.5,
+                                  color: Colors.black.withOpacity(0.5),
+                                ),
+                                
                                 // Right door
-                                Transform(
-                                  alignment: Alignment.centerLeft,
-                                  transform: Matrix4.identity()
-                                    ..setEntry(3, 2, 0.001)
-                                    ..rotateY(_rightDoorAnimation.value * math.pi / 3),
+                                ClipRect(
                                   child: Container(
                                     width: size.width * 0.35,
                                     height: size.height * 0.5,
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          const Color(0xFF2d3561),
-                                          const Color(0xFF0f3460),
-                                        ],
-                                      ),
-                                      borderRadius: const BorderRadius.only(
-                                        topRight: Radius.circular(10),
-                                        bottomRight: Radius.circular(10),
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.5),
-                                          blurRadius: 10,
-                                          offset: const Offset(5, 0),
+                                    alignment: Alignment.centerLeft,
+                                    child: Transform(
+                                      alignment: Alignment.centerLeft,
+                                      transform: Matrix4.identity()
+                                        ..setEntry(3, 2, 0.001)
+                                        ..rotateY(_rightDoorAnimation.value * math.pi / 3),
+                                      child: Container(
+                                        width: size.width * 0.35,
+                                        height: size.height * 0.5,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              const Color(0xFF2d3561),
+                                              const Color(0xFF0f3460),
+                                            ],
+                                          ),
+                                          border: Border(
+                                            right: BorderSide(color: Colors.black.withOpacity(0.3), width: 2),
+                                            top: BorderSide(color: Colors.black.withOpacity(0.3), width: 2),
+                                            bottom: BorderSide(color: Colors.black.withOpacity(0.3), width: 2),
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.5),
+                                              blurRadius: 10,
+                                              offset: const Offset(5, 0),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                    child: CustomPaint(
-                                      painter: DoorDetailPainter(isLeft: false),
+                                        child: CustomPaint(
+                                          painter: DoorDetailPainter(isLeft: false),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
