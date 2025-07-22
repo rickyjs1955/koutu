@@ -201,12 +201,16 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                 ? const CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
                   )
-                : SizedBox(
-                    width: size.width * 0.9,
-                    height: size.height * 0.7,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Wardrobe with clothes
+                      SizedBox(
+                        width: size.width * 0.9,
+                        height: size.height * 0.6,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
                         // Treasure light effect - golden light from inside
                         AnimatedBuilder(
                           animation: _lightBeamAnimation,
@@ -218,7 +222,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                               ),
                               size: Size(
                                 size.width * 0.85,
-                                size.height * 0.65,
+                                size.height * 0.55,
                               ),
                             );
                           },
@@ -230,7 +234,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                           builder: (context, child) {
                             return Container(
                               width: size.width * 0.85,
-                              height: size.height * 0.65,
+                              height: size.height * 0.55,
                               decoration: BoxDecoration(
                                 gradient: RadialGradient(
                                   colors: [
@@ -246,7 +250,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                           },
                         ),
                         
-                        // Content behind doors (revealed when doors open)
+                        // Clothing items behind doors (revealed when doors open)
                         if (_showContent)
                           AnimatedBuilder(
                             animation: _contentController,
@@ -255,49 +259,13 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 opacity: _contentFadeAnimation.value,
                                 child: Transform.scale(
                                   scale: _contentScaleAnimation.value,
-                                  child: Container(
-                                    padding: EdgeInsets.all(isMobile ? 20 : 40),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          'KOUTU',
-                                          style: TextStyle(
-                                            fontSize: isMobile ? 55 : 80,
-                                            fontWeight: FontWeight.bold,
-                                            color: const Color(0xFF8B6F47), // Rich brown
-                                            letterSpacing: isMobile ? 6 : 8,
-                                            shadows: [
-                                              Shadow(
-                                                color: Colors.black.withOpacity(0.5),
-                                                blurRadius: 10,
-                                                offset: const Offset(0, 3),
-                                              ),
-                                              Shadow(
-                                                color: const Color(0xFFFFD700).withOpacity(0.5),
-                                                blurRadius: 20,
-                                                offset: const Offset(0, 0),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 20),
-                                        Text(
-                                          'Your Digital Wardrobe',
-                                          style: TextStyle(
-                                            fontSize: isMobile ? 18 : 24,
-                                            color: const Color(0xFF5D4037), // Dark brown
-                                            letterSpacing: isMobile ? 1 : 2,
-                                            shadows: [
-                                              Shadow(
-                                                color: Colors.black.withOpacity(0.7),
-                                                blurRadius: 5,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
+                                  child: CustomPaint(
+                                    painter: ClothingPainter(
+                                      revealProgress: _contentController.value,
+                                    ),
+                                    size: Size(
+                                      size.width * 0.7,
+                                      size.height * 0.5,
                                     ),
                                   ),
                                 ),
@@ -316,7 +284,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 ClipRect(
                                   child: Container(
                                     width: size.width * 0.425,
-                                    height: size.height * 0.65,
+                                    height: size.height * 0.55,
                                     alignment: Alignment.centerRight,
                                     child: Transform(
                                       alignment: Alignment.centerLeft,
@@ -325,7 +293,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                         ..rotateY(_leftDoorAnimation.value * math.pi / 2.2),
                                       child: Container(
                                         width: size.width * 0.425,
-                                        height: size.height * 0.65,
+                                        height: size.height * 0.55,
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             begin: Alignment.topLeft,
@@ -361,7 +329,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 ClipRect(
                                   child: Container(
                                     width: size.width * 0.425,
-                                    height: size.height * 0.65,
+                                    height: size.height * 0.55,
                                     alignment: Alignment.centerLeft,
                                     child: Transform(
                                       alignment: Alignment.centerRight,
@@ -370,7 +338,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                         ..rotateY(_rightDoorAnimation.value * math.pi / 2.2),
                                       child: Container(
                                         width: size.width * 0.425,
-                                        height: size.height * 0.65,
+                                        height: size.height * 0.55,
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             begin: Alignment.topLeft,
@@ -407,6 +375,43 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                       ],
                     ),
                   ),
+                  
+                  // Logo and tagline below wardrobe
+                  const SizedBox(height: 40),
+                  Text(
+                    'KOUTU',
+                    style: TextStyle(
+                      fontSize: isMobile ? 55 : 80,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF8B6F47), // Rich brown
+                      letterSpacing: isMobile ? 6 : 8,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 5,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Your Digital Wardrobe',
+                    style: TextStyle(
+                      fontSize: isMobile ? 18 : 24,
+                      color: const Color(0xFF5D4037), // Dark brown
+                      letterSpacing: isMobile ? 1 : 2,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 3,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
           ),
         ],
       ),
@@ -454,6 +459,171 @@ class HomePage extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// Custom painter for clothing items inside wardrobe
+class ClothingPainter extends CustomPainter {
+  final double revealProgress;
+  
+  ClothingPainter({required this.revealProgress});
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (revealProgress == 0) return;
+    
+    final paint = Paint()
+      ..style = PaintingStyle.fill;
+    
+    // Draw hanging rod
+    paint
+      ..color = const Color(0xFF6D4C41)
+      ..strokeWidth = 4
+      ..style = PaintingStyle.stroke;
+    
+    canvas.drawLine(
+      Offset(size.width * 0.1, size.height * 0.15),
+      Offset(size.width * 0.9, size.height * 0.15),
+      paint,
+    );
+    
+    // Draw hangers
+    paint
+      ..strokeWidth = 2
+      ..color = const Color(0xFF757575);
+    
+    // Casual wear section (left side)
+    final casualX = [0.2, 0.3, 0.4];
+    for (int i = 0; i < casualX.length; i++) {
+      final x = size.width * casualX[i];
+      // Hanger
+      canvas.drawLine(
+        Offset(x, size.height * 0.15),
+        Offset(x - 10, size.height * 0.18),
+        paint,
+      );
+      canvas.drawLine(
+        Offset(x, size.height * 0.15),
+        Offset(x + 10, size.height * 0.18),
+        paint,
+      );
+      
+      // Draw casual clothes
+      paint.style = PaintingStyle.fill;
+      if (i == 0) {
+        // T-shirt
+        paint.color = const Color(0xFF42A5F5).withOpacity(revealProgress);
+        final tshirtPath = Path()
+          ..moveTo(x - 25, size.height * 0.2)
+          ..lineTo(x - 25, size.height * 0.4)
+          ..lineTo(x + 25, size.height * 0.4)
+          ..lineTo(x + 25, size.height * 0.2)
+          ..close();
+        canvas.drawPath(tshirtPath, paint);
+      } else if (i == 1) {
+        // Hoodie
+        paint.color = const Color(0xFF66BB6A).withOpacity(revealProgress);
+        final hoodiePath = Path()
+          ..moveTo(x - 30, size.height * 0.2)
+          ..lineTo(x - 30, size.height * 0.45)
+          ..lineTo(x + 30, size.height * 0.45)
+          ..lineTo(x + 30, size.height * 0.2)
+          ..close();
+        canvas.drawPath(hoodiePath, paint);
+      } else {
+        // Jeans
+        paint.color = const Color(0xFF5C6BC0).withOpacity(revealProgress);
+        final jeansPath = Path()
+          ..moveTo(x - 20, size.height * 0.2)
+          ..lineTo(x - 20, size.height * 0.5)
+          ..lineTo(x - 10, size.height * 0.5)
+          ..lineTo(x - 10, size.height * 0.35)
+          ..lineTo(x + 10, size.height * 0.35)
+          ..lineTo(x + 10, size.height * 0.5)
+          ..lineTo(x + 20, size.height * 0.5)
+          ..lineTo(x + 20, size.height * 0.2)
+          ..close();
+        canvas.drawPath(jeansPath, paint);
+      }
+    }
+    
+    // Formal wear section (right side)
+    final formalX = [0.6, 0.7, 0.8];
+    for (int i = 0; i < formalX.length; i++) {
+      final x = size.width * formalX[i];
+      // Hanger
+      paint
+        ..style = PaintingStyle.stroke
+        ..color = const Color(0xFF757575);
+      canvas.drawLine(
+        Offset(x, size.height * 0.15),
+        Offset(x - 10, size.height * 0.18),
+        paint,
+      );
+      canvas.drawLine(
+        Offset(x, size.height * 0.15),
+        Offset(x + 10, size.height * 0.18),
+        paint,
+      );
+      
+      // Draw formal clothes
+      paint.style = PaintingStyle.fill;
+      if (i == 0) {
+        // Suit jacket
+        paint.color = const Color(0xFF424242).withOpacity(revealProgress);
+        final suitPath = Path()
+          ..moveTo(x - 35, size.height * 0.2)
+          ..lineTo(x - 35, size.height * 0.45)
+          ..lineTo(x - 15, size.height * 0.45)
+          ..lineTo(x - 15, size.height * 0.4)
+          ..lineTo(x + 15, size.height * 0.4)
+          ..lineTo(x + 15, size.height * 0.45)
+          ..lineTo(x + 35, size.height * 0.45)
+          ..lineTo(x + 35, size.height * 0.2)
+          ..close();
+        canvas.drawPath(suitPath, paint);
+      } else if (i == 1) {
+        // Dress
+        paint.color = const Color(0xFFE91E63).withOpacity(revealProgress);
+        final dressPath = Path()
+          ..moveTo(x - 25, size.height * 0.2)
+          ..lineTo(x - 35, size.height * 0.55)
+          ..lineTo(x + 35, size.height * 0.55)
+          ..lineTo(x + 25, size.height * 0.2)
+          ..close();
+        canvas.drawPath(dressPath, paint);
+      } else {
+        // Shirt
+        paint.color = Colors.white.withOpacity(revealProgress);
+        final shirtPath = Path()
+          ..moveTo(x - 25, size.height * 0.2)
+          ..lineTo(x - 25, size.height * 0.42)
+          ..lineTo(x + 25, size.height * 0.42)
+          ..lineTo(x + 25, size.height * 0.2)
+          ..close();
+        canvas.drawPath(shirtPath, paint);
+        
+        // Collar
+        paint
+          ..style = PaintingStyle.stroke
+          ..color = const Color(0xFF757575).withOpacity(revealProgress);
+        canvas.drawLine(
+          Offset(x - 10, size.height * 0.2),
+          Offset(x, size.height * 0.23),
+          paint,
+        );
+        canvas.drawLine(
+          Offset(x + 10, size.height * 0.2),
+          Offset(x, size.height * 0.23),
+          paint,
+        );
+      }
+    }
+  }
+  
+  @override
+  bool shouldRepaint(covariant ClothingPainter oldDelegate) {
+    return oldDelegate.revealProgress != revealProgress;
   }
 }
 
