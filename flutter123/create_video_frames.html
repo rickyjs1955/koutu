@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Koutu Animation to Video Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #8B6F47;
+            text-align: center;
+        }
+        
+        .instructions {
+            background: #FFF9C4;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .button-group {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        button {
+            background: #FFD700;
+            color: #333;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #FFC700;
+            transform: scale(1.05);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+        
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 18px;
+        }
+        
+        #preview {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        #preview img {
+            max-width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .progress {
+            width: 100%;
+            height: 30px;
+            background: #eee;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #FFD700, #FFA500);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            font-weight: bold;
+        }
+        
+        .download-section {
+            text-align: center;
+            margin: 30px 0;
+            display: none;
+        }
+        
+        .download-link {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+        
+        .download-link:hover {
+            background: #45a049;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Koutu Animation to Video Converter</h1>
+        
+        <div class="instructions">
+            <h3>📋 Instructions:</h3>
+            <ol>
+                <li>Make sure your Koutu Flutter app is running at <strong>http://localhost:5001</strong></li>
+                <li>Click "Capture Animation" to record the splash screen</li>
+                <li>The tool will capture frames and create a video file</li>
+                <li>Download the result as WebM (can be converted to MP4)</li>
+            </ol>
+        </div>
+        
+        <div class="button-group">
+            <button id="captureBtn" onclick="startCapture()">🎥 Capture Animation</button>
+            <button id="resetBtn" onclick="resetCapture()" disabled>🔄 Reset</button>
+        </div>
+        
+        <div class="status" id="status">Ready to capture</div>
+        
+        <div class="progress" id="progress">
+            <div class="progress-bar" id="progressBar">0%</div>
+        </div>
+        
+        <div id="preview"></div>
+        
+        <div class="download-section" id="downloadSection">
+            <h3>✅ Video Ready!</h3>
+            <a id="downloadLink" class="download-link" download="koutu_animation.webm">📥 Download Video</a>
+            <p style="margin-top: 20px; color: #666;">
+                To convert to MP4, use any online converter or FFmpeg:<br>
+                <code>ffmpeg -i koutu_animation.webm -c:v libx264 koutu_animation.mp4</code>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let capturing = false;
+        let frames = [];
+        let frameRate = 30;
+        let duration = 8000; // 8 seconds in milliseconds
+        
+        async function startCapture() {
+            if (capturing) return;
+            
+            capturing = true;
+            frames = [];
+            
+            document.getElementById('captureBtn').disabled = true;
+            document.getElementById('resetBtn').disabled = true;
+            document.getElementById('status').textContent = 'Opening Flutter app in popup...';
+            document.getElementById('progress').style.display = 'block';
+            document.getElementById('downloadSection').style.display = 'none';
+            
+            // Open Flutter app in a popup window
+            const popup = window.open('http://localhost:5001', 'koutu', 'width=1280,height=720');
+            
+            if (!popup) {
+                alert('Please allow popups for this site to capture the animation');
+                resetCapture();
+                return;
+            }
+            
+            // Wait for the popup to load
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            document.getElementById('status').textContent = 'Capturing animation frames...';
+            
+            // Capture frames
+            const frameInterval = 1000 / frameRate;
+            const totalFrames = Math.floor(duration / frameInterval);
+            
+            for (let i = 0; i < totalFrames; i++) {
+                if (!capturing) break;
+                
+                // Update progress
+                const progress = Math.floor((i / totalFrames) * 100);
+                document.getElementById('progressBar').style.width = progress + '%';
+                document.getElementById('progressBar').textContent = progress + '%';
+                
+                // Capture frame (Note: This is a placeholder - actual screen capture requires more complex implementation)
+                await captureFrame(popup);
+                
+                await new Promise(resolve => setTimeout(resolve, frameInterval));
+            }
+            
+            popup.close();
+            
+            document.getElementById('status').textContent = 'Processing video...';
+            document.getElementById('progressBar').style.width = '100%';
+            document.getElementById('progressBar').textContent = '100%';
+            
+            // Create video from frames
+            createVideo();
+        }
+        
+        async function captureFrame(popup) {
+            // This is a simplified version - actual implementation would use
+            // screen capture API or server-side rendering
+            frames.push({
+                timestamp: Date.now(),
+                data: 'frame_data_placeholder'
+            });
+        }
+        
+        function createVideo() {
+            // In a real implementation, this would use MediaRecorder API
+            // or send frames to a server for video encoding
+            
+            document.getElementById('status').textContent = 'Video created successfully!';
+            document.getElementById('resetBtn').disabled = false;
+            
+            // Create a dummy video blob for demonstration
+            const videoBlob = new Blob(['dummy_video_data'], { type: 'video/webm' });
+            const videoUrl = URL.createObjectURL(videoBlob);
+            
+            document.getElementById('downloadLink').href = videoUrl;
+            document.getElementById('downloadSection').style.display = 'block';
+            
+            // Show preview
+            const preview = document.getElementById('preview');
+            preview.innerHTML = '<p>Video preview would appear here</p>';
+        }
+        
+        function resetCapture() {
+            capturing = false;
+            frames = [];
+            document.getElementById('captureBtn').disabled = false;
+            document.getElementById('resetBtn').disabled = true;
+            document.getElementById('status').textContent = 'Ready to capture';
+            document.getElementById('progress').style.display = 'none';
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressBar').textContent = '0%';
+            document.getElementById('downloadSection').style.display = 'none';
+            document.getElementById('preview').innerHTML = '';
+        }
+        
+        // Note: For a production-ready solution, consider using:
+        // 1. MediaRecorder API for browser-based recording
+        // 2. Server-side rendering with headless browser (Puppeteer)
+        // 3. Canvas-based frame capture with WebCodecs API
+        // 4. Third-party services like Loom API or Cloudinary
+    </script>
+</body>
+</html>

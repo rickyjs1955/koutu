@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'native_video_exporter.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,7 +18,11 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       debugShowCheckedModeBanner: false,
-      home: const HelloSplashScreen(),
+      home: NativeVideoExporter(
+        animationDuration: const Duration(seconds: 8),
+        onAnimationComplete: () {},
+        child: const HelloSplashScreen(),
+      ),
     );
   }
 }
