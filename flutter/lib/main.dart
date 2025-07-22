@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import 'simple_splash_screen.dart';
+import 'package:koutu/core/routing/app_router.dart';
 
 void main() {
   runApp(const MyApp());
@@ -11,12 +11,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Red Door Demo',
+    return MaterialApp.router(
+      title: 'KOUTU',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: SimpleSplashScreen(onAnimationComplete: () {
-        // Animation complete callback
-      }),
+      routerConfig: AppRouter.router,
     );
   }
 }

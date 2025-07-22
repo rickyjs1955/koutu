@@ -119,8 +119,8 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final wardrobeWidth = size.width * 0.8;
-    final wardrobeHeight = size.height * 0.6;
+    final wardrobeWidth = size.width * 1.04;  // Enlarged by 30% from 0.8
+    final wardrobeHeight = size.height * 0.78; // Enlarged by 30% from 0.6
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -158,15 +158,15 @@ class _SplashScreenState extends State<SplashScreen>
                         child: Opacity(
                           opacity: _logoFadeAnimation.value,
                           child: Container(
-                            width: 200,
-                            height: 200,
+                            width: 260,  // Enlarged by 30% from 200
+                            height: 260, // Enlarged by 30% from 200
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
                                   color: AppColors.primary.withOpacity(_glowAnimation.value * 0.5),
-                                  blurRadius: 50,
-                                  spreadRadius: 20,
+                                  blurRadius: 65,  // Enlarged by 30% from 50
+                                  spreadRadius: 26, // Enlarged by 30% from 20
                                 ),
                               ],
                             ),
@@ -175,26 +175,26 @@ class _SplashScreenState extends State<SplashScreen>
                               children: [
                                 // Logo icon/image placeholder
                                 Container(
-                                  width: 100,
-                                  height: 100,
+                                  width: 130,  // Enlarged by 30% from 100
+                                  height: 130, // Enlarged by 30% from 100
                                   decoration: BoxDecoration(
                                     color: AppColors.primary,
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
                                     Icons.checkroom,
-                                    size: 50,
+                                    size: 65,  // Enlarged by 30% from 50
                                     color: Colors.white,
                                   ),
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 26), // Enlarged by 30% from 20
                                 Text(
                                   'KOUTU',
                                   style: TextStyle(
-                                    fontSize: 32,
+                                    fontSize: 42,  // Enlarged by 30% from 32
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.primary,
-                                    letterSpacing: 3,
+                                    letterSpacing: 4,  // Enlarged from 3
                                   ),
                                 ),
                               ],
@@ -315,20 +315,20 @@ class _SplashScreenState extends State<SplashScreen>
           
           // Door handle
           Positioned(
-            top: height / 2 - 30,
-            left: isLeft ? null : 20,
-            right: isLeft ? 20 : null,
+            top: height / 2 - 39,  // Enlarged by 30% from 30
+            left: isLeft ? null : 26,  // Enlarged by 30% from 20
+            right: isLeft ? 26 : null, // Enlarged by 30% from 20
             child: Container(
-              width: 8,
-              height: 60,
+              width: 10,  // Enlarged by 30% from 8
+              height: 78, // Enlarged by 30% from 60
               decoration: BoxDecoration(
                 color: Colors.amber[700],
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(5), // Enlarged from 4
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.3),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+                    blurRadius: 5,  // Enlarged from 4
+                    offset: const Offset(0, 3), // Enlarged from 2
                   ),
                 ],
               ),
