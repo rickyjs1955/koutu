@@ -147,7 +147,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
     final bool isMobile = size.width < 600;
     
     return Scaffold(
-      backgroundColor: const Color(0xFF1a1a2e),
+      backgroundColor: const Color(0xFF1a1614), // Dark warm background
       body: Stack(
         children: [
           // Particle effects background
@@ -280,8 +280,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                             begin: Alignment.topLeft,
                                             end: Alignment.bottomRight,
                                             colors: [
-                                              const Color(0xFF2d3561),
-                                              const Color(0xFF0f3460),
+                                              const Color(0xFF3E2723), // Dark brown
+                                              const Color(0xFF2E1A17), // Darker brown
                                             ],
                                           ),
                                           border: Border(
@@ -305,12 +305,6 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                   ),
                                 ),
                                 
-                                // Gap between doors
-                                Container(
-                                  width: isMobile ? 2 : 4,
-                                  height: isMobile ? size.height * 0.4 : size.height * 0.5,
-                                  color: Colors.black.withOpacity(0.5),
-                                ),
                                 
                                 // Right door
                                 ClipRect(
@@ -331,8 +325,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                             begin: Alignment.topLeft,
                                             end: Alignment.bottomRight,
                                             colors: [
-                                              const Color(0xFF2d3561),
-                                              const Color(0xFF0f3460),
+                                              const Color(0xFF3E2723), // Dark brown
+                                              const Color(0xFF2E1A17), // Darker brown
                                             ],
                                           ),
                                           border: Border(
@@ -430,7 +424,7 @@ class ParticlePainter extends CustomPainter {
       final opacity = (1.0 - particleProgress) * glowProgress;
       
       if (opacity > 0) {
-        paint.color = Colors.blue.withOpacity(opacity * 0.3);
+        paint.color = const Color(0xFFFFD700).withOpacity(opacity * 0.2); // Gold particles
         
         final x = size.width * (0.2 + 0.6 * _pseudoRandom(i, 0));
         final baseY = size.height * (0.3 + 0.4 * _pseudoRandom(i, 1));
@@ -462,10 +456,10 @@ class DoorDetailPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..color = Colors.white.withOpacity(0.1);
+      ..strokeWidth = 1.5
+      ..color = const Color(0xFF5D4037).withOpacity(0.3); // Medium brown for panels
     
-    // Draw door panels
+    // Draw door panels with wood grain effect
     final panelRect = Rect.fromLTWH(
       size.width * 0.1,
       size.height * 0.1,
@@ -482,10 +476,24 @@ class DoorDetailPainter extends CustomPainter {
     );
     canvas.drawRect(panelRect2, paint);
     
+    // Add wood grain lines
+    paint
+      ..strokeWidth = 0.5
+      ..color = const Color(0xFF4E342E).withOpacity(0.2);
+    
+    for (int i = 0; i < 5; i++) {
+      final y = size.height * (0.2 + i * 0.15);
+      canvas.drawLine(
+        Offset(size.width * 0.15, y),
+        Offset(size.width * 0.85, y),
+        paint,
+      );
+    }
+    
     // Draw door handle (on the inside edge where doors meet)
     paint
       ..style = PaintingStyle.fill
-      ..color = Colors.amber.withOpacity(0.7);
+      ..color = const Color(0xFFB8860B).withOpacity(0.8); // Dark gold/brass
     
     final handleX = isLeft ? size.width * 0.9 : size.width * 0.1;
     final handleY = size.height * 0.5;
