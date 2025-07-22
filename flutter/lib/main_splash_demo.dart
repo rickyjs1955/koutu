@@ -318,6 +318,7 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
     
     // Shake and build anticipation
     await Future.delayed(const Duration(milliseconds: 500));
+    print('Starting door animation...');
     _doorController.forward();
     
     // Start lighting effects
@@ -605,6 +606,7 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
           child: AnimatedBuilder(
             animation: _leftDoorAnimation,
             builder: (context, child) {
+              print('Left door angle: ${_leftDoorAnimation.value}°');
               return Transform(
                 alignment: Alignment.centerRight,
                 transform: Matrix4.identity()
@@ -661,9 +663,9 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
                 begin: isLeft ? Alignment.centerRight : Alignment.centerLeft,
                 end: isLeft ? Alignment.centerLeft : Alignment.centerRight,
                 colors: [
-                  const Color(0xFF1a1a2e),
-                  const Color(0xFF16213e),
-                  const Color(0xFF0f3460),
+                  const Color(0xFF2a2a4e),
+                  const Color(0xFF26315e),
+                  const Color(0xFF1f4470),
                 ],
               ),
               borderRadius: BorderRadius.only(
