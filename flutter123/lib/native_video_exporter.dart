@@ -117,63 +117,14 @@ class _NativeVideoExporterState extends State<NativeVideoExporter> with TickerPr
   }
   
   void _exportAsWebM() {
-    // Create WebM video using browser API
-    final html.CanvasElement canvas = html.CanvasElement(width: 1280, height: 720);
-    final ctx = canvas.context2D;
-    
-    // Create a MediaRecorder
-    final stream = canvas.captureStream(30);
-    final recorder = html.MediaRecorder(stream, {'mimeType': 'video/webm'});
-    final chunks = <html.Blob>[];
-    
-    recorder.addEventListener('dataavailable', (event) {
-      final e = event as html.BlobEvent;
-      if (e.data != null && e.data!.size > 0) {
-        chunks.add(e.data!);
-      }
-    });
-    
-    recorder.addEventListener('stop', (_) {
-      final blob = html.Blob(chunks, 'video/webm');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      
-      final anchor = html.document.createElement('a') as html.AnchorElement
-        ..href = url
-        ..download = 'koutu_animation.webm';
-      anchor.click();
-      
-      html.Url.revokeObjectUrl(url);
-    });
-    
-    // Start recording
-    recorder.start();
-    
-    // Play frames on canvas
-    int frameIndex = 0;
-    Timer.periodic(const Duration(milliseconds: 33), (timer) {
-      if (frameIndex >= _frames.length) {
-        timer.cancel();
-        recorder.stop();
-        return;
-      }
-      
-      final frameData = _frames[frameIndex];
-      final blob = html.Blob([frameData], 'image/png');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      
-      final img = html.ImageElement(src: url);
-      img.onLoad.listen((_) {
-        ctx.drawImage(img, 0, 0);
-        html.Url.revokeObjectUrl(url);
-      });
-      
-      frameIndex++;
-    });
+    // For now, just call the GIF export which provides frame export
+    // WebM creation requires external tools due to browser limitations
+    _exportAsGif();
   }
   
   void _exportAsGif() {
     // Export frames as animated HTML with instructions
-    final html.StringBuffer htmlContent = html.StringBuffer();
+    final StringBuffer htmlContent = StringBuffer();
     
     htmlContent.write('''
 <!DOCTYPE html>
