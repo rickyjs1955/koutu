@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Koutu Animation - Instant MP4 Converter</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #f8f9fa;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #8B6F47;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 18px;
+        }
+        .main-btn {
+            background: #FFD700;
+            color: #333;
+            border: none;
+            padding: 16px 32px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            display: inline-block;
+            text-decoration: none;
+            margin: 10px;
+        }
+        .main-btn:hover {
+            background: #FFC700;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
+        }
+        .secondary-btn {
+            background: #4CAF50;
+            color: white;
+        }
+        .secondary-btn:hover {
+            background: #45a049;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+        }
+        .step {
+            background: #FFF9C4;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #F57C00;
+        }
+        .step ol {
+            margin: 10px 0;
+            padding-left: 25px;
+        }
+        .step li {
+            margin: 8px 0;
+        }
+        .converter-box {
+            background: #E3F2FD;
+            border-radius: 8px;
+            padding: 30px;
+            margin: 30px 0;
+        }
+        .converter-box h3 {
+            color: #1976D2;
+            margin-top: 0;
+        }
+        .code {
+            background: #263238;
+            color: #AEDE88;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            overflow-x: auto;
+            text-align: left;
+        }
+        .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🎬</div>
+        <h1>Koutu Animation MP4 Converter</h1>
+        <p class="subtitle">Convert your captured animation frames to MP4 video!</p>
+        
+        <div class="step">
+            <h3>📥 Step 1: Get Your Frames</h3>
+            <ol>
+                <li>Run: <code>flutter run -d chrome --web-port=5001 lib/main_with_export.dart</code></li>
+                <li>Click "Capture Animation" button (bottom-right)</li>
+                <li>Wait for capture to complete (8 seconds)</li>
+                <li>Click "Export" to download the HTML file</li>
+                <li>Open the HTML file and click "Download Frames"</li>
+            </ol>
+        </div>
+        
+        <div class="converter-box">
+            <h3>🚀 Instant Online Converters</h3>
+            <p>Choose your preferred converter:</p>
+            
+            <a href="https://ezgif.com/png-to-mp4" target="_blank" class="main-btn">
+                EzGIF Converter
+            </a>
+            
+            <a href="https://cloudconvert.com/png-to-mp4" target="_blank" class="main-btn secondary-btn">
+                CloudConvert
+            </a>
+            
+            <p style="margin-top: 20px;"><strong>Settings to use:</strong></p>
+            <ul style="text-align: left; display: inline-block;">
+                <li>Frame Rate: <strong>30 FPS</strong></li>
+                <li>Quality: <strong>High</strong></li>
+                <li>Resolution: <strong>1280x720</strong> (or Original)</li>
+                <li>Upload all frames in order (frame_0000.png to frame_0239.png)</li>
+            </ul>
+        </div>
+        
+        <div class="step">
+            <h3>💻 Advanced: FFmpeg Method</h3>
+            <p>For highest quality, use FFmpeg locally:</p>
+            <div class="code">
+# High Quality MP4
+ffmpeg -framerate 30 -i frame_%04d.png -c:v libx264 -pix_fmt yuv420p -crf 18 koutu_animation.mp4
+
+# Web Optimized
+ffmpeg -framerate 30 -i frame_%04d.png -c:v libx264 -pix_fmt yuv420p -crf 23 -vf "scale=1280:-2" koutu_web.mp4
+            </div>
+        </div>
+        
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;">
+            <p style="color: #666;">
+                💡 <strong>Pro Tip:</strong> For social media, export at 1080x1080 (square) or 1080x1920 (vertical)
+            </p>
+        </div>
+    </div>
+</body>
+</html>
