@@ -171,7 +171,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
     _doorController.reset();
     _contentController.reset();
     
-    Future.delayed(const Duration(milliseconds: 500), () {
+    // Add a longer delay between loops to prevent stalling
+    Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
         _startAnimation();
       }
