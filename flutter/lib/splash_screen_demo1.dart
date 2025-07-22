@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:rive/rive.dart';
+import 'dart:math';
 
 /// Splash screen featuring an animated wardrobe opening sequence
 /// with particle effects and elegant typography
