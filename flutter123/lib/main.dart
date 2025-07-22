@@ -219,13 +219,24 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                 ? const CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
                   )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Wardrobe with clothes (scaled 30% larger but constrained to screen)
-                      SizedBox(
-                        width: math.min(size.width * 0.95, size.width * 1.17),  // Constrain to 95% of screen
-                        height: size.height * 0.78, // 0.6 * 1.3
+                : Container(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Wardrobe with clothes
+                        Flexible(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: math.min(size.width * 0.95, 1000),
+                              maxHeight: size.height * 0.6,
+                            ),
+                            child: AspectRatio(
+                              aspectRatio: 1.5,
+                              child: SizedBox(
+                                width: double.infinity,
+                                height: double.infinity,
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
@@ -238,10 +249,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 intensity: _lightBeamAnimation.value,
                                 doorOpenProgress: _doorController.value,
                               ),
-                              size: Size(
-                                math.min(size.width * 0.95, size.width * 1.17) * 0.94, // Match glow width
-                                size.height * 0.715, // 0.55 * 1.3
-                              ),
+                              child: Container(),
                             );
                           },
                         ),
@@ -251,8 +259,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                           animation: _glowAnimation,
                           builder: (context, child) {
                             return Container(
-                              width: math.min(size.width * 0.95, size.width * 1.17) * 0.94, // 94% of wardrobe width
-                              height: size.height * 0.715, // 0.55 * 1.3
+                              width: double.infinity,
+                              height: double.infinity,
                               decoration: BoxDecoration(
                                 gradient: RadialGradient(
                                   colors: [
@@ -281,10 +289,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                     painter: ClothingPainter(
                                       revealProgress: _contentController.value,
                                     ),
-                                    size: Size(
-                                      math.min(size.width * 0.95, size.width * 1.17) * 0.78, // 78% of wardrobe width
-                                      size.height * 0.65, // 0.5 * 1.3
-                                    ),
+                                    child: Container(),
                                   ),
                                 ),
                               );
@@ -295,23 +300,28 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                         AnimatedBuilder(
                           animation: Listenable.merge([_leftDoorAnimation, _rightDoorAnimation]),
                           builder: (context, child) {
-                            return Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                // Left door
-                                ClipRect(
-                                  child: Container(
-                                    width: math.min(size.width * 0.95, size.width * 1.17) * 0.475, // 47.5% of wardrobe width
-                                    height: size.height * 0.715, // 0.55 * 1.3
-                                    alignment: Alignment.centerRight,
-                                    child: Transform(
-                                      alignment: Alignment.centerLeft,
-                                      transform: Matrix4.identity()
-                                        ..setEntry(3, 2, 0.001)
-                                        ..rotateY(_leftDoorAnimation.value * math.pi / 2.2),
+                            return LayoutBuilder(
+                              builder: (context, constraints) {
+                                final doorWidth = constraints.maxWidth * 0.5;
+                                final doorHeight = constraints.maxHeight;
+                                
+                                return Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    // Left door
+                                    ClipRect(
                                       child: Container(
-                                        width: math.min(size.width * 0.95, size.width * 1.17) * 0.475, // Match container width
-                                        height: size.height * 0.715, // 0.55 * 1.3
+                                        width: doorWidth,
+                                        height: doorHeight,
+                                        alignment: Alignment.centerRight,
+                                        child: Transform(
+                                          alignment: Alignment.centerLeft,
+                                          transform: Matrix4.identity()
+                                            ..setEntry(3, 2, 0.001)
+                                            ..rotateY(_leftDoorAnimation.value * math.pi / 2.2),
+                                          child: Container(
+                                            width: doorWidth,
+                                            height: doorHeight,
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             begin: Alignment.topLeft,
@@ -346,8 +356,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 // Right door
                                 ClipRect(
                                   child: Container(
-                                    width: math.min(size.width * 0.95, size.width * 1.17) * 0.475, // 47.5% of wardrobe width
-                                    height: size.height * 0.715, // 0.55 * 1.3
+                                    width: doorWidth,
+                                    height: doorHeight,
                                     alignment: Alignment.centerLeft,
                                     child: Transform(
                                       alignment: Alignment.centerRight,
@@ -355,8 +365,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                         ..setEntry(3, 2, 0.001)
                                         ..rotateY(_rightDoorAnimation.value * math.pi / 2.2),
                                       child: Container(
-                                        width: math.min(size.width * 0.95, size.width * 1.17) * 0.475, // Match container width
-                                        height: size.height * 0.715, // 0.55 * 1.3
+                                        width: doorWidth,
+                                        height: doorHeight,
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             begin: Alignment.topLeft,
@@ -386,91 +396,97 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                     ),
                                   ),
                                 ),
-                              ],
+                                  ],
+                                );
+                              },
                             );
                           },
                         ),
                       ],
                     ),
                   ),
+                ),
+              ),
+            ),
                   
-                  // Logo and tagline below wardrobe
-                  const SizedBox(height: 40),
-                  AnimatedBuilder(
-                    animation: _logoGlowAnimation,
-                    builder: (context, child) {
-                      return Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            // Lightning glow effect
-                            BoxShadow(
-                              color: const Color(0xFFFFD700).withOpacity(_logoGlowAnimation.value * 0.6),
-                              blurRadius: 20,
-                              spreadRadius: 5,
-                            ),
-                            BoxShadow(
-                              color: const Color(0xFFFFE57F).withOpacity(_logoGlowAnimation.value * 0.4),
-                              blurRadius: 30,
-                              spreadRadius: 10,
-                            ),
-                          ],
+                        // Logo and tagline below wardrobe
+                        const SizedBox(height: 20),
+                        AnimatedBuilder(
+                          animation: _logoGlowAnimation,
+                          builder: (context, child) {
+                            return Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [
+                                  // Lightning glow effect
+                                  BoxShadow(
+                                    color: const Color(0xFFFFD700).withOpacity(_logoGlowAnimation.value * 0.6),
+                                    blurRadius: 20,
+                                    spreadRadius: 5,
+                                  ),
+                                  BoxShadow(
+                                    color: const Color(0xFFFFE57F).withOpacity(_logoGlowAnimation.value * 0.4),
+                                    blurRadius: 30,
+                                    spreadRadius: 10,
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                'KOUTU',
+                                style: TextStyle(
+                                  fontSize: isMobile ? 60 : 80,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF8B6F47), // Rich brown
+                                  letterSpacing: isMobile ? 6 : 8,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withOpacity(0.3),
+                                      blurRadius: 5,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                    // Golden glow shadow
+                                    Shadow(
+                                      color: const Color(0xFFFFD700).withOpacity(_logoGlowAnimation.value),
+                                      blurRadius: 15,
+                                      offset: Offset.zero,
+                                    ),
+                                    // Lightning effect shadows
+                                    Shadow(
+                                      color: Colors.white.withOpacity(_logoGlowAnimation.value * 0.7),
+                                      blurRadius: 3,
+                                      offset: const Offset(-1, -1),
+                                    ),
+                                    Shadow(
+                                      color: const Color(0xFFFFE57F).withOpacity(_logoGlowAnimation.value * 0.5),
+                                      blurRadius: 8,
+                                      offset: const Offset(1, 1),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                        child: Text(
-                          'KOUTU',
+                        const SizedBox(height: 5),
+                        Text(
+                          'Your Digital Wardrobe',
                           style: TextStyle(
-                            fontSize: isMobile ? 71.5 : 104, // Scaled by 1.3
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF8B6F47), // Rich brown
-                            letterSpacing: isMobile ? 7.8 : 10.4, // Scaled by 1.3
+                            fontSize: isMobile ? 20 : 26,
+                            color: const Color(0xFF5D4037), // Dark brown
+                            letterSpacing: isMobile ? 1 : 2,
                             shadows: [
                               Shadow(
-                                color: Colors.black.withOpacity(0.3),
-                                blurRadius: 5,
-                                offset: const Offset(0, 3),
-                              ),
-                              // Golden glow shadow
-                              Shadow(
-                                color: const Color(0xFFFFD700).withOpacity(_logoGlowAnimation.value),
-                                blurRadius: 15,
-                                offset: Offset.zero,
-                              ),
-                              // Lightning effect shadows
-                              Shadow(
-                                color: Colors.white.withOpacity(_logoGlowAnimation.value * 0.7),
+                                color: Colors.black.withOpacity(0.2),
                                 blurRadius: 3,
-                                offset: const Offset(-1, -1),
-                              ),
-                              Shadow(
-                                color: const Color(0xFFFFE57F).withOpacity(_logoGlowAnimation.value * 0.5),
-                                blurRadius: 8,
-                                offset: const Offset(1, 1),
+                                offset: const Offset(0, 2),
                               ),
                             ],
                           ),
                         ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Your Digital Wardrobe',
-                    style: TextStyle(
-                      fontSize: isMobile ? 23.4 : 31.2, // Scaled by 1.3
-                      color: const Color(0xFF5D4037), // Dark brown
-                      letterSpacing: isMobile ? 1.3 : 2.6, // Scaled by 1.3
-                      shadows: [
-                        Shadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 3,
-                          offset: const Offset(0, 2),
-                        ),
                       ],
                     ),
                   ),
-                ],
               ),
-          ),
         ],
       ),
     );
