@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koutu Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #F5E6D3;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #8B6F47;
+            letter-spacing: 8px;
+            margin: 0;
+        }
+        p {
+            color: #5D4037;
+            margin: 10px 0;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            background: #e8f5e9;
+            border-radius: 5px;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>KOUTU</h1>
+        <p>Your Digital Wardrobe</p>
+        <div class="status">
+            ✅ Static HTML works!<br>
+            Phone can connect to server.<br>
+            <br>
+            <strong>Flutter Web Status:</strong><br>
+            <span id="flutter-status">Checking...</span>
+        </div>
+        <br>
+        <button onclick="testFlutter()">Test Flutter Loading</button>
+    </div>
+    
+    <script>
+        function testFlutter() {
+            document.getElementById('flutter-status').innerHTML = 'Testing Flutter engine...';
+            
+            // Check if Flutter's service worker is registered
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    if (registrations.length > 0) {
+                        document.getElementById('flutter-status').innerHTML = '⚠️ Service Worker found. This might be causing issues.';
+                    } else {
+                        document.getElementById('flutter-status').innerHTML = '❌ No service worker. Flutter might not be loading properly.';
+                    }
+                });
+            } else {
+                document.getElementById('flutter-status').innerHTML = '❌ Service Workers not supported on this browser.';
+            }
+        }
+        
+        // Auto-check on load
+        setTimeout(testFlutter, 1000);
+    </script>
+</body>
+</html>
