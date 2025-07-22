@@ -34,6 +34,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
   late AnimationController _doorController;
   late AnimationController _contentController;
   late AnimationController _particleController;
+  late AnimationController _logoGlowController;
   
   late Animation<double> _leftDoorAnimation;
   late Animation<double> _rightDoorAnimation;
@@ -41,6 +42,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
   late Animation<double> _contentScaleAnimation;
   late Animation<double> _glowAnimation;
   late Animation<double> _lightBeamAnimation;
+  late Animation<double> _logoGlowAnimation;
   
   bool _isLoading = true;
   bool _showContent = false;
@@ -66,6 +68,12 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
       duration: const Duration(seconds: 3),
       vsync: this,
     )..repeat();
+    
+    // Logo glow animation controller
+    _logoGlowController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
 
     // Door animations - starts closed (0.0) opens outward (1.0)
     _leftDoorAnimation = Tween<double>(
@@ -118,6 +126,15 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
       parent: _doorController,
       curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
     ));
+    
+    // Logo glow animation - pulsing effect
+    _logoGlowAnimation = Tween<double>(
+      begin: 0.3,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _logoGlowController,
+      curve: Curves.easeInOut,
+    ));
 
     // Start animation sequence
     Future.delayed(const Duration(milliseconds: 500), () {
@@ -148,6 +165,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
     _doorController.dispose();
     _contentController.dispose();
     _particleController.dispose();
+    _logoGlowController.dispose();
     super.dispose();
   }
 
@@ -378,21 +396,61 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                   
                   // Logo and tagline below wardrobe
                   const SizedBox(height: 40),
-                  Text(
-                    'KOUTU',
-                    style: TextStyle(
-                      fontSize: isMobile ? 55 : 80,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF8B6F47), // Rich brown
-                      letterSpacing: isMobile ? 6 : 8,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black.withOpacity(0.3),
-                          blurRadius: 5,
-                          offset: const Offset(0, 3),
+                  AnimatedBuilder(
+                    animation: _logoGlowAnimation,
+                    builder: (context, child) {
+                      return Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            // Lightning glow effect
+                            BoxShadow(
+                              color: const Color(0xFFFFD700).withOpacity(_logoGlowAnimation.value * 0.6),
+                              blurRadius: 20,
+                              spreadRadius: 5,
+                            ),
+                            BoxShadow(
+                              color: const Color(0xFFFFE57F).withOpacity(_logoGlowAnimation.value * 0.4),
+                              blurRadius: 30,
+                              spreadRadius: 10,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                        child: Text(
+                          'KOUTU',
+                          style: TextStyle(
+                            fontSize: isMobile ? 55 : 80,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF8B6F47), // Rich brown
+                            letterSpacing: isMobile ? 6 : 8,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 5,
+                                offset: const Offset(0, 3),
+                              ),
+                              // Golden glow shadow
+                              Shadow(
+                                color: const Color(0xFFFFD700).withOpacity(_logoGlowAnimation.value),
+                                blurRadius: 15,
+                                offset: Offset.zero,
+                              ),
+                              // Lightning effect shadows
+                              Shadow(
+                                color: Colors.white.withOpacity(_logoGlowAnimation.value * 0.7),
+                                blurRadius: 3,
+                                offset: const Offset(-1, -1),
+                              ),
+                              Shadow(
+                                color: const Color(0xFFFFE57F).withOpacity(_logoGlowAnimation.value * 0.5),
+                                blurRadius: 8,
+                                offset: const Offset(1, 1),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 10),
                   Text(
