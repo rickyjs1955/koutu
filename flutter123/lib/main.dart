@@ -144,6 +144,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final bool isMobile = size.width < 600;
     
     return Scaffold(
       backgroundColor: const Color(0xFF1a1a2e),
@@ -170,8 +171,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
                   )
                 : SizedBox(
-                    width: size.width * 0.8,
-                    height: size.height * 0.6,
+                    width: isMobile ? size.width * 0.9 : size.width * 0.8,
+                    height: isMobile ? size.height * 0.5 : size.height * 0.6,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
@@ -180,8 +181,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                           animation: _glowAnimation,
                           builder: (context, child) {
                             return Container(
-                              width: size.width * 0.7,
-                              height: size.height * 0.5,
+                              width: isMobile ? size.width * 0.8 : size.width * 0.7,
+                              height: isMobile ? size.height * 0.4 : size.height * 0.5,
                               decoration: BoxDecoration(
                                 gradient: RadialGradient(
                                   colors: [
@@ -205,7 +206,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 child: Transform.scale(
                                   scale: _contentScaleAnimation.value,
                                   child: Container(
-                                    padding: const EdgeInsets.all(40),
+                                    padding: EdgeInsets.all(isMobile ? 20 : 40),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withOpacity(0.9),
                                       borderRadius: BorderRadius.circular(20),
@@ -223,10 +224,10 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                         Text(
                                           'KOUTU',
                                           style: TextStyle(
-                                            fontSize: 70,
+                                            fontSize: isMobile ? 45 : 70,
                                             fontWeight: FontWeight.bold,
                                             color: Colors.blue.shade900,
-                                            letterSpacing: 8,
+                                            letterSpacing: isMobile ? 6 : 8,
                                             shadows: [
                                               Shadow(
                                                 color: Colors.blue.withOpacity(0.3),
@@ -240,9 +241,9 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                         Text(
                                           'Your Digital Wardrobe',
                                           style: TextStyle(
-                                            fontSize: 20,
+                                            fontSize: isMobile ? 16 : 20,
                                             color: Colors.blue.shade700,
-                                            letterSpacing: 2,
+                                            letterSpacing: isMobile ? 1 : 2,
                                           ),
                                         ),
                                       ],
@@ -263,8 +264,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 // Left door
                                 ClipRect(
                                   child: Container(
-                                    width: size.width * 0.35,
-                                    height: size.height * 0.5,
+                                    width: isMobile ? size.width * 0.4 : size.width * 0.35,
+                                    height: isMobile ? size.height * 0.4 : size.height * 0.5,
                                     alignment: Alignment.centerRight,
                                     child: Transform(
                                       alignment: Alignment.centerLeft,
@@ -272,8 +273,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                         ..setEntry(3, 2, 0.001)
                                         ..rotateY(-_leftDoorAnimation.value * math.pi / 3),
                                       child: Container(
-                                        width: size.width * 0.35,
-                                        height: size.height * 0.5,
+                                        width: isMobile ? size.width * 0.4 : size.width * 0.35,
+                                        height: isMobile ? size.height * 0.4 : size.height * 0.5,
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             begin: Alignment.topLeft,
@@ -306,16 +307,16 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 
                                 // Gap between doors
                                 Container(
-                                  width: 4,
-                                  height: size.height * 0.5,
+                                  width: isMobile ? 2 : 4,
+                                  height: isMobile ? size.height * 0.4 : size.height * 0.5,
                                   color: Colors.black.withOpacity(0.5),
                                 ),
                                 
                                 // Right door
                                 ClipRect(
                                   child: Container(
-                                    width: size.width * 0.35,
-                                    height: size.height * 0.5,
+                                    width: isMobile ? size.width * 0.4 : size.width * 0.35,
+                                    height: isMobile ? size.height * 0.4 : size.height * 0.5,
                                     alignment: Alignment.centerLeft,
                                     child: Transform(
                                       alignment: Alignment.centerRight,
@@ -323,8 +324,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                         ..setEntry(3, 2, 0.001)
                                         ..rotateY(-_rightDoorAnimation.value * math.pi / 3),
                                       child: Container(
-                                        width: size.width * 0.35,
-                                        height: size.height * 0.5,
+                                        width: isMobile ? size.width * 0.4 : size.width * 0.35,
+                                        height: isMobile ? size.height * 0.4 : size.height * 0.5,
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             begin: Alignment.topLeft,
