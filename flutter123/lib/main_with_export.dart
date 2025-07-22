@@ -415,7 +415,7 @@ class HelloSplashScreenState extends State<HelloSplashScreen>
                                       ..setEntry(3, 2, 0.001)
                                       ..rotateY(_leftDoorAnimation.value * math.pi / 2.2),
                                     child: Container(
-                                      width: 227.5 * (isMobile ? 0.7 : 1.0), // 175 * 1.3
+                                      width: 225 * (isMobile ? 0.7 : 1.0), // Slightly less than half
                                       height: 585 * (isMobile ? 0.7 : 1.0), // 450 * 1.3
                                       decoration: BoxDecoration(
                                         color: const Color(0xFF6D4C41),
@@ -470,7 +470,7 @@ class HelloSplashScreenState extends State<HelloSplashScreen>
                                       ..setEntry(3, 2, 0.001)
                                       ..rotateY(_rightDoorAnimation.value * math.pi / 2.2),
                                     child: Container(
-                                      width: 227.5 * (isMobile ? 0.7 : 1.0), // 175 * 1.3
+                                      width: 225 * (isMobile ? 0.7 : 1.0), // Slightly less than half
                                       height: 585 * (isMobile ? 0.7 : 1.0), // 450 * 1.3
                                       decoration: BoxDecoration(
                                         color: const Color(0xFF6D4C41),
