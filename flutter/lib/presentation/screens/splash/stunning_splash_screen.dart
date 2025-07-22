@@ -421,8 +421,8 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
                 return Transform.translate(
                   offset: Offset(_shakeAnimation.value, 0),
                   child: Container(
-                    width: size.width * 0.8,
-                    height: size.height * 0.7,
+                    width: size.width * 1.04,  // Increased from 0.8 to 1.04 (30% larger)
+                    height: size.height * 0.91, // Increased from 0.7 to 0.91 (30% larger)
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
@@ -436,7 +436,7 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
                         _buildClothingItems(),
                         
                         // Wardrobe doors
-                        _buildLuxuryDoors(size.width * 0.8, size.height * 0.7),
+                        _buildLuxuryDoors(size.width * 1.04, size.height * 0.91),
                         
                         // Sparkle effects
                         _buildSparkles(),
@@ -460,20 +460,20 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
       animation: _glowAnimation,
       builder: (context, child) {
         return Container(
-          width: 300,
-          height: 300,
+          width: 390,  // Increased from 300 to 390 (30% larger)
+          height: 390, // Increased from 300 to 390 (30% larger)
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
                 color: _champagneGold.withOpacity(0.3 * _glowAnimation.value),
-                blurRadius: 100,
-                spreadRadius: 50,
+                blurRadius: 130, // Increased from 100 to 130 (30% larger)
+                spreadRadius: 65, // Increased from 50 to 65 (30% larger)
               ),
               BoxShadow(
                 color: _royalPurple.withOpacity(0.2 * _glowAnimation.value),
-                blurRadius: 150,
-                spreadRadius: 80,
+                blurRadius: 195,  // Increased from 150 to 195 (30% larger)
+                spreadRadius: 104, // Increased from 80 to 104 (30% larger)
               ),
             ],
           ),
@@ -491,8 +491,8 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
           child: Transform.rotate(
             angle: _logoRotationAnimation.value,
             child: Container(
-              width: 200,
-              height: 200,
+              width: 260,  // Increased from 200 to 260 (30% larger)
+              height: 260, // Increased from 200 to 260 (30% larger)
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
@@ -506,14 +506,14 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
                 boxShadow: [
                   BoxShadow(
                     color: _champagneGold.withOpacity(0.5),
-                    blurRadius: 30,
-                    spreadRadius: 10,
+                    blurRadius: 39, // Increased from 30 to 39 (30% larger)
+                    spreadRadius: 13, // Increased from 10 to 13 (30% larger)
                   ),
                 ],
               ),
               child: Icon(
                 Icons.auto_awesome,
-                size: 100,
+                size: 130, // Increased from 100 to 130 (30% larger)
                 color: Colors.white,
               ),
             ),
@@ -539,8 +539,8 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
                 child: Opacity(
                   opacity: _clothingOpacityAnimation.value,
                   child: Container(
-                    width: 60,
-                    height: 60,
+                    width: 78,  // Increased from 60 to 78 (30% larger)
+                    height: 78, // Increased from 60 to 78 (30% larger)
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
@@ -552,14 +552,14 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
                       boxShadow: [
                         BoxShadow(
                           color: _royalPurple.withOpacity(0.4),
-                          blurRadius: 20,
-                          spreadRadius: 5,
+                          blurRadius: 26, // Increased from 20 to 26 (30% larger)
+                          spreadRadius: 6.5, // Increased from 5 to 6.5 (30% larger)
                         ),
                       ],
                     ),
                     child: Icon(
                       item.icon,
-                      size: 30,
+                      size: 39, // Increased from 30 to 39 (30% larger)
                       color: Colors.white,
                     ),
                   ),
@@ -704,12 +704,12 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
           
           // Ornate handle
           Positioned(
-            top: height / 2 - 50,
-            left: isLeft ? null : 30,
-            right: isLeft ? 30 : null,
+            top: height / 2 - 65, // Adjusted from -50 to -65 for 30% larger handle
+            left: isLeft ? null : 39, // Increased from 30 to 39 (30% larger)
+            right: isLeft ? 39 : null, // Increased from 30 to 39 (30% larger)
             child: Container(
-              width: 15,
-              height: 100,
+              width: 19.5,  // Increased from 15 to 19.5 (30% larger)
+              height: 130,  // Increased from 100 to 130 (30% larger)
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
@@ -722,17 +722,17 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
                     _champagneGold,
                   ],
                 ),
-                borderRadius: BorderRadius.circular(7.5),
+                borderRadius: BorderRadius.circular(9.75), // Increased from 7.5 to 9.75 (30% larger)
                 boxShadow: [
                   BoxShadow(
                     color: _champagneGold.withOpacity(0.6),
-                    blurRadius: 15,
-                    spreadRadius: 2,
+                    blurRadius: 19.5, // Increased from 15 to 19.5 (30% larger)
+                    spreadRadius: 2.6, // Increased from 2 to 2.6 (30% larger)
                   ),
                   BoxShadow(
                     color: Colors.black.withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+                    blurRadius: 13, // Increased from 10 to 13 (30% larger)
+                    offset: const Offset(0, 6.5), // Increased from 5 to 6.5 (30% larger)
                   ),
                 ],
               ),
