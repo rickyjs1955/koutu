@@ -40,6 +40,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
   late Animation<double> _contentFadeAnimation;
   late Animation<double> _contentScaleAnimation;
   late Animation<double> _glowAnimation;
+  late Animation<double> _lightBeamAnimation;
   
   bool _isLoading = true;
   bool _showContent = false;
@@ -107,6 +108,15 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
     ).animate(CurvedAnimation(
       parent: _doorController,
       curve: Curves.easeInOut,
+    ));
+    
+    // Light beam animation - intensifies as doors open
+    _lightBeamAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _doorController,
+      curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
     ));
 
     // Start animation sequence
@@ -176,6 +186,23 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
+                        // Treasure light effect - golden light from inside
+                        AnimatedBuilder(
+                          animation: _lightBeamAnimation,
+                          builder: (context, child) {
+                            return CustomPaint(
+                              painter: TreasureLightPainter(
+                                intensity: _lightBeamAnimation.value,
+                                doorOpenProgress: _doorController.value,
+                              ),
+                              size: Size(
+                                isMobile ? size.width * 0.8 : size.width * 0.7,
+                                isMobile ? size.height * 0.4 : size.height * 0.5,
+                              ),
+                            );
+                          },
+                        ),
+                        
                         // Glow effect behind doors
                         AnimatedBuilder(
                           animation: _glowAnimation,
@@ -186,10 +213,12 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                               decoration: BoxDecoration(
                                 gradient: RadialGradient(
                                   colors: [
-                                    Colors.blue.withOpacity(_glowAnimation.value * 0.3),
+                                    const Color(0xFFFFD700).withOpacity(_glowAnimation.value * 0.4),
+                                    const Color(0xFFFFA500).withOpacity(_glowAnimation.value * 0.2),
                                     Colors.transparent,
                                   ],
-                                  radius: 2,
+                                  radius: 1.5,
+                                  center: Alignment.center,
                                 ),
                               ),
                             );
@@ -403,6 +432,92 @@ class HomePage extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// Custom painter for treasure light beams
+class TreasureLightPainter extends CustomPainter {
+  final double intensity;
+  final double doorOpenProgress;
+  
+  TreasureLightPainter({required this.intensity, required this.doorOpenProgress});
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (intensity == 0) return;
+    
+    final center = Offset(size.width / 2, size.height / 2);
+    
+    // Create light beams effect
+    final paint = Paint()
+      ..style = PaintingStyle.fill
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
+    
+    // Draw multiple light rays
+    for (int i = 0; i < 12; i++) {
+      final angle = (i * 30) * math.pi / 180;
+      final startRadius = 20.0;
+      final endRadius = size.width * 0.8;
+      
+      // Create gradient for each light beam
+      final gradient = RadialGradient(
+        center: Alignment.center,
+        colors: [
+          const Color(0xFFFFE57F).withOpacity(intensity * 0.6),
+          const Color(0xFFFFD700).withOpacity(intensity * 0.3),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.3, 1.0],
+      );
+      
+      // Draw light beam
+      final path = Path();
+      path.moveTo(
+        center.dx + math.cos(angle - 0.1) * startRadius,
+        center.dy + math.sin(angle - 0.1) * startRadius,
+      );
+      path.lineTo(
+        center.dx + math.cos(angle - 0.05) * endRadius * doorOpenProgress,
+        center.dy + math.sin(angle - 0.05) * endRadius * doorOpenProgress,
+      );
+      path.lineTo(
+        center.dx + math.cos(angle + 0.05) * endRadius * doorOpenProgress,
+        center.dy + math.sin(angle + 0.05) * endRadius * doorOpenProgress,
+      );
+      path.lineTo(
+        center.dx + math.cos(angle + 0.1) * startRadius,
+        center.dy + math.sin(angle + 0.1) * startRadius,
+      );
+      path.close();
+      
+      paint.shader = gradient.createShader(
+        Rect.fromCenter(center: center, width: size.width, height: size.height),
+      );
+      canvas.drawPath(path, paint);
+    }
+    
+    // Central bright spot
+    final centerGradient = RadialGradient(
+      colors: [
+        Colors.white.withOpacity(intensity * 0.8),
+        const Color(0xFFFFE57F).withOpacity(intensity * 0.5),
+        Colors.transparent,
+      ],
+      stops: const [0.0, 0.2, 1.0],
+    );
+    
+    paint
+      ..shader = centerGradient.createShader(
+        Rect.fromCenter(center: center, width: 100, height: 100),
+      )
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+    
+    canvas.drawCircle(center, 50 * intensity, paint);
+  }
+  
+  @override
+  bool shouldRepaint(covariant TreasureLightPainter oldDelegate) {
+    return oldDelegate.intensity != intensity || oldDelegate.doorOpenProgress != doorOpenProgress;
   }
 }
 
