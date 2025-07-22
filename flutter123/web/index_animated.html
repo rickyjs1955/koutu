@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="KOUTU - Your Digital Wardrobe">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="KOUTU">
+  <title>KOUTU</title>
+  <link rel="manifest" href="manifest.json">
+  <script>
+    var serviceWorkerVersion = "{{flutter_service_worker_version}}";
+  </script>
+  <script src="flutter.js" defer></script>
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: linear-gradient(to bottom, #F5E6D3, #E8D5C4, #D4C4B0);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    
+    #loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      background: inherit;
+    }
+    
+    .wardrobe-container {
+      width: 200px;
+      height: 250px;
+      position: relative;
+      margin-bottom: 40px;
+      perspective: 1000px;
+    }
+    
+    .wardrobe-door {
+      position: absolute;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(135deg, #3E2723, #2E1A17);
+      border: 2px solid #2E1A17;
+      transition: transform 2s ease-in-out;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .door-left {
+      left: 0;
+      transform-origin: left center;
+      border-right: 1px solid #2E1A17;
+    }
+    
+    .door-right {
+      right: 0;
+      transform-origin: right center;
+      border-left: 1px solid #2E1A17;
+    }
+    
+    .door-open .door-left {
+      transform: rotateY(-70deg);
+    }
+    
+    .door-open .door-right {
+      transform: rotateY(70deg);
+    }
+    
+    .door-panel {
+      position: absolute;
+      width: 80%;
+      height: 40%;
+      border: 1px solid rgba(93, 64, 55, 0.3);
+      left: 10%;
+    }
+    
+    .panel-top {
+      top: 10%;
+    }
+    
+    .panel-bottom {
+      bottom: 10%;
+    }
+    
+    .logo {
+      font-size: 48px;
+      font-weight: bold;
+      color: #8B6F47;
+      letter-spacing: 8px;
+      opacity: 0;
+      animation: fadeIn 1s ease-in-out 1.5s forwards;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .tagline {
+      font-size: 18px;
+      color: #5D4037;
+      letter-spacing: 2px;
+      margin-top: 10px;
+      opacity: 0;
+      animation: fadeIn 1s ease-in-out 2s forwards;
+    }
+    
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+      }
+    }
+    
+    .loading-text {
+      position: absolute;
+      bottom: 10%;
+      color: #8B6F47;
+      font-size: 14px;
+      opacity: 0.7;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 0.3; }
+    }
+    
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      .wardrobe-container {
+        width: 160px;
+        height: 200px;
+      }
+      
+      .logo {
+        font-size: 36px;
+        letter-spacing: 6px;
+      }
+      
+      .tagline {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="loading-screen">
+    <div class="wardrobe-container" id="wardrobe">
+      <div class="wardrobe-door door-left">
+        <div class="door-panel panel-top"></div>
+        <div class="door-panel panel-bottom"></div>
+      </div>
+      <div class="wardrobe-door door-right">
+        <div class="door-panel panel-top"></div>
+        <div class="door-panel panel-bottom"></div>
+      </div>
+    </div>
+    <div class="logo">KOUTU</div>
+    <div class="tagline">Your Digital Wardrobe</div>
+    <div class="loading-text">Loading...</div>
+  </div>
+
+  <script>
+    // Start animation after a short delay
+    setTimeout(function() {
+      document.getElementById('wardrobe').classList.add('door-open');
+    }, 500);
+    
+    window.addEventListener('load', function(ev) {
+      _flutter.buildConfig = {
+        engineRevision: 'b8f7f1f9869bb2d116aa6a70dbeac61000b52849',
+        builds: [{
+          compileTarget: 'dartdevc',
+          renderer: 'html',
+          mainJsPath: 'main.dart.js',
+        }]
+      };
+      
+      _flutter.loader.load({
+        config: _flutter.buildConfig,
+        serviceWorkerSettings: {
+          serviceWorkerVersion: serviceWorkerVersion,
+        },
+        onEntrypointLoaded: async function(engineInitializer) {
+          const appRunner = await engineInitializer.initializeEngine();
+          // Fade out loading screen when Flutter is ready
+          setTimeout(function() {
+            document.getElementById('loading-screen').style.opacity = '0';
+            setTimeout(function() {
+              document.getElementById('loading-screen').style.display = 'none';
+            }, 300);
+          }, 100);
+          await appRunner.runApp();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
