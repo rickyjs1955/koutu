@@ -51,7 +51,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
     
     // Door opening animation controller
     _doorController = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 2500),
       vsync: this,
     );
     
@@ -322,7 +322,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                       alignment: Alignment.centerLeft,
                                       transform: Matrix4.identity()
                                         ..setEntry(3, 2, 0.001)
-                                        ..rotateY(_leftDoorAnimation.value * math.pi / 3),
+                                        ..rotateY(_leftDoorAnimation.value * math.pi / 2.2),
                                       child: Container(
                                         width: size.width * 0.425,
                                         height: size.height * 0.65,
@@ -367,7 +367,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                       alignment: Alignment.centerRight,
                                       transform: Matrix4.identity()
                                         ..setEntry(3, 2, 0.001)
-                                        ..rotateY(_rightDoorAnimation.value * math.pi / 3),
+                                        ..rotateY(_rightDoorAnimation.value * math.pi / 2.2),
                                       child: Container(
                                         width: size.width * 0.425,
                                         height: size.height * 0.65,
