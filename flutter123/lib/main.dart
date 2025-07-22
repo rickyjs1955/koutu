@@ -66,10 +66,10 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
       vsync: this,
     )..repeat();
 
-    // Door animations - starts closed (0.0) opens to sides (1.0)
+    // Door animations - starts closed (0.0) opens outward (1.0)
     _leftDoorAnimation = Tween<double>(
       begin: 0.0,
-      end: -1.0,
+      end: 1.0,
     ).animate(CurvedAnimation(
       parent: _doorController,
       curve: Curves.easeInOutCubic,
@@ -77,7 +77,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
     
     _rightDoorAnimation = Tween<double>(
       begin: 0.0,
-      end: 1.0,
+      end: -1.0,
     ).animate(CurvedAnimation(
       parent: _doorController,
       curve: Curves.easeInOutCubic,
@@ -267,10 +267,10 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                     height: size.height * 0.5,
                                     alignment: Alignment.centerRight,
                                     child: Transform(
-                                      alignment: Alignment.centerRight,
+                                      alignment: Alignment.centerLeft,
                                       transform: Matrix4.identity()
                                         ..setEntry(3, 2, 0.001)
-                                        ..rotateY(_leftDoorAnimation.value * math.pi / 3),
+                                        ..rotateY(-_leftDoorAnimation.value * math.pi / 3),
                                       child: Container(
                                         width: size.width * 0.35,
                                         height: size.height * 0.5,
@@ -318,10 +318,10 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                     height: size.height * 0.5,
                                     alignment: Alignment.centerLeft,
                                     child: Transform(
-                                      alignment: Alignment.centerLeft,
+                                      alignment: Alignment.centerRight,
                                       transform: Matrix4.identity()
                                         ..setEntry(3, 2, 0.001)
-                                        ..rotateY(_rightDoorAnimation.value * math.pi / 3),
+                                        ..rotateY(-_rightDoorAnimation.value * math.pi / 3),
                                       child: Container(
                                         width: size.width * 0.35,
                                         height: size.height * 0.5,
@@ -481,12 +481,12 @@ class DoorDetailPainter extends CustomPainter {
     );
     canvas.drawRect(panelRect2, paint);
     
-    // Draw door handle
+    // Draw door handle (on the inside edge where doors meet)
     paint
       ..style = PaintingStyle.fill
       ..color = Colors.amber.withOpacity(0.7);
     
-    final handleX = isLeft ? size.width * 0.8 : size.width * 0.2;
+    final handleX = isLeft ? size.width * 0.9 : size.width * 0.1;
     final handleY = size.height * 0.5;
     
     canvas.drawCircle(Offset(handleX, handleY), 8, paint);
