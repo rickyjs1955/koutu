@@ -222,10 +222,10 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                 : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Wardrobe with clothes
+                      // Wardrobe with clothes (scaled 30% larger)
                       SizedBox(
-                        width: size.width * 0.9,
-                        height: size.height * 0.6,
+                        width: size.width * 1.17,  // 0.9 * 1.3
+                        height: size.height * 0.78, // 0.6 * 1.3
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
@@ -239,8 +239,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 doorOpenProgress: _doorController.value,
                               ),
                               size: Size(
-                                size.width * 0.85,
-                                size.height * 0.55,
+                                size.width * 1.105, // 0.85 * 1.3
+                                size.height * 0.715, // 0.55 * 1.3
                               ),
                             );
                           },
@@ -251,8 +251,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                           animation: _glowAnimation,
                           builder: (context, child) {
                             return Container(
-                              width: size.width * 0.85,
-                              height: size.height * 0.55,
+                              width: size.width * 1.105, // 0.85 * 1.3
+                              height: size.height * 0.715, // 0.55 * 1.3
                               decoration: BoxDecoration(
                                 gradient: RadialGradient(
                                   colors: [
@@ -282,8 +282,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                       revealProgress: _contentController.value,
                                     ),
                                     size: Size(
-                                      size.width * 0.7,
-                                      size.height * 0.5,
+                                      size.width * 0.91, // 0.7 * 1.3
+                                      size.height * 0.65, // 0.5 * 1.3
                                     ),
                                   ),
                                 ),
@@ -301,8 +301,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 // Left door
                                 ClipRect(
                                   child: Container(
-                                    width: size.width * 0.425,
-                                    height: size.height * 0.55,
+                                    width: size.width * 0.5525, // 0.425 * 1.3
+                                    height: size.height * 0.715, // 0.55 * 1.3
                                     alignment: Alignment.centerRight,
                                     child: Transform(
                                       alignment: Alignment.centerLeft,
@@ -310,8 +310,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                         ..setEntry(3, 2, 0.001)
                                         ..rotateY(_leftDoorAnimation.value * math.pi / 2.2),
                                       child: Container(
-                                        width: size.width * 0.425,
-                                        height: size.height * 0.55,
+                                        width: size.width * 0.5525, // 0.425 * 1.3
+                                        height: size.height * 0.715, // 0.55 * 1.3
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             begin: Alignment.topLeft,
@@ -346,8 +346,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                 // Right door
                                 ClipRect(
                                   child: Container(
-                                    width: size.width * 0.425,
-                                    height: size.height * 0.55,
+                                    width: size.width * 0.5525, // 0.425 * 1.3
+                                    height: size.height * 0.715, // 0.55 * 1.3
                                     alignment: Alignment.centerLeft,
                                     child: Transform(
                                       alignment: Alignment.centerRight,
@@ -355,8 +355,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                                         ..setEntry(3, 2, 0.001)
                                         ..rotateY(_rightDoorAnimation.value * math.pi / 2.2),
                                       child: Container(
-                                        width: size.width * 0.425,
-                                        height: size.height * 0.55,
+                                        width: size.width * 0.5525, // 0.425 * 1.3
+                                        height: size.height * 0.715, // 0.55 * 1.3
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             begin: Alignment.topLeft,
@@ -419,10 +419,10 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                         child: Text(
                           'KOUTU',
                           style: TextStyle(
-                            fontSize: isMobile ? 55 : 80,
+                            fontSize: isMobile ? 71.5 : 104, // Scaled by 1.3
                             fontWeight: FontWeight.bold,
                             color: const Color(0xFF8B6F47), // Rich brown
-                            letterSpacing: isMobile ? 6 : 8,
+                            letterSpacing: isMobile ? 7.8 : 10.4, // Scaled by 1.3
                             shadows: [
                               Shadow(
                                 color: Colors.black.withOpacity(0.3),
@@ -456,9 +456,9 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                   Text(
                     'Your Digital Wardrobe',
                     style: TextStyle(
-                      fontSize: isMobile ? 18 : 24,
+                      fontSize: isMobile ? 23.4 : 31.2, // Scaled by 1.3
                       color: const Color(0xFF5D4037), // Dark brown
-                      letterSpacing: isMobile ? 1 : 2,
+                      letterSpacing: isMobile ? 1.3 : 2.6, // Scaled by 1.3
                       shadows: [
                         Shadow(
                           color: Colors.black.withOpacity(0.2),

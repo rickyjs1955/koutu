@@ -284,8 +284,8 @@ class HelloSplashScreenState extends State<HelloSplashScreen>
                         animation: _doorController,
                         builder: (context, child) {
                           return Container(
-                            width: 350 * (isMobile ? 0.7 : 1.0),
-                            height: 450 * (isMobile ? 0.7 : 1.0),
+                            width: 455 * (isMobile ? 0.7 : 1.0), // 350 * 1.3
+                            height: 585 * (isMobile ? 0.7 : 1.0), // 450 * 1.3
                             decoration: BoxDecoration(
                               boxShadow: [
                                 BoxShadow(
@@ -303,8 +303,8 @@ class HelloSplashScreenState extends State<HelloSplashScreen>
                       
                       // Wardrobe doors
                       SizedBox(
-                        width: 350 * (isMobile ? 0.7 : 1.0),
-                        height: 450 * (isMobile ? 0.7 : 1.0),
+                        width: 455 * (isMobile ? 0.7 : 1.0), // 350 * 1.3
+                        height: 585 * (isMobile ? 0.7 : 1.0), // 450 * 1.3
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
@@ -339,7 +339,7 @@ class HelloSplashScreenState extends State<HelloSplashScreen>
                                           children: [
                                             // Wardrobe interior
                                             Container(
-                                              height: 300 * (isMobile ? 0.7 : 1.0),
+                                              height: 390 * (isMobile ? 0.7 : 1.0), // 300 * 1.3
                                               child: Stack(
                                                 children: [
                                                   // Background
@@ -374,7 +374,7 @@ class HelloSplashScreenState extends State<HelloSplashScreen>
                                                     top: 30,
                                                     left: 0,
                                                     right: 0,
-                                                    height: 180 * (isMobile ? 0.7 : 1.0),
+                                                    height: 234 * (isMobile ? 0.7 : 1.0), // 180 * 1.3
                                                     child: CustomPaint(
                                                       painter: ClothingPainter(),
                                                       size: Size.infinite,
@@ -385,7 +385,7 @@ class HelloSplashScreenState extends State<HelloSplashScreen>
                                                     bottom: 0,
                                                     left: 0,
                                                     right: 0,
-                                                    height: 80 * (isMobile ? 0.7 : 1.0),
+                                                    height: 104 * (isMobile ? 0.7 : 1.0), // 80 * 1.3
                                                     child: CustomPaint(
                                                       painter: FoldedClothesPainter(),
                                                       size: Size.infinite,
@@ -415,8 +415,8 @@ class HelloSplashScreenState extends State<HelloSplashScreen>
                                       ..setEntry(3, 2, 0.001)
                                       ..rotateY(_leftDoorAnimation.value * math.pi / 2.2),
                                     child: Container(
-                                      width: 175 * (isMobile ? 0.7 : 1.0),
-                                      height: 450 * (isMobile ? 0.7 : 1.0),
+                                      width: 227.5 * (isMobile ? 0.7 : 1.0), // 175 * 1.3
+                                      height: 585 * (isMobile ? 0.7 : 1.0), // 450 * 1.3
                                       decoration: BoxDecoration(
                                         color: const Color(0xFF6D4C41),
                                         borderRadius: const BorderRadius.only(
@@ -437,8 +437,8 @@ class HelloSplashScreenState extends State<HelloSplashScreen>
                                       ),
                                       child: Center(
                                         child: Container(
-                                          width: 30 * (isMobile ? 0.7 : 1.0),
-                                          height: 30 * (isMobile ? 0.7 : 1.0),
+                                          width: 39 * (isMobile ? 0.7 : 1.0), // 30 * 1.3
+                                          height: 39 * (isMobile ? 0.7 : 1.0), // 30 * 1.3
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
                                             color: const Color(0xFFFFD700),
@@ -470,8 +470,8 @@ class HelloSplashScreenState extends State<HelloSplashScreen>
                                       ..setEntry(3, 2, 0.001)
                                       ..rotateY(_rightDoorAnimation.value * math.pi / 2.2),
                                     child: Container(
-                                      width: 175 * (isMobile ? 0.7 : 1.0),
-                                      height: 450 * (isMobile ? 0.7 : 1.0),
+                                      width: 227.5 * (isMobile ? 0.7 : 1.0), // 175 * 1.3
+                                      height: 585 * (isMobile ? 0.7 : 1.0), // 450 * 1.3
                                       decoration: BoxDecoration(
                                         color: const Color(0xFF6D4C41),
                                         borderRadius: const BorderRadius.only(
@@ -492,8 +492,8 @@ class HelloSplashScreenState extends State<HelloSplashScreen>
                                       ),
                                       child: Center(
                                         child: Container(
-                                          width: 30 * (isMobile ? 0.7 : 1.0),
-                                          height: 30 * (isMobile ? 0.7 : 1.0),
+                                          width: 39 * (isMobile ? 0.7 : 1.0), // 30 * 1.3
+                                          height: 39 * (isMobile ? 0.7 : 1.0), // 30 * 1.3
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
                                             color: const Color(0xFFFFD700),
@@ -552,7 +552,7 @@ class HelloSplashScreenState extends State<HelloSplashScreen>
                                       child: Text(
                                         'KOUTU',
                                         style: TextStyle(
-                                          fontSize: 60 * (isMobile ? 0.7 : 1.0),
+                                          fontSize: 78 * (isMobile ? 0.7 : 1.0), // 60 * 1.3
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,
                                           letterSpacing: 8,
@@ -572,7 +572,7 @@ class HelloSplashScreenState extends State<HelloSplashScreen>
                                 Text(
                                   'Your Digital Wardrobe',
                                   style: TextStyle(
-                                    fontSize: 18 * (isMobile ? 0.7 : 1.0),
+                                    fontSize: 23.4 * (isMobile ? 0.7 : 1.0), // 18 * 1.3
                                     fontWeight: FontWeight.w300,
                                     color: const Color(0xFF6D4C41),
                                     letterSpacing: 2,
