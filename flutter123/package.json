@@ -1,0 +1,13 @@
+{
+  "name": "koutu-animation-recorder",
+  "version": "1.0.0",
+  "description": "Record Koutu Flutter animation to MP4",
+  "main": "record_with_playwright.js",
+  "scripts": {
+    "record": "node record_with_playwright.js",
+    "record-simple": "node simple_record.js"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}
