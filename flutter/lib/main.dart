@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:koutu/presentation/screens/splash/enhanced_splash_screen.dart';
+import 'package:koutu/presentation/screens/home/home_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,6 +21,9 @@ class MyApp extends StatelessWidget {
         brightness: Brightness.dark,
       ),
       home: const EnhancedSplashScreen(),
+      routes: {
+        '/home': (context) => const HomeScreen(),
+      },
     );
   }
 }

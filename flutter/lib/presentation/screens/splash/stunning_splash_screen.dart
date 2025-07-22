@@ -110,15 +110,15 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
       vsync: this,
     );
 
-    // Configure door animations with overshoot
+    // Configure door animations with overshoot - doors open outward
     _leftDoorAnimation = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0.0, end: -95.0)
+        tween: Tween<double>(begin: 0.0, end: -110.0)
             .chain(CurveTween(curve: Curves.easeInOutBack)),
         weight: 80.0,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: -95.0, end: -88.0)
+        tween: Tween<double>(begin: -110.0, end: -95.0)
             .chain(CurveTween(curve: Curves.elasticOut)),
         weight: 20.0,
       ),
@@ -126,12 +126,12 @@ class _EnhancedSplashScreenState extends State<EnhancedSplashScreen>
 
     _rightDoorAnimation = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0.0, end: 95.0)
+        tween: Tween<double>(begin: 0.0, end: 110.0)
             .chain(CurveTween(curve: Curves.easeInOutBack)),
         weight: 80.0,
       ),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 95.0, end: 88.0)
+        tween: Tween<double>(begin: 110.0, end: 95.0)
             .chain(CurveTween(curve: Curves.elasticOut)),
         weight: 20.0,
       ),
