@@ -619,6 +619,137 @@ class ClothingPainter extends CustomPainter {
         );
       }
     }
+    
+    // Draw folded clothes piles at the bottom
+    paint.style = PaintingStyle.fill;
+    
+    // Pile 1 - Folded jeans (left)
+    final pile1X = size.width * 0.15;
+    final pile1Y = size.height * 0.75;
+    final pile1Height = 35.0;
+    
+    // Multiple layers of jeans
+    for (int i = 0; i < 3; i++) {
+      paint.color = Color.lerp(
+        const Color(0xFF3949AB),
+        const Color(0xFF1E88E5),
+        i / 3,
+      )!.withOpacity(revealProgress * 0.9);
+      
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          pile1X,
+          pile1Y - (i * 12),
+          80,
+          pile1Height,
+        ),
+        const Radius.circular(4),
+      );
+      canvas.drawRRect(rect, paint);
+      
+      // Seam line
+      paint
+        ..color = const Color(0xFF1A237E).withOpacity(revealProgress * 0.5)
+        ..strokeWidth = 1
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(
+        Offset(pile1X + 10, pile1Y - (i * 12) + pile1Height / 2),
+        Offset(pile1X + 70, pile1Y - (i * 12) + pile1Height / 2),
+        paint,
+      );
+    }
+    
+    // Pile 2 - Mixed casual clothes (center-left)
+    final pile2X = size.width * 0.35;
+    final pile2Y = size.height * 0.78;
+    paint.style = PaintingStyle.fill;
+    
+    // T-shirts
+    final colors2 = [
+      const Color(0xFFE91E63),
+      const Color(0xFF9C27B0),
+      const Color(0xFF673AB7),
+      const Color(0xFF3F51B5),
+    ];
+    
+    for (int i = 0; i < colors2.length; i++) {
+      paint.color = colors2[i].withOpacity(revealProgress * 0.9);
+      
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          pile2X - (i * 3),
+          pile2Y - (i * 8),
+          70,
+          25,
+        ),
+        const Radius.circular(3),
+      );
+      canvas.drawRRect(rect, paint);
+    }
+    
+    // Pile 3 - Sweaters (center-right)
+    final pile3X = size.width * 0.55;
+    final pile3Y = size.height * 0.8;
+    
+    final sweaterColors = [
+      const Color(0xFF795548),
+      const Color(0xFF607D8B),
+      const Color(0xFF4CAF50),
+    ];
+    
+    for (int i = 0; i < sweaterColors.length; i++) {
+      paint.color = sweaterColors[i].withOpacity(revealProgress * 0.9);
+      
+      // Slightly irregular shapes for natural look
+      final path = Path()
+        ..moveTo(pile3X + (i * 2), pile3Y - (i * 15))
+        ..lineTo(pile3X + 85 + (i * 2), pile3Y - (i * 15) - 3)
+        ..lineTo(pile3X + 85 + (i * 2), pile3Y - (i * 15) + 30)
+        ..lineTo(pile3X + (i * 2), pile3Y - (i * 15) + 32)
+        ..close();
+      
+      canvas.drawPath(path, paint);
+      
+      // Knit texture lines
+      paint
+        ..color = Colors.black.withOpacity(revealProgress * 0.1)
+        ..strokeWidth = 0.5
+        ..style = PaintingStyle.stroke;
+      
+      for (int j = 0; j < 3; j++) {
+        canvas.drawLine(
+          Offset(pile3X + 10 + (i * 2), pile3Y - (i * 15) + 5 + (j * 8)),
+          Offset(pile3X + 75 + (i * 2), pile3Y - (i * 15) + 5 + (j * 8)),
+          paint,
+        );
+      }
+    }
+    
+    // Pile 4 - Small accessories pile (right)
+    final pile4X = size.width * 0.78;
+    final pile4Y = size.height * 0.82;
+    paint.style = PaintingStyle.fill;
+    
+    // Scarves/ties
+    final accessoryColors = [
+      const Color(0xFFFF5722),
+      const Color(0xFFFFEB3B),
+    ];
+    
+    for (int i = 0; i < accessoryColors.length; i++) {
+      paint.color = accessoryColors[i].withOpacity(revealProgress * 0.9);
+      
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          pile4X - (i * 5),
+          pile4Y - (i * 6),
+          60,
+          15,
+        ),
+        const Radius.circular(2),
+      );
+      canvas.drawRRect(rect, paint);
+    }
   }
   
   @override
