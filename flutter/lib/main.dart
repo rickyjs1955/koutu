@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import '../splash_screen_demo1.dart';
+import 'splash_screen_demo1.dart';
 
 void main() {
   runApp(const MyApp());
