@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
 void main() {
   runApp(const MyApp());
@@ -29,54 +30,103 @@ class HelloSplashScreen extends StatefulWidget {
 }
 
 class _HelloSplashScreenState extends State<HelloSplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+    with TickerProviderStateMixin {
+  late AnimationController _doorController;
+  late AnimationController _contentController;
+  late AnimationController _particleController;
+  
+  late Animation<double> _leftDoorAnimation;
+  late Animation<double> _rightDoorAnimation;
+  late Animation<double> _contentFadeAnimation;
+  late Animation<double> _contentScaleAnimation;
+  late Animation<double> _glowAnimation;
+  
   bool _isLoading = true;
+  bool _showContent = false;
 
   @override
   void initState() {
     super.initState();
-    print('HelloSplashScreen initState called');
     
-    _controller = AnimationController(
-      duration: const Duration(seconds: 3),
+    // Door opening animation controller
+    _doorController = AnimationController(
+      duration: const Duration(seconds: 2),
       vsync: this,
     );
+    
+    // Content reveal animation controller
+    _contentController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    
+    // Particle effect controller
+    _particleController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    )..repeat();
 
-    _fadeAnimation = Tween<double>(
+    // Door animations - starts closed (0.0) opens to sides (1.0)
+    _leftDoorAnimation = Tween<double>(
+      begin: 0.0,
+      end: -1.0,
+    ).animate(CurvedAnimation(
+      parent: _doorController,
+      curve: Curves.easeInOutCubic,
+    ));
+    
+    _rightDoorAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
     ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeIn,
+      parent: _doorController,
+      curve: Curves.easeInOutCubic,
     ));
-
-    _scaleAnimation = Tween<double>(
-      begin: 0.5,
+    
+    // Content animations
+    _contentFadeAnimation = Tween<double>(
+      begin: 0.0,
       end: 1.0,
     ).animate(CurvedAnimation(
-      parent: _controller,
+      parent: _contentController,
+      curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
+    ));
+    
+    _contentScaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _contentController,
       curve: Curves.elasticOut,
     ));
+    
+    // Glow effect animation
+    _glowAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _doorController,
+      curve: Curves.easeInOut,
+    ));
 
-    // Start animation after a brief delay to ensure widget is built
+    // Start animation sequence
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
-        print('Starting animation');
-        _controller.forward().then((_) {
-          print('Animation completed');
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) {
-              print('Navigating to HomePage');
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => const HomePage()),
-              );
-            }
+        _doorController.forward().then((_) {
+          setState(() {
+            _showContent = true;
+          });
+          _contentController.forward().then((_) {
+            Future.delayed(const Duration(seconds: 2), () {
+              if (mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => const HomePage()),
+                );
+              }
+            });
           });
         });
       }
@@ -85,82 +135,210 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
 
   @override
   void dispose() {
-    _controller.dispose();
+    _doorController.dispose();
+    _contentController.dispose();
+    _particleController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    print('Building HelloSplashScreen, isLoading: $_isLoading');
+    final size = MediaQuery.of(context).size;
     
     return Scaffold(
-      backgroundColor: Colors.blue.shade100,
-      body: Center(
-        child: _isLoading
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade700),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Loading...',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.blue.shade700,
+      backgroundColor: const Color(0xFF1a1a2e),
+      body: Stack(
+        children: [
+          // Particle effects background
+          AnimatedBuilder(
+            animation: _particleController,
+            builder: (context, child) {
+              return CustomPaint(
+                painter: ParticlePainter(
+                  progress: _particleController.value,
+                  glowProgress: _doorController.value,
+                ),
+                size: size,
+              );
+            },
+          ),
+          
+          // Main content
+          Center(
+            child: _isLoading
+                ? const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                  )
+                : SizedBox(
+                    width: size.width * 0.8,
+                    height: size.height * 0.6,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Glow effect behind doors
+                        AnimatedBuilder(
+                          animation: _glowAnimation,
+                          builder: (context, child) {
+                            return Container(
+                              width: size.width * 0.7,
+                              height: size.height * 0.5,
+                              decoration: BoxDecoration(
+                                gradient: RadialGradient(
+                                  colors: [
+                                    Colors.blue.withOpacity(_glowAnimation.value * 0.3),
+                                    Colors.transparent,
+                                  ],
+                                  radius: 2,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        
+                        // Content behind doors (revealed when doors open)
+                        if (_showContent)
+                          AnimatedBuilder(
+                            animation: _contentController,
+                            builder: (context, child) {
+                              return Opacity(
+                                opacity: _contentFadeAnimation.value,
+                                child: Transform.scale(
+                                  scale: _contentScaleAnimation.value,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(40),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.9),
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.blue.withOpacity(0.5),
+                                          blurRadius: 30,
+                                          spreadRadius: 10,
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'HELLO',
+                                          style: TextStyle(
+                                            fontSize: 70,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.blue.shade900,
+                                            letterSpacing: 8,
+                                            shadows: [
+                                              Shadow(
+                                                color: Colors.blue.withOpacity(0.3),
+                                                blurRadius: 10,
+                                                offset: const Offset(0, 5),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        Text(
+                                          'Your Digital Wardrobe',
+                                          style: TextStyle(
+                                            fontSize: 20,
+                                            color: Colors.blue.shade700,
+                                            letterSpacing: 2,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        
+                        // Wardrobe doors
+                        AnimatedBuilder(
+                          animation: Listenable.merge([_leftDoorAnimation, _rightDoorAnimation]),
+                          builder: (context, child) {
+                            return Stack(
+                              children: [
+                                // Left door
+                                Transform(
+                                  alignment: Alignment.centerRight,
+                                  transform: Matrix4.identity()
+                                    ..setEntry(3, 2, 0.001)
+                                    ..rotateY(_leftDoorAnimation.value * math.pi / 3),
+                                  child: Container(
+                                    width: size.width * 0.35,
+                                    height: size.height * 0.5,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          const Color(0xFF2d3561),
+                                          const Color(0xFF0f3460),
+                                        ],
+                                      ),
+                                      borderRadius: const BorderRadius.only(
+                                        topLeft: Radius.circular(10),
+                                        bottomLeft: Radius.circular(10),
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.5),
+                                          blurRadius: 10,
+                                          offset: const Offset(-5, 0),
+                                        ),
+                                      ],
+                                    ),
+                                    child: CustomPaint(
+                                      painter: DoorDetailPainter(isLeft: true),
+                                    ),
+                                  ),
+                                ),
+                                
+                                // Right door
+                                Transform(
+                                  alignment: Alignment.centerLeft,
+                                  transform: Matrix4.identity()
+                                    ..setEntry(3, 2, 0.001)
+                                    ..rotateY(_rightDoorAnimation.value * math.pi / 3),
+                                  child: Container(
+                                    width: size.width * 0.35,
+                                    height: size.height * 0.5,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          const Color(0xFF2d3561),
+                                          const Color(0xFF0f3460),
+                                        ],
+                                      ),
+                                      borderRadius: const BorderRadius.only(
+                                        topRight: Radius.circular(10),
+                                        bottomRight: Radius.circular(10),
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.5),
+                                          blurRadius: 10,
+                                          offset: const Offset(5, 0),
+                                        ),
+                                      ],
+                                    ),
+                                    child: CustomPaint(
+                                      painter: DoorDetailPainter(isLeft: false),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              )
-            : AnimatedBuilder(
-                animation: _controller,
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: _fadeAnimation.value,
-                    child: Transform.scale(
-                      scale: _scaleAnimation.value,
-                      child: Container(
-                        padding: const EdgeInsets.all(40),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.blue.withOpacity(0.3),
-                              blurRadius: 20,
-                              spreadRadius: 5,
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'HELLO',
-                              style: TextStyle(
-                                fontSize: 80,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue.shade900,
-                                letterSpacing: 10,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              'Welcome to the App',
-                              style: TextStyle(
-                                fontSize: 20,
-                                color: Colors.blue.shade700,
-                                letterSpacing: 2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+          ),
+        ],
       ),
     );
   }
@@ -206,5 +384,96 @@ class HomePage extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// Custom painter for particle effects
+class ParticlePainter extends CustomPainter {
+  final double progress;
+  final double glowProgress;
+  
+  ParticlePainter({required this.progress, required this.glowProgress});
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.fill;
+    
+    // Draw multiple particles
+    for (int i = 0; i < 50; i++) {
+      final particleProgress = (progress + i / 50) % 1.0;
+      final opacity = (1.0 - particleProgress) * glowProgress;
+      
+      if (opacity > 0) {
+        paint.color = Colors.blue.withOpacity(opacity * 0.3);
+        
+        final x = size.width * (0.2 + 0.6 * _pseudoRandom(i, 0));
+        final baseY = size.height * (0.3 + 0.4 * _pseudoRandom(i, 1));
+        final y = baseY - (particleProgress * size.height * 0.3);
+        final radius = 2 + 3 * _pseudoRandom(i, 2);
+        
+        canvas.drawCircle(Offset(x, y), radius, paint);
+      }
+    }
+  }
+  
+  double _pseudoRandom(int seed, int offset) {
+    return ((seed * 31 + offset * 17) % 100) / 100;
+  }
+  
+  @override
+  bool shouldRepaint(covariant ParticlePainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.glowProgress != glowProgress;
+  }
+}
+
+// Custom painter for door details
+class DoorDetailPainter extends CustomPainter {
+  final bool isLeft;
+  
+  DoorDetailPainter({required this.isLeft});
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..color = Colors.white.withOpacity(0.1);
+    
+    // Draw door panels
+    final panelRect = Rect.fromLTWH(
+      size.width * 0.1,
+      size.height * 0.1,
+      size.width * 0.8,
+      size.height * 0.35,
+    );
+    canvas.drawRect(panelRect, paint);
+    
+    final panelRect2 = Rect.fromLTWH(
+      size.width * 0.1,
+      size.height * 0.55,
+      size.width * 0.8,
+      size.height * 0.35,
+    );
+    canvas.drawRect(panelRect2, paint);
+    
+    // Draw door handle
+    paint
+      ..style = PaintingStyle.fill
+      ..color = Colors.amber.withOpacity(0.7);
+    
+    final handleX = isLeft ? size.width * 0.8 : size.width * 0.2;
+    final handleY = size.height * 0.5;
+    
+    canvas.drawCircle(Offset(handleX, handleY), 8, paint);
+    
+    // Handle shadow
+    paint.color = Colors.black.withOpacity(0.3);
+    canvas.drawCircle(Offset(handleX + 2, handleY + 2), 8, paint);
+  }
+  
+  @override
+  bool shouldRepaint(covariant DoorDetailPainter oldDelegate) {
+    return false;
   }
 }
