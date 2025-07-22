@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:koutu/presentation/screens/splash/enhanced_splash_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -10,40 +11,15 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Koutu',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        brightness: Brightness.light,
       ),
-      home: const MyHomePage(),
-    );
-  }
-}
-
-class MyHomePage extends StatelessWidget {
-  const MyHomePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Flutter Web Test'),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
       ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'Hello, Flutter Web!',
-              style: TextStyle(fontSize: 24),
-            ),
-            SizedBox(height: 20),
-            Text(
-              'If you can see this, Flutter web is working!',
-              style: TextStyle(fontSize: 16),
-            ),
-          ],
-        ),
-      ),
+      home: const EnhancedSplashScreen(),
     );
   }
 }
