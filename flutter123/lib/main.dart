@@ -499,34 +499,56 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5E6D3),
       appBar: AppBar(
-        title: const Text('Home'),
-        backgroundColor: Colors.blue.shade700,
+        title: const Text('KOUTU'),
+        backgroundColor: const Color(0xFF8B6F47),
+        elevation: 0,
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.home,
+              Icons.checkroom,
               size: 100,
-              color: Colors.blue.shade700,
+              color: const Color(0xFF8B6F47),
             ),
             const SizedBox(height: 20),
             Text(
-              'Welcome Home!',
+              'Welcome to KOUTU!',
               style: TextStyle(
                 fontSize: 30,
                 fontWeight: FontWeight.bold,
-                color: Colors.blue.shade900,
+                color: const Color(0xFF5D4037),
               ),
             ),
             const SizedBox(height: 10),
             Text(
-              'The splash screen has completed',
+              'Your Digital Wardrobe',
               style: TextStyle(
                 fontSize: 18,
-                color: Colors.blue.shade600,
+                color: const Color(0xFF8B6F47),
+              ),
+            ),
+            const SizedBox(height: 40),
+            ElevatedButton.icon(
+              onPressed: () {
+                // Restart the app to show animation again
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const HelloSplashScreen()),
+                  (route) => false,
+                );
+              },
+              icon: const Icon(Icons.replay),
+              label: const Text('Replay Animation'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8B6F47),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ],
@@ -549,286 +571,418 @@ class ClothingPainter extends CustomPainter {
     final paint = Paint()
       ..style = PaintingStyle.fill;
     
-    // Draw hanging rod
-    paint
-      ..color = const Color(0xFF6D4C41)
-      ..strokeWidth = 4
-      ..style = PaintingStyle.stroke;
+    // Draw hanging rod with metallic effect
+    final rodPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          const Color(0xFF9E9E9E),
+          const Color(0xFF616161),
+          const Color(0xFF9E9E9E),
+        ],
+      ).createShader(Rect.fromLTWH(size.width * 0.1, size.height * 0.14, size.width * 0.8, 6));
     
-    canvas.drawLine(
-      Offset(size.width * 0.1, size.height * 0.15),
-      Offset(size.width * 0.9, size.height * 0.15),
-      paint,
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width * 0.1, size.height * 0.14, size.width * 0.8, 6),
+        const Radius.circular(3),
+      ),
+      rodPaint,
     );
     
-    // Draw hangers
-    paint
-      ..strokeWidth = 2
-      ..color = const Color(0xFF757575);
+    // Draw organized hanging clothes with proper spacing
+    final hangingItems = [
+      {'x': 0.15, 'type': 'shirt', 'color': const Color(0xFF2196F3)},
+      {'x': 0.25, 'type': 'tshirt', 'color': const Color(0xFF4CAF50)},
+      {'x': 0.35, 'type': 'jacket', 'color': const Color(0xFF795548)},
+      {'x': 0.45, 'type': 'hoodie', 'color': const Color(0xFF9C27B0)},
+      {'x': 0.55, 'type': 'dress', 'color': const Color(0xFFE91E63)},
+      {'x': 0.65, 'type': 'suit', 'color': const Color(0xFF37474F)},
+      {'x': 0.75, 'type': 'shirt', 'color': Colors.white},
+      {'x': 0.85, 'type': 'blazer', 'color': const Color(0xFF1A237E)},
+    ];
     
-    // Casual wear section (left side)
-    final casualX = [0.2, 0.3, 0.4];
-    for (int i = 0; i < casualX.length; i++) {
-      final x = size.width * casualX[i];
-      // Hanger
-      canvas.drawLine(
-        Offset(x, size.height * 0.15),
-        Offset(x - 10, size.height * 0.18),
-        paint,
-      );
-      canvas.drawLine(
-        Offset(x, size.height * 0.15),
-        Offset(x + 10, size.height * 0.18),
-        paint,
-      );
+    for (var item in hangingItems) {
+      final x = size.width * (item['x'] as double);
       
-      // Draw casual clothes
-      paint.style = PaintingStyle.fill;
-      if (i == 0) {
-        // T-shirt
-        paint.color = const Color(0xFF42A5F5).withOpacity(revealProgress);
-        final tshirtPath = Path()
-          ..moveTo(x - 25, size.height * 0.2)
-          ..lineTo(x - 25, size.height * 0.4)
-          ..lineTo(x + 25, size.height * 0.4)
-          ..lineTo(x + 25, size.height * 0.2)
-          ..close();
-        canvas.drawPath(tshirtPath, paint);
-      } else if (i == 1) {
-        // Hoodie
-        paint.color = const Color(0xFF66BB6A).withOpacity(revealProgress);
-        final hoodiePath = Path()
-          ..moveTo(x - 30, size.height * 0.2)
-          ..lineTo(x - 30, size.height * 0.45)
-          ..lineTo(x + 30, size.height * 0.45)
-          ..lineTo(x + 30, size.height * 0.2)
-          ..close();
-        canvas.drawPath(hoodiePath, paint);
-      } else {
-        // Jeans
-        paint.color = const Color(0xFF5C6BC0).withOpacity(revealProgress);
-        final jeansPath = Path()
-          ..moveTo(x - 20, size.height * 0.2)
-          ..lineTo(x - 20, size.height * 0.5)
-          ..lineTo(x - 10, size.height * 0.5)
-          ..lineTo(x - 10, size.height * 0.35)
-          ..lineTo(x + 10, size.height * 0.35)
-          ..lineTo(x + 10, size.height * 0.5)
-          ..lineTo(x + 20, size.height * 0.5)
-          ..lineTo(x + 20, size.height * 0.2)
-          ..close();
-        canvas.drawPath(jeansPath, paint);
-      }
-    }
-    
-    // Formal wear section (right side)
-    final formalX = [0.6, 0.7, 0.8];
-    for (int i = 0; i < formalX.length; i++) {
-      final x = size.width * formalX[i];
-      // Hanger
+      // Draw hanger with metallic look
       paint
         ..style = PaintingStyle.stroke
-        ..color = const Color(0xFF757575);
-      canvas.drawLine(
-        Offset(x, size.height * 0.15),
-        Offset(x - 10, size.height * 0.18),
-        paint,
-      );
-      canvas.drawLine(
-        Offset(x, size.height * 0.15),
-        Offset(x + 10, size.height * 0.18),
+        ..strokeWidth = 2
+        ..color = const Color(0xFF9E9E9E).withOpacity(revealProgress);
+      
+      // Hanger hook
+      canvas.drawArc(
+        Rect.fromCircle(center: Offset(x, size.height * 0.13), radius: 4),
+        math.pi * 0.2,
+        math.pi * 0.6,
+        false,
         paint,
       );
       
-      // Draw formal clothes
+      // Hanger body
+      canvas.drawLine(
+        Offset(x, size.height * 0.15),
+        Offset(x - 12, size.height * 0.18),
+        paint,
+      );
+      canvas.drawLine(
+        Offset(x, size.height * 0.15),
+        Offset(x + 12, size.height * 0.18),
+        paint,
+      );
+      
+      // Draw clothes with consistent styling
       paint.style = PaintingStyle.fill;
-      if (i == 0) {
-        // Suit jacket
-        paint.color = const Color(0xFF424242).withOpacity(revealProgress);
-        final suitPath = Path()
-          ..moveTo(x - 35, size.height * 0.2)
-          ..lineTo(x - 35, size.height * 0.45)
-          ..lineTo(x - 15, size.height * 0.45)
-          ..lineTo(x - 15, size.height * 0.4)
-          ..lineTo(x + 15, size.height * 0.4)
-          ..lineTo(x + 15, size.height * 0.45)
-          ..lineTo(x + 35, size.height * 0.45)
-          ..lineTo(x + 35, size.height * 0.2)
-          ..close();
-        canvas.drawPath(suitPath, paint);
-      } else if (i == 1) {
-        // Dress
-        paint.color = const Color(0xFFE91E63).withOpacity(revealProgress);
-        final dressPath = Path()
-          ..moveTo(x - 25, size.height * 0.2)
-          ..lineTo(x - 35, size.height * 0.55)
-          ..lineTo(x + 35, size.height * 0.55)
-          ..lineTo(x + 25, size.height * 0.2)
-          ..close();
-        canvas.drawPath(dressPath, paint);
-      } else {
-        // Shirt
-        paint.color = Colors.white.withOpacity(revealProgress);
-        final shirtPath = Path()
-          ..moveTo(x - 25, size.height * 0.2)
-          ..lineTo(x - 25, size.height * 0.42)
-          ..lineTo(x + 25, size.height * 0.42)
-          ..lineTo(x + 25, size.height * 0.2)
-          ..close();
-        canvas.drawPath(shirtPath, paint);
-        
-        // Collar
-        paint
-          ..style = PaintingStyle.stroke
-          ..color = const Color(0xFF757575).withOpacity(revealProgress);
-        canvas.drawLine(
-          Offset(x - 10, size.height * 0.2),
-          Offset(x, size.height * 0.23),
-          paint,
-        );
-        canvas.drawLine(
-          Offset(x + 10, size.height * 0.2),
-          Offset(x, size.height * 0.23),
-          paint,
-        );
+      paint.color = (item['color'] as Color).withOpacity(revealProgress * 0.9);
+      
+      switch (item['type']) {
+        case 'shirt':
+          _drawShirt(canvas, x, size, paint, revealProgress);
+          break;
+        case 'tshirt':
+          _drawTShirt(canvas, x, size, paint, revealProgress);
+          break;
+        case 'jacket':
+          _drawJacket(canvas, x, size, paint, revealProgress);
+          break;
+        case 'hoodie':
+          _drawHoodie(canvas, x, size, paint, revealProgress);
+          break;
+        case 'dress':
+          _drawDress(canvas, x, size, paint, revealProgress);
+          break;
+        case 'suit':
+          _drawSuit(canvas, x, size, paint, revealProgress);
+          break;
+        case 'blazer':
+          _drawBlazer(canvas, x, size, paint, revealProgress);
+          break;
       }
     }
     
-    // Draw folded clothes piles at the bottom
-    paint.style = PaintingStyle.fill;
     
-    // Pile 1 - Folded jeans (left)
-    final pile1X = size.width * 0.15;
-    final pile1Y = size.height * 0.75;
-    final pile1Height = 35.0;
-    
-    // Multiple layers of jeans
-    for (int i = 0; i < 3; i++) {
-      paint.color = Color.lerp(
-        const Color(0xFF3949AB),
-        const Color(0xFF1E88E5),
-        i / 3,
-      )!.withOpacity(revealProgress * 0.9);
-      
-      final rect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          pile1X,
-          pile1Y - (i * 12),
-          80,
-          pile1Height,
-        ),
-        const Radius.circular(4),
-      );
-      canvas.drawRRect(rect, paint);
-      
-      // Seam line
-      paint
-        ..color = const Color(0xFF1A237E).withOpacity(revealProgress * 0.5)
-        ..strokeWidth = 1
-        ..style = PaintingStyle.stroke;
-      canvas.drawLine(
-        Offset(pile1X + 10, pile1Y - (i * 12) + pile1Height / 2),
-        Offset(pile1X + 70, pile1Y - (i * 12) + pile1Height / 2),
-        paint,
-      );
-    }
-    
-    // Pile 2 - Mixed casual clothes (center-left)
-    final pile2X = size.width * 0.35;
-    final pile2Y = size.height * 0.78;
-    paint.style = PaintingStyle.fill;
-    
-    // T-shirts
-    final colors2 = [
-      const Color(0xFFE91E63),
-      const Color(0xFF9C27B0),
-      const Color(0xFF673AB7),
-      const Color(0xFF3F51B5),
-    ];
-    
-    for (int i = 0; i < colors2.length; i++) {
-      paint.color = colors2[i].withOpacity(revealProgress * 0.9);
-      
-      final rect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          pile2X - (i * 3),
-          pile2Y - (i * 8),
-          70,
-          25,
-        ),
-        const Radius.circular(3),
-      );
-      canvas.drawRRect(rect, paint);
-    }
-    
-    // Pile 3 - Sweaters (center-right)
-    final pile3X = size.width * 0.55;
-    final pile3Y = size.height * 0.8;
-    
-    final sweaterColors = [
-      const Color(0xFF795548),
-      const Color(0xFF607D8B),
-      const Color(0xFF4CAF50),
-    ];
-    
-    for (int i = 0; i < sweaterColors.length; i++) {
-      paint.color = sweaterColors[i].withOpacity(revealProgress * 0.9);
-      
-      // Slightly irregular shapes for natural look
-      final path = Path()
-        ..moveTo(pile3X + (i * 2), pile3Y - (i * 15))
-        ..lineTo(pile3X + 85 + (i * 2), pile3Y - (i * 15) - 3)
-        ..lineTo(pile3X + 85 + (i * 2), pile3Y - (i * 15) + 30)
-        ..lineTo(pile3X + (i * 2), pile3Y - (i * 15) + 32)
-        ..close();
-      
-      canvas.drawPath(path, paint);
-      
-      // Knit texture lines
-      paint
-        ..color = Colors.black.withOpacity(revealProgress * 0.1)
-        ..strokeWidth = 0.5
-        ..style = PaintingStyle.stroke;
-      
-      for (int j = 0; j < 3; j++) {
-        canvas.drawLine(
-          Offset(pile3X + 10 + (i * 2), pile3Y - (i * 15) + 5 + (j * 8)),
-          Offset(pile3X + 75 + (i * 2), pile3Y - (i * 15) + 5 + (j * 8)),
-          paint,
-        );
-      }
-    }
-    
-    // Pile 4 - Small accessories pile (right)
-    final pile4X = size.width * 0.78;
-    final pile4Y = size.height * 0.82;
-    paint.style = PaintingStyle.fill;
-    
-    // Scarves/ties
-    final accessoryColors = [
-      const Color(0xFFFF5722),
-      const Color(0xFFFFEB3B),
-    ];
-    
-    for (int i = 0; i < accessoryColors.length; i++) {
-      paint.color = accessoryColors[i].withOpacity(revealProgress * 0.9);
-      
-      final rect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          pile4X - (i * 5),
-          pile4Y - (i * 6),
-          60,
-          15,
-        ),
-        const Radius.circular(2),
-      );
-      canvas.drawRRect(rect, paint);
-    }
+    // Draw organized shelves at bottom
+    _drawOrganizedShelves(canvas, size, paint, revealProgress);
   }
   
   @override
   bool shouldRepaint(covariant ClothingPainter oldDelegate) {
     return oldDelegate.revealProgress != revealProgress;
+  }
+  
+  void _drawShirt(Canvas canvas, double x, Size size, Paint paint, double progress) {
+    final shirtPath = Path()
+      ..moveTo(x - 20, size.height * 0.19)
+      ..lineTo(x - 20, size.height * 0.38)
+      ..lineTo(x + 20, size.height * 0.38)
+      ..lineTo(x + 20, size.height * 0.19)
+      ..close();
+    canvas.drawPath(shirtPath, paint);
+    
+    // Collar
+    paint
+      ..style = PaintingStyle.stroke
+      ..color = Colors.black.withOpacity(progress * 0.3)
+      ..strokeWidth = 1;
+    canvas.drawLine(
+      Offset(x - 8, size.height * 0.19),
+      Offset(x, size.height * 0.21),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(x + 8, size.height * 0.19),
+      Offset(x, size.height * 0.21),
+      paint,
+    );
+  }
+  
+  void _drawTShirt(Canvas canvas, double x, Size size, Paint paint, double progress) {
+    final tshirtPath = Path()
+      ..moveTo(x - 18, size.height * 0.19)
+      ..lineTo(x - 18, size.height * 0.35)
+      ..lineTo(x + 18, size.height * 0.35)
+      ..lineTo(x + 18, size.height * 0.19)
+      ..close();
+    canvas.drawPath(tshirtPath, paint);
+    
+    // Sleeves
+    final sleevePath = Path()
+      ..moveTo(x - 18, size.height * 0.19)
+      ..lineTo(x - 25, size.height * 0.24)
+      ..lineTo(x - 20, size.height * 0.26)
+      ..lineTo(x - 18, size.height * 0.23);
+    canvas.drawPath(sleevePath, paint);
+    
+    final sleevePath2 = Path()
+      ..moveTo(x + 18, size.height * 0.19)
+      ..lineTo(x + 25, size.height * 0.24)
+      ..lineTo(x + 20, size.height * 0.26)
+      ..lineTo(x + 18, size.height * 0.23);
+    canvas.drawPath(sleevePath2, paint);
+  }
+  
+  void _drawJacket(Canvas canvas, double x, Size size, Paint paint, double progress) {
+    final jacketPath = Path()
+      ..moveTo(x - 25, size.height * 0.19)
+      ..lineTo(x - 25, size.height * 0.42)
+      ..lineTo(x + 25, size.height * 0.42)
+      ..lineTo(x + 25, size.height * 0.19)
+      ..close();
+    canvas.drawPath(jacketPath, paint);
+    
+    // Zipper line
+    paint
+      ..style = PaintingStyle.stroke
+      ..color = Colors.black.withOpacity(progress * 0.4)
+      ..strokeWidth = 1.5;
+    canvas.drawLine(
+      Offset(x, size.height * 0.19),
+      Offset(x, size.height * 0.42),
+      paint,
+    );
+  }
+  
+  void _drawHoodie(Canvas canvas, double x, Size size, Paint paint, double progress) {
+    paint.style = PaintingStyle.fill;
+    final hoodiePath = Path()
+      ..moveTo(x - 26, size.height * 0.19)
+      ..lineTo(x - 26, size.height * 0.44)
+      ..lineTo(x + 26, size.height * 0.44)
+      ..lineTo(x + 26, size.height * 0.19)
+      ..close();
+    canvas.drawPath(hoodiePath, paint);
+    
+    // Hood
+    paint.color = paint.color.withOpacity(paint.color.opacity * 0.8);
+    final hoodPath = Path()
+      ..moveTo(x - 15, size.height * 0.19)
+      ..quadraticBezierTo(x, size.height * 0.16, x + 15, size.height * 0.19);
+    canvas.drawPath(hoodPath, paint);
+    
+    // Pocket
+    paint
+      ..style = PaintingStyle.stroke
+      ..color = Colors.black.withOpacity(progress * 0.3)
+      ..strokeWidth = 1;
+    canvas.drawRect(
+      Rect.fromLTWH(x - 10, size.height * 0.32, 20, 15),
+      paint,
+    );
+  }
+  
+  void _drawDress(Canvas canvas, double x, Size size, Paint paint, double progress) {
+    final dressPath = Path()
+      ..moveTo(x - 18, size.height * 0.19)
+      ..lineTo(x - 28, size.height * 0.48)
+      ..lineTo(x + 28, size.height * 0.48)
+      ..lineTo(x + 18, size.height * 0.19)
+      ..close();
+    canvas.drawPath(dressPath, paint);
+    
+    // Waistline
+    paint
+      ..style = PaintingStyle.stroke
+      ..color = Colors.black.withOpacity(progress * 0.2)
+      ..strokeWidth = 1;
+    canvas.drawLine(
+      Offset(x - 20, size.height * 0.28),
+      Offset(x + 20, size.height * 0.28),
+      paint,
+    );
+  }
+  
+  void _drawSuit(Canvas canvas, double x, Size size, Paint paint, double progress) {
+    final suitPath = Path()
+      ..moveTo(x - 28, size.height * 0.19)
+      ..lineTo(x - 28, size.height * 0.44)
+      ..lineTo(x - 10, size.height * 0.44)
+      ..lineTo(x - 10, size.height * 0.38)
+      ..lineTo(x + 10, size.height * 0.38)
+      ..lineTo(x + 10, size.height * 0.44)
+      ..lineTo(x + 28, size.height * 0.44)
+      ..lineTo(x + 28, size.height * 0.19)
+      ..close();
+    canvas.drawPath(suitPath, paint);
+    
+    // Lapels
+    paint
+      ..style = PaintingStyle.stroke
+      ..color = Colors.black.withOpacity(progress * 0.4)
+      ..strokeWidth = 1.5;
+    canvas.drawLine(
+      Offset(x - 8, size.height * 0.19),
+      Offset(x - 12, size.height * 0.26),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(x + 8, size.height * 0.19),
+      Offset(x + 12, size.height * 0.26),
+      paint,
+    );
+  }
+  
+  void _drawBlazer(Canvas canvas, double x, Size size, Paint paint, double progress) {
+    final blazerPath = Path()
+      ..moveTo(x - 26, size.height * 0.19)
+      ..lineTo(x - 26, size.height * 0.42)
+      ..lineTo(x + 26, size.height * 0.42)
+      ..lineTo(x + 26, size.height * 0.19)
+      ..close();
+    canvas.drawPath(blazerPath, paint);
+    
+    // Buttons
+    paint.style = PaintingStyle.fill;
+    paint.color = Colors.black.withOpacity(progress * 0.6);
+    canvas.drawCircle(Offset(x - 8, size.height * 0.30), 2, paint);
+    canvas.drawCircle(Offset(x - 8, size.height * 0.35), 2, paint);
+  }
+  
+  void _drawOrganizedShelves(Canvas canvas, Size size, Paint paint, double progress) {
+    // Draw shelf boards
+    paint
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFF6D4C41).withOpacity(progress);
+    
+    // Top shelf
+    canvas.drawRect(
+      Rect.fromLTWH(size.width * 0.1, size.height * 0.65, size.width * 0.8, 4),
+      paint,
+    );
+    
+    // Bottom shelf
+    canvas.drawRect(
+      Rect.fromLTWH(size.width * 0.1, size.height * 0.85, size.width * 0.8, 4),
+      paint,
+    );
+    
+    // Draw organized folded items on shelves
+    
+    // Top shelf items
+    final topShelfY = size.height * 0.65 - 35;
+    
+    // Stack of jeans
+    for (int i = 0; i < 4; i++) {
+      paint.color = Color.lerp(
+        const Color(0xFF1565C0),
+        const Color(0xFF0D47A1),
+        i / 4,
+      )!.withOpacity(progress * 0.9);
+      
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            size.width * 0.15,
+            topShelfY - (i * 8),
+            60,
+            30,
+          ),
+          const Radius.circular(3),
+        ),
+        paint,
+      );
+    }
+    
+    // Stack of t-shirts
+    final tshirtColors = [
+      const Color(0xFF43A047),
+      const Color(0xFF1E88E5),
+      const Color(0xFFE53935),
+      const Color(0xFFFDD835),
+    ];
+    
+    for (int i = 0; i < tshirtColors.length; i++) {
+      paint.color = tshirtColors[i].withOpacity(progress * 0.9);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            size.width * 0.35,
+            topShelfY - (i * 7),
+            55,
+            25,
+          ),
+          const Radius.circular(3),
+        ),
+        paint,
+      );
+    }
+    
+    // Stack of sweaters
+    final sweaterColors = [
+      const Color(0xFF6D4C41),
+      const Color(0xFF455A64),
+      const Color(0xFF512DA8),
+    ];
+    
+    for (int i = 0; i < sweaterColors.length; i++) {
+      paint.color = sweaterColors[i].withOpacity(progress * 0.9);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            size.width * 0.55,
+            topShelfY - (i * 10),
+            70,
+            35,
+          ),
+          const Radius.circular(4),
+        ),
+        paint,
+      );
+    }
+    
+    // Accessories box
+    paint.color = const Color(0xFF795548).withOpacity(progress * 0.9);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.75,
+          topShelfY - 10,
+          50,
+          40,
+        ),
+        const Radius.circular(4),
+      ),
+      paint,
+    );
+    
+    // Bottom shelf items
+    final bottomShelfY = size.height * 0.85 - 30;
+    
+    // Shoe boxes
+    final shoeBoxColors = [
+      const Color(0xFF37474F),
+      const Color(0xFF263238),
+      const Color(0xFF212121),
+    ];
+    
+    for (int i = 0; i < 3; i++) {
+      paint.color = shoeBoxColors[i].withOpacity(progress * 0.9);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            size.width * (0.15 + i * 0.25),
+            bottomShelfY,
+            size.width * 0.18,
+            25,
+          ),
+          const Radius.circular(3),
+        ),
+        paint,
+      );
+      
+      // Brand stripe
+      paint.color = Colors.white.withOpacity(progress * 0.3);
+      canvas.drawRect(
+        Rect.fromLTWH(
+          size.width * (0.15 + i * 0.25) + 5,
+          bottomShelfY + 10,
+          size.width * 0.18 - 10,
+          3,
+        ),
+        paint,
+      );
+    }
   }
 }
 
