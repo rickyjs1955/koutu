@@ -16,7 +16,7 @@ call flutter pub get
 
 echo.
 echo Step 4: Building with enhanced wardrobe animation...
-echo This will include the 30%% larger wardrobe opening effect...
+echo This will include the proportionally 30%% larger wardrobe doors...
 call flutter build web --release
 
 echo.
@@ -38,7 +38,7 @@ echo   1. Ensure phone is on same WiFi network
 echo   2. Find your IP with 'ipconfig' command
 echo   3. Visit http://[YOUR-IP]:8888 on phone
 echo.
-echo The splash screen will show the 30%% larger wardrobe doors!
+echo The splash screen will show the proportionally 30%% larger wardrobe doors!
 echo.
 echo Press Ctrl+C to stop the server
 echo.
