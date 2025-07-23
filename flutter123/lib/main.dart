@@ -229,8 +229,8 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
                         Flexible(
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
-                              maxWidth: math.min(size.width * 0.95, 1000),
-                              maxHeight: size.height * 0.6,
+                              maxWidth: math.min(size.width * 0.95, 1300),
+                              maxHeight: size.height * 0.78,
                             ),
                             child: AspectRatio(
                               aspectRatio: 1.5,
