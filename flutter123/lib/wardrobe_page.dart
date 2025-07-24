@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'models/clothing_item.dart';
+import 'models/wardrobe.dart';
 
 class WardrobePage extends StatefulWidget {
   const WardrobePage({Key? key}) : super(key: key);
@@ -15,13 +16,16 @@ class _WardrobePageState extends State<WardrobePage> {
   int _selectedIndex = 0;
   final ImagePicker _picker = ImagePicker();
   
+  // Store wardrobes
+  List<Wardrobe> wardrobes = [];
+  
   // Store clothing items
   List<ClothingItem> wardrobeItems = [];
   
   // For web compatibility - store image data
   Map<String, Uint8List> imageDataMap = {};
   
-  bool get isWardrobeEmpty => wardrobeItems.isEmpty;
+  bool get hasNoWardrobes => wardrobes.isEmpty;
   
   Future<void> _pickImage(ImageSource source) async {
     try {
@@ -66,8 +70,8 @@ class _WardrobePageState extends State<WardrobePage> {
         child: IndexedStack(
           index: _selectedIndex,
           children: [
+            _buildMainTab(),
             _buildWardrobeTab(),
-            _buildAddItemTab(),
             _buildOutfitTab(),
             _buildProfileTab(),
           ],
@@ -97,12 +101,12 @@ class _WardrobePageState extends State<WardrobePage> {
           unselectedItemColor: Colors.grey,
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.checkroom),
-              label: 'Wardrobe',
+              icon: Icon(Icons.home),
+              label: 'Main',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.add_circle_outline),
-              label: 'Add Item',
+              icon: Icon(Icons.checkroom),
+              label: 'Wardrobe',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.style),
@@ -118,8 +122,43 @@ class _WardrobePageState extends State<WardrobePage> {
     );
   }
   
+  Widget _buildMainTab() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.home,
+              size: 80,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Main',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Coming soon',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
   Widget _buildWardrobeTab() {
-    if (isWardrobeEmpty) {
+    if (hasNoWardrobes) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -135,14 +174,14 @@ class _WardrobePageState extends State<WardrobePage> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.checkroom,
+                  Icons.folder_special,
                   size: 60,
                   color: const Color(0xFF8B6F47).withOpacity(0.5),
                 ),
               ),
               const SizedBox(height: 24),
               Text(
-                'Your wardrobe is empty',
+                'No wardrobes yet',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w600,
@@ -151,7 +190,7 @@ class _WardrobePageState extends State<WardrobePage> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Add your first clothing item to get started',
+                'Create your first wardrobe to organize your clothes',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[600],
@@ -159,13 +198,9 @@ class _WardrobePageState extends State<WardrobePage> {
               ),
               const SizedBox(height: 32),
               ElevatedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _selectedIndex = 1; // Go to Add Item tab
-                  });
-                },
+                onPressed: () => _showCreateWardrobeDialog(),
                 icon: const Icon(Icons.add),
-                label: const Text('Add Item'),
+                label: const Text('Create Wardrobe'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF8B6F47),
                   foregroundColor: Colors.white,
@@ -185,7 +220,7 @@ class _WardrobePageState extends State<WardrobePage> {
       );
     }
     
-    // Display wardrobe items in a grid
+    // Display wardrobes list
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -197,19 +232,18 @@ class _WardrobePageState extends State<WardrobePage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'My Wardrobe',
+                  'My Wardrobes',
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: const Color(0xFF2C2C2C),
                   ),
                 ),
-                Text(
-                  '${wardrobeItems.length} items',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
+                IconButton(
+                  onPressed: () => _showCreateWardrobeDialog(),
+                  icon: const Icon(Icons.add_circle),
+                  color: const Color(0xFF8B6F47),
+                  iconSize: 32,
                 ),
               ],
             ),
@@ -220,81 +254,68 @@ class _WardrobePageState extends State<WardrobePage> {
                 crossAxisCount: 2,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 0.8,
+                childAspectRatio: 1.0,
               ),
-              itemCount: wardrobeItems.length,
+              itemCount: wardrobes.length,
               itemBuilder: (context, index) {
-                final item = wardrobeItems[index];
-                final imageData = imageDataMap[item.id];
+                final wardrobe = wardrobes[index];
                 
                 return GestureDetector(
                   onTap: () {
-                    // TODO: Show item details
+                    // TODO: Navigate to wardrobe details
                   },
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 10,
                           offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Stack(
-                        children: [
-                          // Display image
-                          Positioned.fill(
-                            child: imageData != null
-                                ? Image.memory(
-                                    imageData,
-                                    fit: BoxFit.cover,
-                                  )
-                                : Container(
-                                    color: Colors.grey[300],
-                                    child: const Icon(
-                                      Icons.image,
-                                      size: 50,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8B6F47).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          // Gradient overlay at bottom
-                          Positioned(
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            child: Container(
-                              height: 60,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    Colors.black.withOpacity(0.7),
-                                  ],
-                                ),
-                              ),
+                          child: Icon(
+                            Icons.folder_special,
+                            size: 40,
+                            color: const Color(0xFF8B6F47),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Text(
+                            wardrobe.name,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2C2C2C),
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
                           ),
-                          // Date added
-                          Positioned(
-                            bottom: 8,
-                            left: 8,
-                            child: Text(
-                              'Added ${_formatDate(item.addedDate)}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${wardrobe.itemCount} items',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -306,83 +327,78 @@ class _WardrobePageState extends State<WardrobePage> {
     );
   }
   
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
+  void _showCreateWardrobeDialog() {
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController descriptionController = TextEditingController();
     
-    if (difference.inDays == 0) {
-      return 'today';
-    } else if (difference.inDays == 1) {
-      return 'yesterday';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
-  }
-  
-  Widget _buildAddItemTab() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: const Color(0xFF8B6F47).withOpacity(0.1),
-                shape: BoxShape.circle,
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Create New Wardrobe'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Wardrobe Name',
+                  hintText: 'e.g., Summer Collection, Work Clothes',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
               ),
-              child: const Icon(
-                Icons.camera_alt,
-                size: 50,
-                color: Color(0xFF8B6F47),
+              const SizedBox(height: 16),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description (Optional)',
+                  hintText: 'Add a description...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
               ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Add New Item',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF2C2C2C),
-              ),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () => _pickImage(ImageSource.camera),
-              icon: const Icon(Icons.camera_alt),
-              label: const Text('Take Photo'),
+            ElevatedButton(
+              onPressed: () {
+                if (nameController.text.trim().isNotEmpty) {
+                  final newWardrobe = Wardrobe(
+                    id: Wardrobe.generateId(),
+                    name: nameController.text.trim(),
+                    createdDate: DateTime.now(),
+                    description: descriptionController.text.trim().isEmpty 
+                        ? null 
+                        : descriptionController.text.trim(),
+                  );
+                  
+                  setState(() {
+                    wardrobes.add(newWardrobe);
+                  });
+                  
+                  Navigator.of(context).pop();
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Wardrobe "${newWardrobe.name}" created'),
+                      backgroundColor: const Color(0xFF8B6F47),
+                    ),
+                  );
+                }
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF8B6F47),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                minimumSize: const Size(200, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: () => _pickImage(ImageSource.gallery),
-              icon: const Icon(Icons.photo_library),
-              label: const Text('Choose from Gallery'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF8B6F47),
-                side: const BorderSide(color: Color(0xFF8B6F47)),
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                minimumSize: const Size(200, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+              child: const Text('Create'),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
   
@@ -393,34 +409,26 @@ class _WardrobePageState extends State<WardrobePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: const Color(0xFF8B6F47).withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.style,
-                size: 60,
-                color: const Color(0xFF8B6F47).withOpacity(0.5),
-              ),
+            Icon(
+              Icons.style,
+              size: 80,
+              color: Colors.grey[400],
             ),
             const SizedBox(height: 24),
-            const Text(
-              'No outfits yet',
+            Text(
+              'Outfit',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF2C2C2C),
+                color: Colors.grey[600],
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              'Add clothing items to start creating outfits',
+              'Coming soon',
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey[600],
+                color: Colors.grey[500],
               ),
             ),
           ],
