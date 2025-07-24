@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'wardrobe_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -150,7 +151,7 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
             Future.delayed(const Duration(seconds: 2), () {
               if (mounted) {
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => const HomePage()),
+                  MaterialPageRoute(builder: (context) => const WardrobePage()),
                 );
               }
             });
@@ -493,70 +494,6 @@ class _HelloSplashScreenState extends State<HelloSplashScreen>
   }
 }
 
-class HomePage extends StatelessWidget {
-  const HomePage({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5E6D3),
-      appBar: AppBar(
-        title: const Text('KOUTU'),
-        backgroundColor: const Color(0xFF8B6F47),
-        elevation: 0,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.checkroom,
-              size: 100,
-              color: const Color(0xFF8B6F47),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Welcome to KOUTU!',
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF5D4037),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Your Digital Wardrobe',
-              style: TextStyle(
-                fontSize: 18,
-                color: const Color(0xFF8B6F47),
-              ),
-            ),
-            const SizedBox(height: 40),
-            ElevatedButton.icon(
-              onPressed: () {
-                // Restart the app to show animation again
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const HelloSplashScreen()),
-                  (route) => false,
-                );
-              },
-              icon: const Icon(Icons.replay),
-              label: const Text('Replay Animation'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8B6F47),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // Custom painter for clothing items inside wardrobe
 class ClothingPainter extends CustomPainter {
