@@ -1,46 +1,25 @@
 @echo off
-echo 🚀 Building and Serving KOUTU with Enhanced Wardrobe Effect
-echo ==========================================================
+echo 🚀 Running KOUTU with Flutter Development Server
+echo ===============================================
 echo.
 
-echo Step 1: Navigating to Flutter directory...
-cd /d "%~dp0\..\flutter"
-
+echo Finding your IP address for phone access...
 echo.
-echo Step 2: Cleaning previous build...
-call flutter clean >nul 2>&1
-
-echo.
-echo Step 3: Getting dependencies...
-call flutter pub get
-
-echo.
-echo Step 4: Building with enhanced wardrobe animation...
-echo This will include the proportionally 30%% larger wardrobe doors...
-call flutter build web --release
-
-echo.
-echo ✅ Build complete with enhanced wardrobe effect!
+echo Your computer's IP addresses:
+echo ============================
+for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do echo %%a
 echo.
 
-echo Step 5: Starting multi-platform server...
-cd build\web
-
+echo Starting Flutter development server...
 echo.
-echo 📱 Server starting on port 8888...
+echo The app will be accessible at:
+echo   - Local: http://localhost:5000
+echo   - Phone: http://[YOUR-IP]:5000
+echo     (Use one of the IP addresses shown above)
 echo.
-echo Access your app with the enlarged wardrobe effect:
-echo   - Local: http://localhost:8888
-echo   - Network: http://%COMPUTERNAME%:8888
-echo.
-echo To access from your phone:
-echo   1. Ensure phone is on same WiFi network
-echo   2. Find your IP with 'ipconfig' command
-echo   3. Visit http://[YOUR-IP]:8888 on phone
-echo.
-echo The splash screen will show the proportionally 30%% larger wardrobe doors!
+echo Make sure your phone is on the same WiFi network!
 echo.
 echo Press Ctrl+C to stop the server
 echo.
 
-python -m http.server 8888
+flutter run -d chrome --web-port=5000
