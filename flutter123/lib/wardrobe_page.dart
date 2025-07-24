@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'models/clothing_item.dart';
 
 class WardrobePage extends StatefulWidget {
   const WardrobePage({Key? key}) : super(key: key);
@@ -9,9 +13,50 @@ class WardrobePage extends StatefulWidget {
 
 class _WardrobePageState extends State<WardrobePage> {
   int _selectedIndex = 0;
+  final ImagePicker _picker = ImagePicker();
   
-  // For now, we'll track if the wardrobe is empty
-  bool isWardrobeEmpty = true;
+  // Store clothing items
+  List<ClothingItem> wardrobeItems = [];
+  
+  // For web compatibility - store image data
+  Map<String, Uint8List> imageDataMap = {};
+  
+  bool get isWardrobeEmpty => wardrobeItems.isEmpty;
+  
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        maxWidth: 1800,
+        maxHeight: 1800,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        // Read image data for web compatibility
+        final bytes = await image.readAsBytes();
+        final String id = ClothingItem.generateId();
+        
+        // Create clothing item
+        final newItem = ClothingItem(
+          id: id,
+          imagePath: image.path,
+          addedDate: DateTime.now(),
+        );
+        
+        setState(() {
+          wardrobeItems.add(newItem);
+          imageDataMap[id] = bytes;
+          // After adding item, switch to wardrobe tab
+          _selectedIndex = 0;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error picking image: $e')),
+      );
+    }
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -140,10 +185,140 @@ class _WardrobePageState extends State<WardrobePage> {
       );
     }
     
-    // TODO: Implement wardrobe grid view when items exist
-    return const Center(
-      child: Text('Wardrobe items will appear here'),
+    // Display wardrobe items in a grid
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'My Wardrobe',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF2C2C2C),
+                  ),
+                ),
+                Text(
+                  '${wardrobeItems.length} items',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.8,
+              ),
+              itemCount: wardrobeItems.length,
+              itemBuilder: (context, index) {
+                final item = wardrobeItems[index];
+                final imageData = imageDataMap[item.id];
+                
+                return GestureDetector(
+                  onTap: () {
+                    // TODO: Show item details
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Stack(
+                        children: [
+                          // Display image
+                          Positioned.fill(
+                            child: imageData != null
+                                ? Image.memory(
+                                    imageData,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Container(
+                                    color: Colors.grey[300],
+                                    child: const Icon(
+                                      Icons.image,
+                                      size: 50,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                          ),
+                          // Gradient overlay at bottom
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              height: 60,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Colors.black.withOpacity(0.7),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Date added
+                          Positioned(
+                            bottom: 8,
+                            left: 8,
+                            child: Text(
+                              'Added ${_formatDate(item.addedDate)}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
+  }
+  
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    
+    if (difference.inDays == 0) {
+      return 'today';
+    } else if (difference.inDays == 1) {
+      return 'yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
   }
   
   Widget _buildAddItemTab() {
@@ -177,9 +352,7 @@ class _WardrobePageState extends State<WardrobePage> {
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: () {
-                // TODO: Implement camera functionality
-              },
+              onPressed: () => _pickImage(ImageSource.camera),
               icon: const Icon(Icons.camera_alt),
               label: const Text('Take Photo'),
               style: ElevatedButton.styleFrom(
@@ -194,9 +367,7 @@ class _WardrobePageState extends State<WardrobePage> {
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
-              onPressed: () {
-                // TODO: Implement gallery functionality
-              },
+              onPressed: () => _pickImage(ImageSource.gallery),
               icon: const Icon(Icons.photo_library),
               label: const Text('Choose from Gallery'),
               style: OutlinedButton.styleFrom(
