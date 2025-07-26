@@ -57,6 +57,7 @@ interface TestExportJob {
   created_at: string;
   updated_at: string;
   completed_at?: string;
+  timeouts?: NodeJS.Timeout[];
 }
 
 interface TestGarment {
@@ -71,10 +72,10 @@ interface TestGarment {
 
 // ==================== GLOBAL TEST STATE ====================
 
-const testUsers = new Map<string, TestUser>();
-const exportJobs = new Map<string, TestExportJob>();
-const garments = new Map<string, TestGarment>();
-const results: any[] = [];
+let testUsers = new Map<string, TestUser>();
+let exportJobs = new Map<string, TestExportJob>();
+let garments = new Map<string, TestGarment>();
+let results: any[] = [];
 
 let primaryUser: TestUser;
 let secondaryUser: TestUser;
@@ -168,13 +169,17 @@ const createTestApp = (): Express => {
     
     exportJobs.set(jobId, job);
     
-    // Simulate background processing
-    setTimeout(() => {
+    // Simulate background processing with cleanup
+    const timeout1 = setTimeout(() => {
+      if (!exportJobs.has(jobId)) return; // Job was deleted, skip
+      
       job.status = 'processing';
       job.progress = 50;
       job.processed_items = 50;
       
-      setTimeout(() => {
+      const timeout2 = setTimeout(() => {
+        if (!exportJobs.has(jobId)) return; // Job was deleted, skip
+        
         job.status = 'completed';
         job.progress = 100;
         job.processed_items = 100;
@@ -182,7 +187,15 @@ const createTestApp = (): Express => {
         job.file_size = 1024 * 1024 * 10; // 10MB
         job.completed_at = new Date().toISOString();
       }, 100);
+      
+      // Store timeout for cleanup if needed
+      if (!job.timeouts) job.timeouts = [];
+      job.timeouts.push(timeout2);
     }, 50);
+    
+    // Store timeout for cleanup if needed
+    if (!job.timeouts) job.timeouts = [];
+    job.timeouts.push(timeout1);
     
     res.status(202).json({
       success: true,
@@ -398,6 +411,14 @@ const createTestApp = (): Express => {
 
 // ==================== TEST HELPERS ====================
 
+const cleanupJob = (jobId: string): void => {
+  const job = exportJobs.get(jobId);
+  if (job && job.timeouts) {
+    job.timeouts.forEach(timeout => clearTimeout(timeout));
+  }
+  exportJobs.delete(jobId);
+};
+
 const createMockGarments = (userId: string, count: number): void => {
   const categories = ['shirts', 'pants', 'dresses', 'shoes'];
   
@@ -494,6 +515,13 @@ describe('Export Routes Performance Tests', () => {
     app = createTestApp();
   });
   
+  afterEach(() => {
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+    }
+  });
+
   afterAll(async () => {
     // Save performance results
     const timestamp = new Date().toISOString().replace(/:/g, '-');
@@ -502,6 +530,23 @@ describe('Export Routes Performance Tests', () => {
     await fs.writeFile(resultsPath, JSON.stringify(results, null, 2));
     
     console.log(`Performance results saved to: ${resultsPath}`);
+    
+    // Clean up all test data to prevent memory leaks
+    // Clear all job timeouts first
+    exportJobs.forEach((job, jobId) => {
+      cleanupJob(jobId);
+    });
+    
+    testUsers.clear();
+    garments.clear();
+    results = [];
+    
+    // Clear references
+    testUsers = null as any;
+    exportJobs = null as any;
+    garments = null as any;
+    primaryUser = null as any;
+    secondaryUser = null as any;
   });
   
   describe('Response Time Tests', () => {
@@ -809,12 +854,18 @@ describe('Export Routes Performance Tests', () => {
   
   describe('Memory Usage Tests', () => {
     test('Memory efficiency with many export jobs', async () => {
+      // Force garbage collection before test
+      if (global.gc) {
+        global.gc();
+      }
+      
       const initialMemory = process.memoryUsage();
       const jobCount = 1000;
+      const createdJobIds: string[] = [];
       
       // Create many export jobs
       for (let i = 0; i < jobCount; i++) {
-        await request(app)
+        const response = await request(app)
           .post('/api/v1/export/ml')
           .set('Authorization', `Bearer ${primaryUser.token}`)
           .send({
@@ -829,6 +880,15 @@ describe('Export Routes Performance Tests', () => {
               }
             }
           });
+        
+        if (response.body.data?.jobId) {
+          createdJobIds.push(response.body.data.jobId);
+        }
+      }
+      
+      // Force garbage collection after creating jobs
+      if (global.gc) {
+        global.gc();
       }
       
       const finalMemory = process.memoryUsage();
@@ -850,6 +910,11 @@ describe('Export Routes Performance Tests', () => {
       
       results.push(result);
       console.log('\nMemory usage:', result.memoryIncrease);
+      
+      // Clean up created jobs to prevent memory leak
+      createdJobIds.forEach(jobId => {
+        cleanupJob(jobId);
+      });
       
       // Memory usage should be reasonable
       expect(memoryIncrease.heapUsed).toBeLessThan(200); // Less than 200MB for 1000 jobs
@@ -884,16 +949,18 @@ describe('Export Routes Performance Tests', () => {
         const checkTime = performance.now() - checkStart;
         const job = statusResponse.body.data;
         
-        statusChecks.push({
-          attempt: attempts + 1,
-          status: job.status,
-          progress: job.progress,
-          checkTime: parseFloat(checkTime.toFixed(2)),
-          totalElapsed: parseFloat((performance.now() - startTime).toFixed(2))
-        });
-        
-        if (job.status === 'completed') {
-          completed = true;
+        if (job) {
+          statusChecks.push({
+            attempt: attempts + 1,
+            status: job.status,
+            progress: job.progress,
+            checkTime: parseFloat(checkTime.toFixed(2)),
+            totalElapsed: parseFloat((performance.now() - startTime).toFixed(2))
+          });
+          
+          if (job.status === 'completed') {
+            completed = true;
+          }
         }
         
         attempts++;
