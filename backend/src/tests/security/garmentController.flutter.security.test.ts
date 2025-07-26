@@ -54,6 +54,13 @@ jest.mock('../../middlewares/errorHandler', () => ({
       error.type = 'not_found';
       return error;
     }),
+    authorizationDenied: jest.fn((message: string = 'Access denied', resource?: string) => {
+      const error = new Error(message) as any;
+      error.statusCode = 403;
+      error.resource = resource;
+      error.type = 'authorization';
+      return error;
+    }),
     internalError: jest.fn((message?: string, cause?: Error) => {
       const error = new Error(message || 'Internal server error') as any;
       error.statusCode = 500;
