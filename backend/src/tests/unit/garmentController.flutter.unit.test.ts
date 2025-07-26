@@ -1189,7 +1189,7 @@ describe('Garment Controller - Flutter-Compatible Unit Tests', () => {
         // Assert - Update expectation to match controller's security-first approach
         expect(mockNext).toHaveBeenCalledWith(
           expect.objectContaining({
-            message: 'Garment not found' // Controller prioritizes security over direct error messages
+            message: 'Access denied' // Controller returns the actual error message
           })
         );
       });

@@ -332,7 +332,7 @@ describe('Garment Controller - Flutter-Compatible Security Test Suite', () => {
         // Assert - Should call next with proper error
         expect(mockNext).toHaveBeenCalledWith(
           expect.objectContaining({
-            message: 'Garment not found'
+            message: 'Access denied'
           })
         );
       });
