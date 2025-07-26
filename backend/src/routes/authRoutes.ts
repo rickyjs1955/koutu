@@ -81,17 +81,21 @@ const UpdateEmailSchema = z.object({
 
 // ==================== MOBILE-SPECIFIC VALIDATION SCHEMAS ====================
 
+// Define safe fallback patterns for testing
+const DEVICE_ID_PATTERN = MobileValidation?.MOBILE_PATTERNS?.deviceId || /^[a-zA-Z0-9\-_]{16,128}$/;
+const PUSH_TOKEN_PATTERN = MobileValidation?.MOBILE_PATTERNS?.pushToken || /^[a-zA-Z0-9\-_:]{32,512}$/;
+
 // Mobile registration schema with device info
 const MobileRegisterSchema = RegisterSchema.extend({
-  device_id: z.string().regex(MobileValidation.MOBILE_PATTERNS.deviceId),
+  device_id: z.string().regex(DEVICE_ID_PATTERN),
   device_type: z.enum(['ios', 'android']),
   device_name: z.string().max(100).optional(),
-  push_token: z.string().regex(MobileValidation.MOBILE_PATTERNS.pushToken).optional()
+  push_token: z.string().regex(PUSH_TOKEN_PATTERN).optional()
 });
 
 // Mobile login schema with device tracking
 const MobileLoginSchema = LoginSchema.extend({
-  device_id: z.string().regex(MobileValidation.MOBILE_PATTERNS.deviceId),
+  device_id: z.string().regex(DEVICE_ID_PATTERN),
   device_type: z.enum(['ios', 'android']),
   remember_device: z.boolean().default(false)
 });
@@ -99,14 +103,14 @@ const MobileLoginSchema = LoginSchema.extend({
 // Biometric registration schema
 const BiometricRegistrationSchema = z.object({
   biometric_type: z.enum(['fingerprint', 'face_id', 'touch_id']),
-  device_id: z.string().regex(MobileValidation.MOBILE_PATTERNS.deviceId),
+  device_id: z.string().regex(DEVICE_ID_PATTERN),
   public_key: z.string() // For secure key exchange
 });
 
 // Refresh token schema
 const RefreshTokenSchema = z.object({
   refresh_token: z.string(),
-  device_id: z.string().regex(MobileValidation.MOBILE_PATTERNS.deviceId).optional()
+  device_id: z.string().regex(DEVICE_ID_PATTERN).optional()
 });
 
 // ==================== ENHANCED CONTROLLERS (UNCHANGED) ====================

@@ -30,6 +30,9 @@
     "docker:logs:firebase": "docker-compose logs firebase-emulator",
     "test:setup": "npm run docker:test-up && sleep 5 && npm run migrate:test",
     "test:full": "npm run test:setup && npm run test:int",
+    "test:stress": "node --max-old-space-size=4096 --expose-gc node_modules/.bin/jest --config=jest.stress.config.js --runInBand",
+    "test:stress:watch": "node --max-old-space-size=4096 --expose-gc node_modules/.bin/jest --config=jest.stress.config.js --runInBand --watch",
+    "test:stress:auth": "node --max-old-space-size=4096 --expose-gc node_modules/.bin/jest --config=jest.stress.config.js --runInBand src/tests/stress/authRoutes.stress.test.ts",
     "db:connect": "docker exec -it koutu-postgres-test psql -U postgres -d koutu_test",
     "db:reset": "docker-compose restart postgres-test"
   },

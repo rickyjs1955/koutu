@@ -1,0 +1,10 @@
+{
+  "name": "backend-stress-tests",
+  "version": "1.0.0",
+  "scripts": {
+    "test:stress": "node --max-old-space-size=4096 --expose-gc node_modules/.bin/jest --config=jest.stress.config.js --runInBand",
+    "test:stress:watch": "node --max-old-space-size=4096 --expose-gc node_modules/.bin/jest --config=jest.stress.config.js --runInBand --watch",
+    "test:stress:auth": "node --max-old-space-size=4096 --expose-gc node_modules/.bin/jest --config=jest.stress.config.js --runInBand src/tests/stress/authRoutes.stress.test.ts",
+    "test:stress:debug": "node --inspect-brk --max-old-space-size=4096 --expose-gc node_modules/.bin/jest --config=jest.stress.config.js --runInBand"
+  }
+}

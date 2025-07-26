@@ -19,6 +19,9 @@ module.exports = {
     '!src/**/__mocks__/**',
     '!src/**/__helpers__/**'
   ],
+  setupFiles: [
+    '<rootDir>/src/tests/pre-setup.ts'
+  ],
   setupFilesAfterEnv: [
     '<rootDir>/src/tests/setup.ts'
   ],

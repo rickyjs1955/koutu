@@ -5,11 +5,26 @@ import { Request, Response, NextFunction } from 'express';
 import { wardrobeController } from '../../controllers/wardrobeController';
 import { garmentModel } from '../../models/garmentModel';
 import { wardrobeModel } from '../../models/wardrobeModel';
+import { wardrobeService } from '../../services/wardrobeService';
 import { wardrobeMocks } from '../__mocks__/wardrobes.mock';
 
 // Mock the models
 jest.mock('../../models/wardrobeModel');
 jest.mock('../../models/garmentModel');
+
+// Mock the wardrobeService
+jest.mock('../../services/wardrobeService', () => ({
+  wardrobeService: {
+    createWardrobe: jest.fn(),
+    getWardrobes: jest.fn(),
+    getWardrobe: jest.fn(),
+    updateWardrobe: jest.fn(),
+    deleteWardrobe: jest.fn(),
+    addGarmentToWardrobe: jest.fn(),
+    removeGarmentFromWardrobe: jest.fn(),
+    reorderGarments: jest.fn()
+  }
+}));
 
 // Advanced sanitization mock with more sophisticated tracking
 jest.mock('../../utils/sanitize', () => ({
@@ -341,9 +356,10 @@ describe('wardrobeController - Advanced Security Tests (Part 2)', () => {
 
         mockReq.params = { id: validWardrobeId };
         mockReq.body = { garmentId: validGarmentId };
-        mockWardrobeModel.findById.mockResolvedValue(userWardrobe);
-        mockGarmentModel.findById.mockResolvedValue(externalGarment);
-        mockWardrobeModel.addGarment.mockResolvedValue(true);
+        
+        // Mock the service to resolve successfully
+        const mockWardrobeService = wardrobeService as jest.Mocked<typeof wardrobeService>;
+        mockWardrobeService.addGarmentToWardrobe.mockResolvedValue(undefined);
 
         await wardrobeController.addGarmentToWardrobe(
           mockReq as Request,
@@ -351,7 +367,14 @@ describe('wardrobeController - Advanced Security Tests (Part 2)', () => {
           mockNext
         );
 
-        expect(mockWardrobeModel.addGarment).toHaveBeenCalled();
+        expect(mockWardrobeService.addGarmentToWardrobe).toHaveBeenCalledWith({
+          wardrobeId: validWardrobeId,
+          userId: mockUser.id,
+          garmentId: validGarmentId,
+          position: 0  // validatePosition defaults undefined to 0
+        });
+        
+        expect(mockRes.success).toHaveBeenCalled();
       });
     });
   });
@@ -366,7 +389,9 @@ describe('wardrobeController - Advanced Security Tests (Part 2)', () => {
         ) as Error & { code?: string };
         detailedDbError.code = '23505';
 
-        mockWardrobeModel.create.mockRejectedValue(detailedDbError);
+        // Mock the service to throw the database error
+        const mockWardrobeService = wardrobeService as jest.Mocked<typeof wardrobeService>;
+        mockWardrobeService.createWardrobe.mockRejectedValue(detailedDbError);
 
         const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -569,14 +594,11 @@ describe('wardrobeController - Advanced Security Tests (Part 2)', () => {
 
         mockReq.params = { id: validWardrobeId };
         mockReq.body = { garmentPositions: partialReorder };
-        mockWardrobeModel.findById.mockResolvedValue(userWardrobe);
 
-        // First operation succeeds, second fails
-        mockWardrobeModel.removeGarment
-          .mockResolvedValueOnce(true)
-          .mockRejectedValueOnce(new Error('Constraint violation'));
-
-        mockWardrobeModel.addGarment.mockResolvedValue(true);
+        // Mock the service to reject with a partial failure error
+        const mockWardrobeService = wardrobeService as jest.Mocked<typeof wardrobeService>;
+        const partialFailureError = new Error('Failed to reorder garments. Some positions may have been updated.');
+        mockWardrobeService.reorderGarments.mockRejectedValue(partialFailureError);
 
         await expect(
           wardrobeController.reorderGarments(
@@ -584,11 +606,14 @@ describe('wardrobeController - Advanced Security Tests (Part 2)', () => {
             mockRes as Response,
             mockNext
           )
-        ).rejects.toThrow('Failed to reorder garments. Some positions may have been updated.');
+        ).rejects.toThrow('Failed to reorder garments');
 
-        // Should indicate partial completion without exposing internal state
-        expect(mockWardrobeModel.removeGarment).toHaveBeenCalledTimes(2);
-        expect(mockWardrobeModel.addGarment).toHaveBeenCalledTimes(1);
+        // Verify the service was called with the correct parameters
+        expect(mockWardrobeService.reorderGarments).toHaveBeenCalledWith(
+          validWardrobeId,
+          mockUser.id,
+          ['a0000000-e4f5-1789-abcd-ef0123456789', 'a0000001-e4f5-1789-abcd-ef0123456789']
+        );
       });
 
       it('should prevent error amplification attacks', async () => {
@@ -596,7 +621,8 @@ describe('wardrobeController - Advanced Security Tests (Part 2)', () => {
         mockReq.body = { name: 'Cascade Test' };
 
         const cascadingError = new Error('Primary service unavailable');
-        mockWardrobeModel.create.mockRejectedValue(cascadingError);
+        const mockWardrobeService = wardrobeService as jest.Mocked<typeof wardrobeService>;
+        mockWardrobeService.createWardrobe.mockRejectedValue(cascadingError);
 
         // Should not trigger additional operations on failure
         await expect(
@@ -607,9 +633,11 @@ describe('wardrobeController - Advanced Security Tests (Part 2)', () => {
           )
         ).rejects.toThrow('Failed to create wardrobe');
 
-        // Verify no additional model calls were made
-        expect(mockWardrobeModel.findByUserId).not.toHaveBeenCalled();
-        expect(mockGarmentModel.findById).not.toHaveBeenCalled();
+        // Verify only the initial service call was made
+        expect(mockWardrobeService.createWardrobe).toHaveBeenCalledTimes(1);
+        // Verify no additional service calls were made
+        expect(mockWardrobeService.getWardrobes).not.toHaveBeenCalled();
+        expect(mockWardrobeService.getWardrobe).not.toHaveBeenCalled();
       });
     });
   });

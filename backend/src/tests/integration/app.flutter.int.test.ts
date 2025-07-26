@@ -15,6 +15,68 @@ const wardrobeStore: any[] = [];
 
 // ==================== CRITICAL: MOCK SHARED SCHEMAS FIRST ====================
 
+// Create the shared mock object
+const sharedSchemaMocks = {
+  // Export all the validation and schema mocks
+  UUIDSchema: {
+    parse: jest.fn((value) => value),
+    safeParse: jest.fn((value) => ({ success: true, data: value })),
+    optional: jest.fn().mockReturnThis(),
+    nullable: jest.fn().mockReturnThis()
+  },
+  ImageStatusSchema: {
+    parse: jest.fn((value) => value),
+    safeParse: jest.fn((value) => ({ success: true, data: value })),
+    optional: jest.fn().mockReturnThis(),
+    nullable: jest.fn().mockReturnThis()
+  },
+  TimestampSchema: {
+    parse: jest.fn((value) => value),
+    safeParse: jest.fn((value) => ({ success: true, data: value })),
+    optional: jest.fn().mockReturnThis(),
+    nullable: jest.fn().mockReturnThis()
+  },
+  UserSchema: {
+    parse: jest.fn((value) => value),
+    safeParse: jest.fn((value) => ({ success: true, data: value }))
+  },
+  CreateUserSchema: {
+    parse: jest.fn((value) => value),
+    safeParse: jest.fn((value) => ({ success: true, data: value }))
+  },
+  BiometricLoginSchema: {
+    parse: jest.fn((value) => value),
+    safeParse: jest.fn((value) => ({ success: true, data: value }))
+  },
+  DeviceRegistrationSchema: {
+    parse: jest.fn((value) => value),
+    safeParse: jest.fn((value) => ({ success: true, data: value }))
+  },
+  // Mobile validation constants and patterns
+  MobileValidation: {
+    MAX_MOBILE_FILE_SIZE: 5 * 1024 * 1024,
+    MAX_MOBILE_TEXT_LENGTH: 500,
+    MAX_MOBILE_ARRAY_LENGTH: 100,
+    MOBILE_IMAGE_FORMATS: ['jpeg', 'jpg', 'png', 'webp'],
+    MOBILE_PATTERNS: {
+      deviceId: /^[a-zA-Z0-9\-_]{16,128}$/,
+      biometricId: /^[a-zA-Z0-9\-_]{32,256}$/,
+      pushToken: /^[a-zA-Z0-9\-_:]{32,512}$/
+    }
+  },
+  // Mobile export formats
+  MobileExportFormats: {
+    IMAGE_THUMBNAIL: { width: 150, height: 150, quality: 0.7 },
+    IMAGE_PREVIEW: { width: 600, height: 600, quality: 0.8 },
+    IMAGE_FULL: { width: 1200, height: 1200, quality: 0.9 },
+    BATCH_SIZE: 20,
+    CHUNK_SIZE: 1024 * 1024 // 1MB chunks for progressive download
+  }
+};
+
+// Mock the main shared schemas index that exports MobileValidation
+jest.mock('../../../../shared/src/schemas', () => sharedSchemaMocks);
+
 // Mock the shared schemas that the app depends on
 jest.mock('../../../../shared/src/schemas/base/common', () => ({
   UUIDSchema: {
@@ -126,7 +188,31 @@ jest.mock('../../../../shared/src/schemas', () => ({
 jest.mock('../../../../shared/src/schemas/export', () => ({
   mlExportRequestSchema: {
     parse: jest.fn((value) => value),
-    safeParse: jest.fn((value) => ({ success: true, data: value }))
+    safeParse: jest.fn((value) => ({ success: true, data: value })),
+    extend: jest.fn(() => ({
+      parse: jest.fn((value) => value),
+      safeParse: jest.fn((value) => ({ success: true, data: value }))
+    }))
+  }
+}));
+
+// Mock the polygon schemas
+jest.mock('../../../../shared/src/schemas/polygon', () => ({
+  CreatePolygonSchema: {
+    parse: jest.fn((value) => value),
+    safeParse: jest.fn((value) => ({ success: true, data: value })),
+    extend: jest.fn(() => ({
+      parse: jest.fn((value) => value),
+      safeParse: jest.fn((value) => ({ success: true, data: value }))
+    }))
+  },
+  UpdatePolygonSchema: {
+    parse: jest.fn((value) => value),
+    safeParse: jest.fn((value) => ({ success: true, data: value })),
+    extend: jest.fn(() => ({
+      parse: jest.fn((value) => value),
+      safeParse: jest.fn((value) => ({ success: true, data: value }))
+    }))
   }
 }));
 
@@ -762,6 +848,69 @@ jest.mock('../../controllers/wardrobeController', () => ({
         });
       }
       res.status(200).json({ status: 'success', message: 'Garment removed from wardrobe' });
+    }),
+    reorderGarments: jest.fn((req: any, res: any, next: any) => {
+      if (!req.user) {
+        return res.status(401).json({ 
+          status: 'error', 
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required' 
+        });
+      }
+      res.status(200).json({ status: 'success', message: 'Garments reordered successfully' });
+    }),
+    getWardrobeStats: jest.fn((req: any, res: any, next: any) => {
+      if (!req.user) {
+        return res.status(401).json({ 
+          status: 'error', 
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required' 
+        });
+      }
+      res.status(200).json({ 
+        status: 'success', 
+        data: { 
+          totalGarments: 0,
+          createdDate: new Date().toISOString(),
+          lastUpdated: new Date().toISOString()
+        } 
+      });
+    }),
+    syncWardrobes: jest.fn((req: any, res: any, next: any) => {
+      if (!req.user) {
+        return res.status(401).json({ 
+          status: 'error', 
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required' 
+        });
+      }
+      res.status(200).json({ 
+        status: 'success', 
+        data: { 
+          created: [],
+          updated: [],
+          deleted: [],
+          conflicts: []
+        } 
+      });
+    }),
+    batchOperations: jest.fn((req: any, res: any, next: any) => {
+      if (!req.user) {
+        return res.status(401).json({ 
+          status: 'error', 
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required' 
+        });
+      }
+      res.status(200).json({ 
+        status: 'success', 
+        data: { 
+          results: [],
+          totalOperations: 0,
+          successCount: 0,
+          failedCount: 0
+        } 
+      });
     })
   }
 }));
@@ -795,6 +944,24 @@ jest.mock('../../controllers/imageController', () => ({
     }),
     batchUpdateStatus: jest.fn((req: any, res: any, next: any) => {
       res.status(200).json({ status: 'success', message: 'Batch update complete' });
+    }),
+    getMobileThumbnails: jest.fn((req: any, res: any, next: any) => {
+      res.status(200).json({ status: 'success', data: { images: [], page: 1, limit: 20 } });
+    }),
+    getMobileOptimizedImage: jest.fn((req: any, res: any, next: any) => {
+      res.status(200).json({ status: 'success', data: { id: 'test-image-id', url: '/test/mobile.jpg' } });
+    }),
+    batchGenerateThumbnails: jest.fn((req: any, res: any, next: any) => {
+      res.status(200).json({ status: 'success', data: { successCount: 1 } });
+    }),
+    getSyncData: jest.fn((req: any, res: any, next: any) => {
+      res.status(200).json({ status: 'success', data: { images: [] } });
+    }),
+    flutterUploadImage: jest.fn((req: any, res: any, next: any) => {
+      res.status(201).json({ status: 'success', data: { image: { id: 'test-image-id' } } });
+    }),
+    batchSyncOperations: jest.fn((req: any, res: any, next: any) => {
+      res.status(200).json({ status: 'success', data: { successCount: 1 } });
     })
   }
 }));
@@ -2155,6 +2322,17 @@ describe('🚀 App Integration Tests - Dual-Mode Compatible', () => {
         });
 
         it('should maintain referential integrity across related tables', async () => {
+          // Ensure test user exists in the database
+          const userCheck = await testDB.query('SELECT id FROM users WHERE id = $1', [testUser.id]);
+          if (userCheck.rows.length === 0) {
+            console.log('⚠️ Test user not found, creating user first');
+            await testDB.query(
+              `INSERT INTO users (id, email, firebase_uid, created_at, updated_at) 
+              VALUES ($1, $2, $3, NOW(), NOW())`,
+              [testUser.id, testUser.email, testUser.firebaseUid]
+            );
+          }
+          
           // Create wardrobe
           const wardrobeData = TestDataFactory.generateTestWardrobe(testUser.id);
           const wardrobe = await testDB.query(

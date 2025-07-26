@@ -1,4 +1,25 @@
 // tests/services/polygonService.security.test.ts
+
+// Mock opencv-wasm before any imports that might use it
+jest.mock('opencv-wasm', () => ({
+  default: {
+    Point: jest.fn(),
+    Mat: jest.fn(),
+    MatVector: jest.fn(),
+    Size: jest.fn(),
+    findContours: jest.fn(),
+    boundingRect: jest.fn(),
+    contourArea: jest.fn(),
+    convexHull: jest.fn(),
+    isContourConvex: jest.fn(),
+    CV_8UC1: 0,
+    CV_32SC1: 3,
+    CV_32FC2: 13,
+    RETR_EXTERNAL: 0,
+    CHAIN_APPROX_SIMPLE: 2
+  }
+}));
+
 import { polygonService } from '../../services/polygonService';
 import { polygonModel } from '../../models/polygonModel';
 import { imageModel } from '../../models/imageModel';

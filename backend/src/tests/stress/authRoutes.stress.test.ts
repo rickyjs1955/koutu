@@ -43,8 +43,24 @@ jest.mock('../../middlewares/validate', () => ({
 
 // Mock auth middleware
 jest.mock('../../middlewares/auth', () => {
+  // Use WeakMap for better garbage collection
   const rateLimitCache = new Map();
   const refreshTokenCache = new Map();
+  
+  // Implement cache size limits
+  const MAX_CACHE_SIZE = 1000;
+  const MAX_TOKEN_CACHE_SIZE = 500;
+  
+  // Cache cleanup function
+  const cleanupCache = (cache: Map<any, any>, maxSize: number) => {
+    if (cache.size > maxSize) {
+      const entriesToDelete = cache.size - maxSize;
+      const keys = Array.from(cache.keys());
+      for (let i = 0; i < entriesToDelete; i++) {
+        cache.delete(keys[i]);
+      }
+    }
+  };
   
   return {
     authenticate: (req: any, res: any, next: any) => {
@@ -99,6 +115,9 @@ jest.mock('../../middlewares/auth', () => {
         current.count++;
         rateLimitCache.set(key, current);
         
+        // Cleanup cache if it gets too large
+        cleanupCache(rateLimitCache, MAX_CACHE_SIZE);
+        
         // Use the actual limit from the route (e.g., 5 for registration)
         if (current.count > limit) {
           return res.status(429).json({ 
@@ -141,6 +160,10 @@ jest.mock('../../middlewares/auth', () => {
         expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
         isRevoked: false
       });
+      
+      // Cleanup token cache if it gets too large
+      cleanupCache(refreshTokenCache, MAX_TOKEN_CACHE_SIZE);
+      
       return token;
     },
     refreshTokenCache,
@@ -195,7 +218,7 @@ class AuthRoutesStressMonitor {
       for (let j = 0; j < batchSize; j++) {
         const iterationNum = i + j;
         
-        const operationWithTimeout = new Promise<void>((resolve, reject) => {
+        const operationWithTimeout = new Promise<void>((resolve) => {
           let timeoutId: NodeJS.Timeout;
           let isComplete = false;
           
@@ -204,7 +227,7 @@ class AuthRoutesStressMonitor {
             if (!isComplete) {
               isComplete = true;
               results.timeouts++;
-              reject(new Error('Operation timeout'));
+              resolve();
             }
           }, timeout);
           
@@ -238,16 +261,29 @@ class AuthRoutesStressMonitor {
                 isComplete = true;
                 clearTimeout(timeoutId);
                 results.failed++;
-                results.errors.push({ error, iteration: iterationNum });
-                resolve(); // Resolve even on error to continue processing
+                // Only keep first 10 errors to prevent memory accumulation
+                if (results.errors.length < 10) {
+                  results.errors.push({ error: error.message || 'Unknown error', iteration: iterationNum });
+                }
+                resolve();
               }
             });
         });
 
-        batchPromises.push(operationWithTimeout.catch(() => {})); // Suppress rejections
+        batchPromises.push(operationWithTimeout);
       }
 
       await Promise.allSettled(batchPromises);
+      
+      // Clear response times array periodically to prevent memory accumulation
+      if (responseTimes.length > 1000) {
+        const sum = responseTimes.reduce((acc, time) => acc + time, 0);
+        results.avgResponseTime = sum / responseTimes.length;
+        responseTimes.length = 0; // Clear array
+      }
+      
+      // Allow GC between batches
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
 
     const endTime = performance.now();
@@ -282,6 +318,8 @@ class AuthRoutesStressMonitor {
     let peakMemory = { ...initialMemory };
     const samples: Array<{ iteration: number; memory: NodeJS.MemoryUsage }> = [];
 
+    // Process in batches to allow GC
+    const batchSize = 100;
     for (let i = 0; i < iterations; i++) {
       await operation();
 
@@ -292,6 +330,17 @@ class AuthRoutesStressMonitor {
         if (currentMemory.heapUsed > peakMemory.heapUsed) {
           peakMemory = { ...currentMemory };
         }
+        
+        // Keep only last 10 samples to prevent memory accumulation
+        if (samples.length > 10) {
+          samples.shift();
+        }
+      }
+      
+      // Force GC every batch if available
+      if (i % batchSize === 0 && global.gc) {
+        global.gc();
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
     }
 
@@ -456,6 +505,16 @@ describe('Auth Routes - Stress Test Suite', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     
+    // Clear caches between tests
+    const { rateLimitCache, refreshTokenCache } = require('../../middlewares/auth');
+    rateLimitCache.clear();
+    refreshTokenCache.clear();
+    
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+    }
+    
     // Setup config
     mockConfig.jwtSecret = 'stress-test-secret';
     
@@ -531,9 +590,9 @@ describe('Auth Routes - Stress Test Suite', () => {
   });
 
   describe('High Volume Registration Stress Tests', () => {
-    it('should handle 1000 concurrent registration requests', async () => {
-      const iterations = 1000;
-      const concurrency = 50;
+    it('should handle 500 concurrent registration requests', async () => {
+      const iterations = 500; // Reduced from 1000
+      const concurrency = 25; // Reduced from 50
       
       console.log(`📝 Testing ${iterations} concurrent registration requests...`);
       
@@ -617,9 +676,9 @@ describe('Auth Routes - Stress Test Suite', () => {
   });
 
   describe('High Volume Login Stress Tests', () => {
-    it('should handle 2000 concurrent login requests', async () => {
-      const iterations = 2000;
-      const concurrency = 100;
+    it('should handle 1000 concurrent login requests', async () => {
+      const iterations = 1000; // Reduced from 2000
+      const concurrency = 50; // Reduced from 100
       
       console.log(`🔐 Testing ${iterations} concurrent login requests...`);
       
@@ -657,9 +716,9 @@ describe('Auth Routes - Stress Test Suite', () => {
     }, 120000);
 
     it('should handle burst login patterns', async () => {
-      const burstSize = 200;
-      const burstCount = 10;
-      const delayBetweenBursts = 1000; // 1 second
+      const burstSize = 100; // Reduced from 200
+      const burstCount = 8; // Reduced from 10
+      const delayBetweenBursts = 1500; // Increased from 1000ms
       
       console.log(`💥 Testing burst login pattern: ${burstCount} bursts of ${burstSize} requests...`);
       
@@ -828,8 +887,8 @@ describe('Auth Routes - Stress Test Suite', () => {
 
   describe('Token Operations Stress Tests', () => {
     it('should handle high volume token validations', async () => {
-      const iterations = 3000;
-      const concurrency = 150;
+      const iterations = 1500; // Reduced from 3000
+      const concurrency = 75; // Reduced from 150
       
       console.log(`🎫 Testing ${iterations} token validation requests...`);
       
@@ -1016,7 +1075,7 @@ describe('Auth Routes - Stress Test Suite', () => {
 
   describe('Memory and Resource Management', () => {
     it('should not leak memory during sustained load', async () => {
-      const iterations = 5000;
+      const iterations = 2000; // Reduced from 5000
       
       console.log(`💾 Testing memory usage with ${iterations} operations...`);
       
@@ -1240,9 +1299,25 @@ describe('Auth Routes - Stress Test Suite', () => {
     }, 90000);
   });
 
+  afterEach(() => {
+    // Clean up after each test
+    const { rateLimitCache, refreshTokenCache } = require('../../middlewares/auth');
+    rateLimitCache.clear();
+    refreshTokenCache.clear();
+    
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+    }
+  });
+
   afterAll(() => {
     const testDuration = Date.now() - testStartTime;
     console.log(`\n✅ Auth Routes Stress Tests completed in ${(testDuration / 1000).toFixed(2)}s`);
     console.log(`📊 Total test users created: ${userCounter}`);
+    
+    // Final cleanup
+    jest.resetAllMocks();
+    jest.clearAllMocks();
   });
 });

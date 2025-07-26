@@ -1,6 +1,9 @@
 // /backend/src/tests/integration/polygonService.int.test.ts
 // Full production-ready integration test suite with real database connections
 
+// Mock opencv-wasm before any imports that might use it
+jest.mock('opencv-wasm');
+
 import { TestDatabaseConnection } from '../../utils/testDatabaseConnection';
 import { testUserModel } from '../../utils/testUserModel';
 import { testImageModel } from '../../utils/testImageModel';

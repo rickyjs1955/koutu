@@ -1,4 +1,55 @@
 // tests/services/polygonService.unit.test.ts
+
+// Mock opencv-wasm before any imports that might use it
+jest.mock('opencv-wasm', () => ({
+  default: {
+    Point: jest.fn(),
+    Mat: jest.fn(),
+    MatVector: jest.fn(),
+    Size: jest.fn(),
+    Rect: jest.fn(),
+    RotatedRect: jest.fn(),
+    Scalar: jest.fn(),
+    cvtColor: jest.fn(),
+    COLOR_BGR2GRAY: 0,
+    COLOR_GRAY2BGR: 1,
+    threshold: jest.fn(),
+    THRESH_BINARY: 0,
+    findContours: jest.fn(),
+    RETR_EXTERNAL: 0,
+    CHAIN_APPROX_SIMPLE: 1,
+    contourArea: jest.fn(),
+    approxPolyDP: jest.fn(),
+    arcLength: jest.fn(),
+    GaussianBlur: jest.fn(),
+    Canny: jest.fn(),
+    dilate: jest.fn(),
+    erode: jest.fn(),
+    morphologyEx: jest.fn(),
+    MORPH_CLOSE: 2,
+    getStructuringElement: jest.fn(),
+    MORPH_RECT: 0,
+    HoughLinesP: jest.fn(),
+    detectMultiScale: jest.fn(),
+    CascadeClassifier: jest.fn(),
+    imencode: jest.fn(),
+    imdecode: jest.fn(),
+    CV_8UC1: 0,
+    CV_8UC3: 16,
+    CV_8UC4: 24,
+    CV_32FC1: 5,
+    CV_32FC3: 21,
+    _malloc: jest.fn(),
+    _free: jest.fn(),
+    HEAPU8: new Uint8Array(1024),
+    FS: {
+      readFile: jest.fn(),
+      writeFile: jest.fn(),
+      unlink: jest.fn()
+    }
+  }
+}));
+
 import { polygonService } from '../../services/polygonService';
 import { polygonModel } from '../../models/polygonModel';
 import { imageModel } from '../../models/imageModel';

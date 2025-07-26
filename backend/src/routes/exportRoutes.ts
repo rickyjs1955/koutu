@@ -23,11 +23,14 @@ const MobileExportRequestSchema = mlExportRequestSchema.extend({
   exclude_masks: z.boolean().default(false) // Save bandwidth
 });
 
+// Define fallback chunk size for testing
+const CHUNK_SIZE = MobileExportFormats?.CHUNK_SIZE || (1024 * 1024);
+
 // Progressive download schema
 const ProgressiveDownloadSchema = z.object({
   job_id: z.string().uuid(),
   chunk_index: z.number().int().min(0),
-  chunk_size: z.number().int().min(1024).max(MobileExportFormats.CHUNK_SIZE).default(MobileExportFormats.CHUNK_SIZE)
+  chunk_size: z.number().int().min(1024).max(CHUNK_SIZE).default(CHUNK_SIZE)
 });
 
 // Export preview schema
