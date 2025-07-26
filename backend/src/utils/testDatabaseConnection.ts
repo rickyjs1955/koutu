@@ -421,27 +421,82 @@ export class TestDatabaseConnection {
     const client = await this.testPool.connect();
     this.activeConnections.add(client);
     try {
-      // Clear tables in reverse dependency order to avoid foreign key violations
-      const tables = [
-        'wardrobe_items',
-        'user_oauth_providers',
-        'garment_items',
-        'wardrobes',
-        'polygons',         // Added: polygons must be cleared before original_images
-        'original_images', 
-        'users'
-      ];
-
-      // Disable foreign key checks temporarily
-      await client.query('SET session_replication_role = replica');
+      // Use a transaction to ensure atomicity and avoid deadlocks
+      await client.query('BEGIN');
       
       try {
+        // Clear tables in reverse dependency order to avoid foreign key violations
+        const tables = [
+          'wardrobe_items',
+          'user_oauth_providers',
+          'garment_items',
+          'wardrobes',
+          'polygons',         // Added: polygons must be cleared before original_images
+          'original_images', 
+          'users'
+        ];
+
+        // Disable foreign key checks temporarily within the transaction
+        await client.query('SET CONSTRAINTS ALL DEFERRED');
+        
+        // Use DELETE instead of TRUNCATE to avoid locks
         for (const table of tables) {
-          await client.query(`TRUNCATE TABLE ${table} RESTART IDENTITY CASCADE`);
+          await client.query(`DELETE FROM ${table}`);
         }
-      } finally {
-        // Re-enable foreign key checks
-        await client.query('SET session_replication_role = DEFAULT');
+        
+        // Reset sequences
+        for (const table of tables) {
+          // Get all sequences for the table
+          const sequences = await client.query(`
+            SELECT 
+              pg_get_serial_sequence('"${table}"', column_name) as sequence_name
+            FROM information_schema.columns 
+            WHERE table_name = '${table}' 
+              AND column_default LIKE 'nextval%'
+          `);
+          
+          for (const row of sequences.rows) {
+            if (row.sequence_name) {
+              await client.query(`ALTER SEQUENCE ${row.sequence_name} RESTART WITH 1`);
+            }
+          }
+        }
+        
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error clearing tables:', error);
+      // If we get a deadlock or connection error, try to recover
+      if (error instanceof Error && 
+          (error.message.includes('deadlock') || 
+           error.message.includes('terminating connection') ||
+           error.message.includes('database "koutu_test" does not exist'))) {
+        // Re-initialize the database connection
+        await this.cleanup();
+        await this.initialize();
+        // Retry once
+        const retryClient = await this.testPool.connect();
+        try {
+          await retryClient.query('BEGIN');
+          await retryClient.query('DELETE FROM wardrobe_items');
+          await retryClient.query('DELETE FROM user_oauth_providers');
+          await retryClient.query('DELETE FROM garment_items');
+          await retryClient.query('DELETE FROM wardrobes');
+          await retryClient.query('DELETE FROM polygons');
+          await retryClient.query('DELETE FROM original_images');
+          await retryClient.query('DELETE FROM users');
+          await retryClient.query('COMMIT');
+        } catch (retryError) {
+          await retryClient.query('ROLLBACK');
+          throw retryError;
+        } finally {
+          retryClient.release();
+        }
+      } else {
+        throw error;
       }
     } finally {
       this.activeConnections.delete(client);
