@@ -504,16 +504,27 @@ describe('TestDatabaseConnection Unit Tests', () => {
 
     it('should clear all tables in correct order', async () => {
       const mockClient = {
-        query: jest.fn().mockResolvedValue({ rows: [], command: 'TRUNCATE', rowCount: 0, oid: 0, fields: [] }),
+        query: jest.fn().mockResolvedValue({ rows: [], command: 'DELETE', rowCount: 0, oid: 0, fields: [] }),
         release: jest.fn(),
       };
       mockTestPoolInstance.connect.mockResolvedValueOnce(mockClient);
 
       await TestDatabaseConnection.clearAllTables();
 
-      expect(mockClient.query).toHaveBeenCalledWith('SET session_replication_role = replica');
-      expect(mockClient.query).toHaveBeenCalledWith('TRUNCATE TABLE user_oauth_providers RESTART IDENTITY CASCADE');
-      expect(mockClient.query).toHaveBeenCalledWith('SET session_replication_role = DEFAULT');
+      // Should start a transaction
+      expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+      
+      // Should defer constraints
+      expect(mockClient.query).toHaveBeenCalledWith('SET CONSTRAINTS ALL DEFERRED');
+      
+      // Should delete from tables in correct order
+      const deleteCalls = mockClient.query.mock.calls.filter((call: any) =>
+        call[0].startsWith('DELETE FROM')
+      );
+      
+      expect(deleteCalls.length).toBeGreaterThan(0);
+      expect(deleteCalls[0][0]).toContain('wardrobe_items');
+      expect(deleteCalls[deleteCalls.length - 1][0]).toContain('users');
     });
 
     it('should handle clearing when pool not initialized', async () => {
@@ -538,18 +549,20 @@ describe('TestDatabaseConnection Unit Tests', () => {
 
     it('should use CASCADE to handle foreign key dependencies', async () => {
       const mockClient = {
-        query: jest.fn().mockResolvedValue({ rows: [], command: 'TRUNCATE', rowCount: 0, oid: 0, fields: [] }),
+        query: jest.fn().mockResolvedValue({ rows: [], command: 'DELETE', rowCount: 0, oid: 0, fields: [] }),
         release: jest.fn(),
       };
       mockTestPoolInstance.connect.mockResolvedValueOnce(mockClient);
 
       await TestDatabaseConnection.clearAllTables();
 
-      const cascadeCalls = mockClient.query.mock.calls.filter((call: any) =>
-        call[0].includes('CASCADE')
-      );
-
-      expect(cascadeCalls.length).toBeGreaterThan(0);
+      // The implementation uses SET CONSTRAINTS ALL DEFERRED instead of CASCADE
+      // This allows deleting in any order by deferring constraint checks
+      expect(mockClient.query).toHaveBeenCalledWith('SET CONSTRAINTS ALL DEFERRED');
+      
+      // Should also ensure transaction is used for consistency
+      expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
     });
   });
 

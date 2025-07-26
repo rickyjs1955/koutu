@@ -2080,21 +2080,29 @@ describe('Image Controller Flutter Integration Tests', () => {
       const responses = await Promise.all(requests);
       
       // All requests should succeed
-      responses.forEach((response, index) => {
+      const filenames = new Set<string>();
+      responses.forEach((response) => {
         expect(response.status).toBe(201);
         const body = response.body as FlutterSuccessResponse<{ image: ImageData }>;
         expect(body).toMatchObject({
           success: true,
           data: {
             image: expect.objectContaining({
-              original_filename: `concurrent-image-${index}.jpg`
+              original_filename: expect.stringMatching(/^concurrent-image-\d+\.jpg$/)
             })
           },
           message: 'Image uploaded successfully',
           timestamp: expect.any(String),
           requestId: expect.any(String)
         });
+        filenames.add(body.data.image.original_filename);
       });
+      
+      // Ensure we got all the expected filenames
+      expect(filenames.size).toBe(concurrentRequests);
+      for (let i = 0; i < concurrentRequests; i++) {
+        expect(filenames.has(`concurrent-image-${i}.jpg`)).toBe(true);
+      }
 
       expect(mockImageService.uploadImage).toHaveBeenCalledTimes(concurrentRequests);
     });

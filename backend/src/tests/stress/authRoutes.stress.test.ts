@@ -892,14 +892,28 @@ describe('Auth Routes - Stress Test Suite', () => {
       
       console.log(`🎫 Testing ${iterations} token validation requests...`);
       
+      // Pre-generate tokens to reduce allocation during test
+      const validTokens = Array.from({ length: 100 }, (_, i) => `valid-token-${i}`);
+      const invalidTokens = Array.from({ length: 20 }, (_, i) => `invalid-token-${i}`);
+      let tokenIndex = 0;
+      
+      // Create a shared agent for connection pooling
+      const agent = request.agent(app);
+      
       const stressResults = await AuthRoutesStressMonitor.measureStressResponse(
         () => {
+          // Use pre-generated tokens with round-robin selection
           const isValid = Math.random() > 0.2; // 80% valid tokens
-          const token = isValid ? `valid-token-${Date.now()}` : 'invalid-token';
-          return request(app)
+          const token = isValid 
+            ? validTokens[tokenIndex++ % validTokens.length]
+            : invalidTokens[tokenIndex++ % invalidTokens.length];
+          
+          // Reuse agent for better connection pooling
+          return agent
             .post('/auth/validate-token')
             .set('Authorization', `Bearer ${token}`)
-            .set('Accept', 'application/json');
+            .set('Accept', 'application/json')
+            .timeout({ response: 5000, deadline: 10000 }); // Add timeout for faster failure
         },
         iterations,
         concurrency,
@@ -910,7 +924,8 @@ describe('Auth Routes - Stress Test Suite', () => {
         total_requests: iterations,
         success_rate: `${((stressResults.successful / iterations) * 100).toFixed(2)}%`,
         avg_response: `${stressResults.avgResponseTime.toFixed(2)}ms`,
-        throughput: `${stressResults.throughput.toFixed(2)} ops/sec`
+        throughput: `${stressResults.throughput.toFixed(2)} ops/sec`,
+        memory_used: `${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)}MB`
       });
 
       // Token validation has rate limiting (20 per 15 minutes)
