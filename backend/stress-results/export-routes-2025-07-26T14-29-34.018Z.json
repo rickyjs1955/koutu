@@ -1,0 +1,142 @@
+[
+  {
+    "test": "Extreme concurrent export creation",
+    "type": "stress_test",
+    "duration": 10111.953895999999,
+    "totalRequests": 3440,
+    "successfulRequests": 3440,
+    "failedRequests": 0,
+    "errors": {},
+    "metrics": {
+      "avgResponseTime": 39.93958608546509,
+      "minResponseTime": 5.012433999999303,
+      "maxResponseTime": 199.2491370000007,
+      "p50ResponseTime": 21.28701799999999,
+      "p95ResponseTime": 115.28711699999985,
+      "p99ResponseTime": 152.84813199999917,
+      "requestsPerSecond": 340.19142446454055,
+      "errorRate": 0
+    },
+    "resourceUsage": {
+      "peakMemory": 103.57122802734375,
+      "avgMemory": 79.83645790501645
+    }
+  },
+  {
+    "test": "Normal load baseline",
+    "type": "stress_test",
+    "duration": 3071.883826000001,
+    "totalRequests": 347,
+    "successfulRequests": 347,
+    "failedRequests": 0,
+    "errors": {},
+    "metrics": {
+      "avgResponseTime": 10.77278653890488,
+      "minResponseTime": 2.6144750000003114,
+      "maxResponseTime": 52.7828329999993,
+      "p50ResponseTime": 7.203482000000804,
+      "p95ResponseTime": 31.696421999999075,
+      "p99ResponseTime": 44.733295,
+      "requestsPerSecond": 112.96000098149541,
+      "errorRate": 0
+    },
+    "resourceUsage": {
+      "peakMemory": 111.5887222290039,
+      "avgMemory": 106.04221216837566
+    }
+  },
+  {
+    "test": "Traffic spike",
+    "type": "stress_test",
+    "duration": 3080.599224999998,
+    "totalRequests": 876,
+    "successfulRequests": 876,
+    "failedRequests": 0,
+    "errors": {},
+    "metrics": {
+      "avgResponseTime": 108.64553111757981,
+      "minResponseTime": 2.6559779999988677,
+      "maxResponseTime": 280.5063229999978,
+      "p50ResponseTime": 102.78376399999979,
+      "p95ResponseTime": 204.92078200000105,
+      "p99ResponseTime": 260.31079599999794,
+      "requestsPerSecond": 284.36026111121305,
+      "errorRate": 0
+    },
+    "resourceUsage": {
+      "peakMemory": 125.980712890625,
+      "avgMemory": 118.08928680419922
+    }
+  },
+  {
+    "test": "Sustained load test",
+    "type": "stress_test",
+    "duration": 15095.690940000004,
+    "totalRequests": 2701,
+    "successfulRequests": 2701,
+    "failedRequests": 0,
+    "errors": {},
+    "metrics": {
+      "avgResponseTime": 28.872133077749037,
+      "minResponseTime": 2.267758000001777,
+      "maxResponseTime": 132.726926000003,
+      "p50ResponseTime": 24.17978099999891,
+      "p95ResponseTime": 69.33010099999956,
+      "p99ResponseTime": 96.45390499999849,
+      "requestsPerSecond": 178.9252317588849,
+      "errorRate": 0
+    },
+    "resourceUsage": {
+      "peakMemory": 155.56352996826172,
+      "avgMemory": 139.45891097496295
+    }
+  },
+  {
+    "test": "Memory pressure test",
+    "type": "stress_test",
+    "duration": 10056.496225000003,
+    "totalRequests": 1096,
+    "successfulRequests": 1096,
+    "failedRequests": 0,
+    "errors": {},
+    "metrics": {
+      "avgResponseTime": 15.11732546806577,
+      "minResponseTime": 5.426256999999168,
+      "maxResponseTime": 73.73898100000224,
+      "p50ResponseTime": 11.855384999995294,
+      "p95ResponseTime": 35.131924999994226,
+      "p99ResponseTime": 60.445801000001666,
+      "requestsPerSecond": 108.98427995979283,
+      "errorRate": 0
+    },
+    "resourceUsage": {
+      "peakMemory": 177.95574188232422,
+      "avgMemory": 165.6606018066406
+    }
+  },
+  {
+    "test": "Authentication storm",
+    "type": "stress_test",
+    "duration": 5097.615318999997,
+    "totalRequests": 1836,
+    "successfulRequests": 541,
+    "failedRequests": 1295,
+    "errors": {
+      "401": 1295
+    },
+    "metrics": {
+      "avgResponseTime": 7.097704174292018,
+      "minResponseTime": 0.6324420000019018,
+      "maxResponseTime": 72.10794400000304,
+      "p50ResponseTime": 2.6462740000060876,
+      "p95ResponseTime": 28.954004999999597,
+      "p99ResponseTime": 40.117739000001166,
+      "requestsPerSecond": 360.1684091690484,
+      "errorRate": 0.7053376906318083
+    },
+    "resourceUsage": {
+      "peakMemory": 188.56461334228516,
+      "avgMemory": 107.49902877807617
+    }
+  }
+]
