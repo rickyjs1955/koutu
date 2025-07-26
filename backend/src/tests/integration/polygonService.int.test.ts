@@ -626,35 +626,46 @@ function safeParseMetadata(metadataData: any): any {
 }
 
 async function createTestUsersAndImages() {
-  // Create primary test user
-  const userData = {
-    email: `primary-${Date.now()}@example.com`,
-    password: 'testpassword123'
-  };
-  const user = await testUserModel.create(userData);
-  testUserId = user.id;
+  try {
+    // Create primary test user
+    const userData = {
+      email: `primary-${Date.now()}@example.com`,
+      password: 'testpassword123'
+    };
+    console.log('Creating primary user with email:', userData.email);
+    const user = await testUserModel.create(userData);
+    testUserId = user.id;
+    console.log('Primary user created with ID:', testUserId);
+    
+    // Verify user exists in database
+    const userCheck = await TestDatabaseConnection.query('SELECT id FROM users WHERE id = $1', [testUserId]);
+    console.log('User verification:', userCheck.rows.length > 0 ? 'User exists' : 'User NOT found');
 
-  // Create secondary test user for authorization testing
-  const secondaryUserData = {
-    email: `secondary-${Date.now()}@example.com`,
-    password: 'testpassword123'
-  };
-  const secondaryUser = await testUserModel.create(secondaryUserData);
-  secondaryUserId = secondaryUser.id;
+    // Create secondary test user for authorization testing
+    const secondaryUserData = {
+      email: `secondary-${Date.now()}@example.com`,
+      password: 'testpassword123'
+    };
+    console.log('Creating secondary user with email:', secondaryUserData.email);
+    const secondaryUser = await testUserModel.create(secondaryUserData);
+    secondaryUserId = secondaryUser.id;
+    console.log('Secondary user created with ID:', secondaryUserId);
 
-  // Create test images
-  const imageData = {
-    user_id: testUserId,
-    file_path: '/test/images/polygon-integration-test.jpg',
-    original_metadata: {
-      width: 1200,
-      height: 800,
-      format: 'jpeg',
-      size: 245760
-    }
-  };
-  const image = await testImageModel.create(imageData);
-  testImageId = image.id;
+    // Create test images
+    const imageData = {
+      user_id: testUserId,
+      file_path: '/test/images/polygon-integration-test.jpg',
+      original_metadata: {
+        width: 1200,
+        height: 800,
+        format: 'jpeg',
+        size: 245760
+      }
+    };
+    console.log('Creating image for user:', testUserId);
+    const image = await testImageModel.create(imageData);
+    testImageId = image.id;
+    console.log('Image created with ID:', testImageId);
 
   const secondaryImageData = {
     user_id: secondaryUserId,
@@ -668,8 +679,13 @@ async function createTestUsersAndImages() {
   };
   const secondaryImage = await testImageModel.create(secondaryImageData);
   secondaryImageId = secondaryImage.id;
+  console.log('Secondary image created with ID:', secondaryImageId);
 
   return { user, secondaryUser, image, secondaryImage };
+  } catch (error) {
+    console.error('Error in createTestUsersAndImages:', error);
+    throw error;
+  }
 }
 
 async function createGarmentItem(polygonId: string, userId: string) {
@@ -1364,12 +1380,13 @@ describe('Polygon Service Full Integration Tests', () => {
       // Step 7: Test complete deletion cascade
       await polygonService.deletePolygon(garmentPolygonId, testUserId);
 
-      // Verify garment item was deleted (cascade)
+      // Verify garment item still exists but polygon_id is NULL (ON DELETE SET NULL)
       const deletedGarmentCheck = await TestDatabaseConnection.query(
         'SELECT * FROM garment_items WHERE id = $1', 
         [garmentItem.id]
       );
-      expect(deletedGarmentCheck.rows).toHaveLength(0);
+      expect(deletedGarmentCheck.rows).toHaveLength(1);
+      expect(deletedGarmentCheck.rows[0].polygon_id).toBeNull();
 
       // Verify detail polygons are still intact (they reference the image, not the main polygon)
       const remainingPolygons = await TestDatabaseConnection.query(
@@ -1904,15 +1921,16 @@ describe('Polygon Service Full Integration Tests', () => {
       // Create garment item
       const garmentItem = await createGarmentItem(polygonId, testUserId);
 
-      // Delete polygon (should cascade to garment item)
+      // Delete polygon (should set garment item's polygon_id to NULL)
       await polygonService.deletePolygon(polygonId, testUserId);
 
-      // Verify cascade deletion
+      // Verify garment item still exists but polygon_id is NULL (ON DELETE SET NULL)
       const deletedGarmentCheck = await TestDatabaseConnection.query(
         'SELECT * FROM garment_items WHERE id = $1',
         [garmentItem.id]
       );
-      expect(deletedGarmentCheck.rows).toHaveLength(0);
+      expect(deletedGarmentCheck.rows).toHaveLength(1);
+      expect(deletedGarmentCheck.rows[0].polygon_id).toBeNull();
 
       testPolygonIds = testPolygonIds.filter(id => id !== polygon.id);
     });

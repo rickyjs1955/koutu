@@ -1,5 +1,5 @@
 // Mock for opencv-wasm module
-module.exports = {
+const cv = {
   Point: jest.fn(),
   Mat: jest.fn(),
   MatVector: jest.fn(), 
@@ -45,3 +45,7 @@ module.exports = {
   rectangle: jest.fn(),
   putText: jest.fn()
 };
+
+// Export both as default and named export to cover different import styles
+module.exports = cv;
+module.exports.default = cv;

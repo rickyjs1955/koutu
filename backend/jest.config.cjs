@@ -2,7 +2,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  roots: ['<rootDir>/src'],
+  roots: ['<rootDir>/src', '<rootDir>'],
   testMatch: [
     '**/tests/**/*.test.ts',
     '**/?(*.)+(spec|test).ts'
@@ -39,6 +39,8 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1'
   },
+  // Add moduleDirectories to help Jest find manual mocks
+  moduleDirectories: ['node_modules', '<rootDir>'],
   silent: true, // Suppress console output during tests
   
   // Removed global setup/teardown to avoid ES module issues

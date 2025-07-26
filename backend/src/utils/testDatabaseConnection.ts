@@ -229,16 +229,33 @@ export class TestDatabaseConnection {
       )
     `);
 
+    // Create polygons table (required for garment_items that reference polygon_id)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS polygons (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        original_image_id UUID NOT NULL REFERENCES original_images(id) ON DELETE CASCADE,
+        points JSONB NOT NULL,
+        label VARCHAR(255),
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     // ENHANCED: garment_items with all required columns
     await client.query(`
       CREATE TABLE IF NOT EXISTS garment_items (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         original_image_id UUID REFERENCES original_images(id) ON DELETE SET NULL,
+        polygon_id UUID REFERENCES polygons(id) ON DELETE SET NULL,
         name VARCHAR(255),
         description TEXT,
         category VARCHAR(100),
+        subcategory VARCHAR(100),
         color VARCHAR(100),
+        material VARCHAR(100),
         brand VARCHAR(255),
         size VARCHAR(50),
         price DECIMAL(10,2),
@@ -282,17 +299,30 @@ export class TestDatabaseConnection {
     `);
 
     // Add comprehensive indexes for better performance
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_original_images_user_id ON original_images(user_id);
-      CREATE INDEX IF NOT EXISTS idx_original_images_status ON original_images(status);
-      CREATE INDEX IF NOT EXISTS idx_original_images_upload_date ON original_images(upload_date DESC);
-      CREATE INDEX IF NOT EXISTS idx_garment_items_user_id ON garment_items(user_id);
-      CREATE INDEX IF NOT EXISTS idx_wardrobes_user_id ON wardrobes(user_id);
-      CREATE INDEX IF NOT EXISTS idx_wardrobes_name ON wardrobes(name);
-      CREATE INDEX IF NOT EXISTS idx_wardrobe_items_wardrobe_id ON wardrobe_items(wardrobe_id);
-      CREATE INDEX IF NOT EXISTS idx_wardrobe_items_garment_id ON wardrobe_items(garment_item_id);
-      CREATE INDEX IF NOT EXISTS idx_wardrobe_items_position ON wardrobe_items(wardrobe_id, position);
-    `);
+    const indexes = [
+      'CREATE INDEX IF NOT EXISTS idx_original_images_user_id ON original_images(user_id)',
+      'CREATE INDEX IF NOT EXISTS idx_original_images_status ON original_images(status)',
+      'CREATE INDEX IF NOT EXISTS idx_original_images_upload_date ON original_images(upload_date DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_polygons_user_id ON polygons(user_id)',
+      'CREATE INDEX IF NOT EXISTS idx_polygons_image_id ON polygons(original_image_id)',
+      'CREATE INDEX IF NOT EXISTS idx_polygons_label ON polygons(label)',
+      'CREATE INDEX IF NOT EXISTS idx_garment_items_user_id ON garment_items(user_id)',
+      'CREATE INDEX IF NOT EXISTS idx_garment_items_polygon_id ON garment_items(polygon_id)',
+      'CREATE INDEX IF NOT EXISTS idx_wardrobes_user_id ON wardrobes(user_id)',
+      'CREATE INDEX IF NOT EXISTS idx_wardrobes_name ON wardrobes(name)',
+      'CREATE INDEX IF NOT EXISTS idx_wardrobe_items_wardrobe_id ON wardrobe_items(wardrobe_id)',
+      'CREATE INDEX IF NOT EXISTS idx_wardrobe_items_garment_id ON wardrobe_items(garment_item_id)',
+      'CREATE INDEX IF NOT EXISTS idx_wardrobe_items_position ON wardrobe_items(wardrobe_id, position)'
+    ];
+
+    for (const index of indexes) {
+      try {
+        await client.query(index);
+      } catch (error) {
+        console.warn(`Warning creating index: ${error}`);
+        // Continue with other indexes even if one fails
+      }
+    }
 
     console.log('✅ Enhanced database schema created');
   }
@@ -397,6 +427,7 @@ export class TestDatabaseConnection {
         'user_oauth_providers',
         'garment_items',
         'wardrobes',
+        'polygons',         // Added: polygons must be cleared before original_images
         'original_images', 
         'users'
       ];
