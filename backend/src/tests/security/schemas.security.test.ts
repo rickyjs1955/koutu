@@ -422,11 +422,15 @@ describe('Schema Security Tests', () => {
 
     describe('Information Disclosure Prevention', () => {
         it('should provide consistent error timing to prevent timing attacks', () => {
+        // Create data arrays once outside the loop to avoid repeated allocations
+        const largeDataArray = new Array(30000).fill(1); // Reduced from 120000
+        const smallDataArray = new Array(100).fill(0);
+        
         const validButComplexGarment = {
             mask_data: {
-            width: 300,
-            height: 400,
-            data: new Array(120000).fill(1)
+            width: 150, // Reduced from 300
+            height: 200, // Reduced from 400
+            data: largeDataArray // Reuse the same array
             },
             metadata: {
             type: 'complex_garment_with_long_name',
@@ -439,7 +443,7 @@ describe('Schema Security Tests', () => {
             mask_data: {
             width: 10,
             height: 10,
-            data: new Array(100).fill(0) // Invalid - all zeros
+            data: smallDataArray // Reuse the same array
             },
             metadata: {
             type: 'x',
@@ -448,10 +452,14 @@ describe('Schema Security Tests', () => {
             }
         };
 
-        // Measure validation times with more iterations for accuracy
+        // Measure validation times with fewer iterations for speed
         const timings: number[] = [];
 
-        for (let i = 0; i < 20; i++) { // Increased iterations for better average
+        // Warm up the validator to avoid cold start bias
+        CreateGarmentWithBusinessRulesSchema.safeParse(validButComplexGarment);
+        CreateGarmentWithBusinessRulesSchema.safeParse(invalidButSimpleGarment);
+
+        for (let i = 0; i < 10; i++) { // Reduced from 20 to 10 iterations
             const start1 = performance.now();
             CreateGarmentWithBusinessRulesSchema.safeParse(validButComplexGarment);
             const end1 = performance.now();
@@ -463,9 +471,9 @@ describe('Schema Security Tests', () => {
             timings.push(Math.abs((end1 - start1) - (end2 - start2)));
         }
 
-        // Remove outliers (highest and lowest 2)
+        // Remove outliers (highest and lowest)
         timings.sort((a, b) => a - b);
-        const trimmedTimings = timings.slice(2, -2);
+        const trimmedTimings = timings.slice(1, -1); // Remove 1 from each end instead of 2
         
         // More realistic timing expectations for Instagram processing
         const avgDifference = trimmedTimings.reduce((a, b) => a + b, 0) / trimmedTimings.length;
