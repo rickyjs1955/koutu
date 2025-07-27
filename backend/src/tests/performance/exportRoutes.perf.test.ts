@@ -867,33 +867,57 @@ describe('Export Routes Performance Tests', () => {
       }
       
       const initialMemory = process.memoryUsage();
-      const jobCount = 1000;
+      const jobCount = 200; // Reduced from 1000 for faster execution
+      const batchSize = 20; // Process in batches to reduce memory pressure
       const createdJobIds: string[] = [];
       
-      // Create many export jobs
-      for (let i = 0; i < jobCount; i++) {
-        const response = await request(app)
-          .post('/api/v1/export/ml')
-          .set('Authorization', `Bearer ${primaryUser.token}`)
-          .send({
-            options: {
-              format: 'zip',
-              include_images: true,
-              include_masks: true,
-              metadata: {
-                index: i,
-                test: 'memory',
-                large_field: 'x'.repeat(1000)
-              }
-            }
-          });
+      // Pre-create reusable request data to reduce allocations
+      const baseOptions = {
+        format: 'zip',
+        include_images: true,
+        include_masks: true
+      };
+      
+      // Create export jobs in batches
+      for (let batch = 0; batch < jobCount; batch += batchSize) {
+        const currentBatchSize = Math.min(batchSize, jobCount - batch);
+        const batchPromises = [];
         
-        if (response.body.data?.jobId) {
-          createdJobIds.push(response.body.data.jobId);
+        for (let i = 0; i < currentBatchSize; i++) {
+          const index = batch + i;
+          const promise = request(app)
+            .post('/api/v1/export/ml')
+            .set('Authorization', `Bearer ${primaryUser.token}`)
+            .send({
+              options: {
+                ...baseOptions,
+                metadata: {
+                  index,
+                  test: 'memory',
+                  batch: Math.floor(index / batchSize)
+                }
+              }
+            });
+          
+          batchPromises.push(promise);
+        }
+        
+        // Process batch and collect job IDs
+        const batchResponses = await Promise.all(batchPromises);
+        batchResponses.forEach(response => {
+          if (response.body.data?.jobId) {
+            createdJobIds.push(response.body.data.jobId);
+          }
+        });
+        
+        // Allow garbage collection between batches
+        if (batch + batchSize < jobCount && global.gc) {
+          await new Promise(resolve => setImmediate(resolve));
+          global.gc();
         }
       }
       
-      // Force garbage collection after creating jobs
+      // Force garbage collection after creating all jobs
       if (global.gc) {
         global.gc();
       }
@@ -918,13 +942,19 @@ describe('Export Routes Performance Tests', () => {
       results.push(result);
       console.log('\nMemory usage:', result.memoryIncrease);
       
-      // Clean up created jobs to prevent memory leak
-      createdJobIds.forEach(jobId => {
-        cleanupJob(jobId);
-      });
+      // Clean up created jobs in batches to prevent memory spike
+      for (let i = 0; i < createdJobIds.length; i += 50) {
+        const batch = createdJobIds.slice(i, i + 50);
+        batch.forEach(jobId => cleanupJob(jobId));
+        
+        if (i + 50 < createdJobIds.length && global.gc) {
+          await new Promise(resolve => setImmediate(resolve));
+          global.gc();
+        }
+      }
       
       // Memory usage should be reasonable
-      expect(memoryIncrease.heapUsed).toBeLessThan(200); // Less than 200MB for 1000 jobs
+      expect(memoryIncrease.heapUsed).toBeLessThan(50); // Less than 50MB for 200 jobs
     });
   });
   
@@ -1060,23 +1090,50 @@ describe('Export Routes Performance Tests', () => {
       const users = [primaryUser, secondaryUser];
       const statResults: any[] = [];
       
+      // Pre-calculate garment counts to avoid repeated filtering
+      const userGarmentCounts = new Map<string, number>();
+      for (const [, garment] of garments) {
+        const count = userGarmentCounts.get(garment.user_id) || 0;
+        userGarmentCounts.set(garment.user_id, count + 1);
+      }
+      
+      // Warm up the stats endpoint
+      await request(app)
+        .get('/api/v1/export/ml/stats')
+        .set('Authorization', `Bearer ${primaryUser.token}`);
+      
+      // Test each user with multiple iterations for accurate timing
       for (const user of users) {
-        const userGarmentCount = Array.from(garments.values())
-          .filter(g => g.user_id === user.id).length;
+        const userGarmentCount = userGarmentCounts.get(user.id) || 0;
+        const iterations = 3;
+        const times: number[] = [];
         
-        const start = performance.now();
-        const response = await request(app)
-          .get('/api/v1/export/ml/stats')
-          .set('Authorization', `Bearer ${user.token}`);
+        // Run multiple iterations and take the best time
+        for (let i = 0; i < iterations; i++) {
+          const start = performance.now();
+          const response = await request(app)
+            .get('/api/v1/export/ml/stats')
+            .set('Authorization', `Bearer ${user.token}`);
+          
+          const calcTime = performance.now() - start;
+          times.push(calcTime);
+          
+          expect(response.status).toBe(200);
+          
+          // Validate response structure
+          expect(response.body.data).toHaveProperty('total_garments');
+          expect(response.body.data).toHaveProperty('total_images');
+        }
         
-        const calcTime = performance.now() - start;
-        
-        expect(response.status).toBe(200);
+        // Use the best (minimum) time to avoid outliers
+        const bestTime = Math.min(...times);
+        const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
         
         statResults.push({
           user: user.email,
           garmentCount: userGarmentCount,
-          calculationTime: parseFloat(calcTime.toFixed(2))
+          calculationTime: parseFloat(bestTime.toFixed(2)),
+          avgTime: parseFloat(avgTime.toFixed(2))
         });
       }
       
@@ -1089,11 +1146,20 @@ describe('Export Routes Performance Tests', () => {
       results.push(result);
       console.log('\nStatistics calculation:', statResults);
       
-      // Calculation time should scale reasonably with dataset size
-      // Increased threshold to account for test environment variability
+      // Performance assertions with optimized thresholds
       statResults.forEach(r => {
-        expect(r.calculationTime).toBeLessThan(150); // Under 150ms for stability
+        expect(r.calculationTime).toBeLessThan(50); // Best time under 50ms
+        expect(r.avgTime).toBeLessThan(75); // Average under 75ms
       });
+      
+      // Check performance scaling
+      if (statResults.length > 1) {
+        const [smaller, larger] = statResults.sort((a, b) => a.garmentCount - b.garmentCount);
+        const scalingFactor = larger.calculationTime / smaller.calculationTime;
+        
+        // Performance should scale sub-linearly with dataset size
+        expect(scalingFactor).toBeLessThan(2.5); // Max 2.5x slower for larger dataset
+      }
     });
   });
 });

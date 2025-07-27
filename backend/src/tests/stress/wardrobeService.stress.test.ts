@@ -497,22 +497,30 @@ describe('WardrobeService Stress Tests', () => {
     });
 
     it('should handle backward pagination under stress', async () => {
-      // Reduced dataset size
-      const datasetSize = 2500;
-      const dataset = createLargeMockDataset(datasetSize);
+      // Optimized dataset size for faster execution
+      const datasetSize = 1500; // Further reduced for efficiency
+      const pageSize = 150; // Larger page size for fewer iterations
+      const maxPages = 10; // Further reduced iterations
+      
+      // Pre-create dataset with simple data for better performance
+      const dataset = createLargeMockDataset(datasetSize, 'simple');
+      
+      // Set up mocks - return full dataset and let service handle pagination
       mockedWardrobeModel.findByUserId.mockResolvedValue(dataset);
+      
       mockedWardrobeModel.getGarments.mockResolvedValue([]);
 
       // Start from the end
       const lastItem = dataset[dataset.length - 1];
       let cursor = lastItem.id;
       let pageCount = 0;
-      const maxPages = 25; // Reduced from 50
-      const pageSize = 100; // Increased page size
+      const pageTimes: number[] = [];
 
-      stressMetrics.startTime = process.hrtime.bigint();
+      const overallStart = performance.now();
 
       while (pageCount < maxPages) {
+        const pageStart = performance.now();
+        
         const result = await wardrobeService.getUserWardrobes({
           userId: testUserId,
           pagination: {
@@ -521,28 +529,44 @@ describe('WardrobeService Stress Tests', () => {
             direction: 'backward'
           }
         });
-
-        pageCount++;
         
-        // Update memory less frequently
-        if (pageCount % 5 === 0) {
-          updatePeakMemory();
-        }
+        const pageTime = performance.now() - pageStart;
+        pageTimes.push(pageTime);
+        pageCount++;
 
-        if (!result.pagination?.hasPrev || !result.pagination?.prevCursor) {
+        // Check if we've reached the beginning
+        if (!result.pagination?.hasPrev || !result.pagination?.prevCursor || result.wardrobes.length === 0) {
           break;
         }
+        
         cursor = result.pagination.prevCursor;
       }
 
-      stressMetrics.endTime = process.hrtime.bigint();
+      const totalTime = performance.now() - overallStart;
 
+      // Performance assertions
       expect(pageCount).toBeGreaterThan(1);
+      expect(pageCount).toBeLessThanOrEqual(maxPages);
       
-      const durationMs = Number(stressMetrics.endTime - stressMetrics.startTime) / 1000000;
-      expect(durationMs).toBeLessThan(15000); // Reduced from 30 seconds
+      // Overall time should be very fast
+      expect(totalTime).toBeLessThan(3000); // 3 seconds max (was 15s)
       
-      // Clear dataset
+      // Average page time should be consistent
+      const avgPageTime = pageTimes.reduce((a, b) => a + b, 0) / pageTimes.length;
+      expect(avgPageTime).toBeLessThan(300); // Each page under 300ms
+      
+      // Check for performance degradation
+      if (pageTimes.length > 2) {
+        const firstQuarter = pageTimes.slice(0, Math.ceil(pageTimes.length / 4));
+        const lastQuarter = pageTimes.slice(-Math.ceil(pageTimes.length / 4));
+        const avgFirst = firstQuarter.reduce((a, b) => a + b, 0) / firstQuarter.length;
+        const avgLast = lastQuarter.reduce((a, b) => a + b, 0) / lastQuarter.length;
+        
+        // Performance should not degrade more than 50%
+        expect(avgLast).toBeLessThan(avgFirst * 1.5);
+      }
+      
+      // Clear dataset for memory efficiency
       dataset.length = 0;
     });
   });

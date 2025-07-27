@@ -1,0 +1,28 @@
+[
+  {
+    "test": "Memory usage with many jobs",
+    "type": "memory_test",
+    "jobCount": 1000,
+    "memoryIncrease": {
+      "heapUsed": 21.13,
+      "external": 0.34
+    },
+    "unit": "MB"
+  },
+  {
+    "test": "Statistics calculation performance",
+    "type": "calculation_test",
+    "results": [
+      {
+        "user": "perf-test@example.com",
+        "garmentCount": 1000,
+        "calculationTime": 8.26
+      },
+      {
+        "user": "perf-test-2@example.com",
+        "garmentCount": 500,
+        "calculationTime": 10.08
+      }
+    ]
+  }
+]
