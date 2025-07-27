@@ -211,7 +211,9 @@ describe('Image Routes - Performance Test Suite', () => {
     });
     
     router.get('/:id', (req: any, res: any) => {
-      const delay = req.headers['x-perf-delay'] ? Number(req.headers['x-perf-delay']) : 1;
+      const isCached = req.headers['x-perf-cached'] === 'true';
+      // Cached requests are much faster
+      const delay = isCached ? 0 : (req.headers['x-perf-delay'] ? Number(req.headers['x-perf-delay']) : 5);
       
       setTimeout(() => {
         res.json({
@@ -222,7 +224,7 @@ describe('Image Routes - Performance Test Suite', () => {
           }),
           performance: {
             queryTime: delay,
-            cached: req.headers['x-perf-cached'] === 'true'
+            cached: isCached
           }
         });
       }, delay);
@@ -256,8 +258,9 @@ describe('Image Routes - Performance Test Suite', () => {
     router.post('/:id/optimize', (req: any, res: any) => {
       const { quality = 80 } = req.body;
       
-      // Simulate optimization time based on quality
-      const delay = Math.floor(100 - quality); // Higher quality = more processing time
+      // Simulate optimization time based on quality - higher quality = more processing time
+      // Base time of 10ms + quality-based delay
+      const delay = 10 + Math.floor(quality / 5); // 10-28ms range
       
       setTimeout(() => {
         res.json({
@@ -298,6 +301,9 @@ describe('Image Routes - Performance Test Suite', () => {
     setupHappyPathMocks();
     
     server = app.listen(0);
+    
+    // Allow server to fully start
+    await new Promise(resolve => setTimeout(resolve, 10));
   });
   
   beforeEach(() => {
@@ -315,17 +321,22 @@ describe('Image Routes - Performance Test Suite', () => {
     // Output performance summary
     console.log('\n=== Performance Test Summary ===');
     Object.entries(performanceMetrics).forEach(([route, metrics]) => {
-      console.log(`${route}:`);
-      console.log(`  Samples: ${metrics.samples.length}`);
-      console.log(`  Min: ${metrics.min.toFixed(2)}ms`);
-      console.log(`  Avg: ${metrics.avg.toFixed(2)}ms`);
-      console.log(`  Max: ${metrics.max.toFixed(2)}ms`);
-      console.log(`  P95: ${metrics.p95.toFixed(2)}ms`);
-      console.log(`  P99: ${metrics.p99.toFixed(2)}ms`);
-      console.log(`  Throughput: ${metrics.throughput.toFixed(2)} req/s`);
-      console.log('');
+      if (metrics.samples.length > 0) {
+        console.log(`${route}:`);
+        console.log(`  Samples: ${metrics.samples.length}`);
+        console.log(`  Min: ${metrics.min.toFixed(2)}ms`);
+        console.log(`  Avg: ${metrics.avg.toFixed(2)}ms`);
+        console.log(`  Max: ${metrics.max.toFixed(2)}ms`);
+        console.log(`  P95: ${metrics.p95.toFixed(2)}ms`);
+        console.log(`  P99: ${metrics.p99.toFixed(2)}ms`);
+        console.log(`  Throughput: ${metrics.throughput.toFixed(2)} req/s`);
+        console.log('');
+      }
     });
     console.log('================================\n');
+    
+    // Small delay to ensure cleanup
+    await new Promise(resolve => setTimeout(resolve, 100));
   });
 
   describe('📊 Basic Performance Benchmarks', () => {
@@ -406,6 +417,7 @@ describe('Image Routes - Performance Test Suite', () => {
 
     test('should handle image optimization efficiently', async () => {
       const qualities = [50, 75, 90];
+      const durations: number[] = [];
       
       for (const quality of qualities) {
         const { result, duration } = await measurePerformance(async () => {
@@ -417,8 +429,19 @@ describe('Image Routes - Performance Test Suite', () => {
 
         expect(result.body.success).toBe(true);
         expect(result.body.data.compressionRatio).toBe(quality / 100);
-        expect(duration).toBeLessThan(150); // Should complete within 150ms
+        
+        durations.push(duration);
+        
+        // All optimizations should complete quickly
+        expect(duration).toBeLessThan(100); // Under 100ms for any quality level
       }
+      
+      // Average optimization time should be very good
+      const avgDuration = durations.reduce((sum, d) => sum + d, 0) / durations.length;
+      expect(avgDuration).toBeLessThan(80); // Average under 80ms
+      
+      // Log performance metrics
+      console.log(`Optimization performance - Avg: ${avgDuration.toFixed(2)}ms, Min: ${Math.min(...durations).toFixed(2)}ms, Max: ${Math.max(...durations).toFixed(2)}ms`);
     });
   });
 
@@ -625,7 +648,7 @@ describe('Image Routes - Performance Test Suite', () => {
       
       // Run multiple batches to simulate sustained load
       for (let batch = 0; batch < sustainedRequests / batchSize; batch++) {
-        const batchOperations = Array.from({ length: batchSize }, (_, i) => 
+        const batchOperations = Array.from({ length: batchSize }, () => 
           () => request(app)
             .get('/api/v1/images')
             .query({ page: 1, limit: 5 })
@@ -681,15 +704,18 @@ describe('Image Routes - Performance Test Suite', () => {
     test('should show cache benefits for individual image retrieval', async () => {
       const imageId = '123e4567-e89b-12d3-a456-426614174000';
       
-      // Uncached request
+      // Warm up the route first
+      await request(app).get(`/api/v1/images/${imageId}`).expect(200);
+      
+      // Uncached request with realistic database delay
       const { duration: uncachedDuration } = await measurePerformance(async () => {
         return await request(app)
           .get(`/api/v1/images/${imageId}`)
-          .set('x-perf-delay', '10')
+          .set('x-perf-delay', '15')
           .expect(200);
       }, 'Image Retrieval - Uncached');
 
-      // Cached request
+      // Cached request - should be instant
       const { duration: cachedDuration } = await measurePerformance(async () => {
         return await request(app)
           .get(`/api/v1/images/${imageId}`)
@@ -697,8 +723,14 @@ describe('Image Routes - Performance Test Suite', () => {
           .expect(200);
       }, 'Image Retrieval - Cached');
 
-      expect(cachedDuration).toBeLessThan(uncachedDuration * 0.9);
-      expect(cachedDuration).toBeLessThan(70);
+      // Cache should provide significant performance improvement
+      expect(cachedDuration).toBeLessThan(uncachedDuration * 0.5); // At least 50% faster
+      expect(cachedDuration).toBeLessThan(10); // Cached should be under 10ms
+      expect(uncachedDuration).toBeGreaterThan(15); // Uncached should include the delay
+      
+      // Calculate cache effectiveness
+      const cacheImprovement = ((uncachedDuration - cachedDuration) / uncachedDuration) * 100;
+      console.log(`Cache improvement: ${cacheImprovement.toFixed(2)}% (${uncachedDuration.toFixed(2)}ms → ${cachedDuration.toFixed(2)}ms)`);
     });
   });
 

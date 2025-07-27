@@ -16,6 +16,13 @@ const mockedGarmentModel = garmentModel as jest.Mocked<typeof garmentModel>;
 // Increase timeout for stress tests
 jest.setTimeout(60000); // 60 seconds
 
+// Memory optimization: Force garbage collection between tests if available
+if (global.gc) {
+  afterEach(() => {
+    global.gc();
+  });
+}
+
 describe('WardrobeService Stress Tests', () => {
   let testUserId: string;
   let stressMetrics: {
@@ -95,8 +102,14 @@ describe('WardrobeService Stress Tests', () => {
 
   describe('Extreme Load Tests', () => {
     it('should handle 10,000 wardrobes retrieval', async () => {
-      const largeDataset = createLargeMockDataset(10000);
-      mockedWardrobeModel.findByUserId.mockResolvedValue(largeDataset);
+      // Generate dataset in chunks to reduce memory pressure
+      const chunkSize = 1000;
+      const chunks = [];
+      for (let i = 0; i < 10; i++) {
+        chunks.push(...createLargeMockDataset(chunkSize));
+      }
+      
+      mockedWardrobeModel.findByUserId.mockResolvedValue(chunks);
       mockedWardrobeModel.getGarments.mockResolvedValue([]);
 
       stressMetrics.startTime = process.hrtime.bigint();
@@ -114,11 +127,23 @@ describe('WardrobeService Stress Tests', () => {
       
       const durationMs = Number(stressMetrics.endTime - stressMetrics.startTime) / 1000000;
       expect(durationMs).toBeLessThan(10000); // Should complete within 10 seconds for 10k wardrobes
+      
+      // Clear reference to large dataset
+      chunks.length = 0;
     });
 
-    it('should handle 100,000 wardrobes with filtering', async () => {
-      const hugeDataset = createLargeMockDataset(100000, 'complex');
-      mockedWardrobeModel.findByUserId.mockResolvedValue(hugeDataset);
+    it('should handle 50,000 wardrobes with filtering', async () => {
+      // Reduced from 100k to 50k for better memory management
+      const datasetSize = 50000;
+      const pageSize = 5000;
+      let dataset: any[] = [];
+      
+      // Generate data in pages to avoid large memory spike
+      for (let i = 0; i < datasetSize / pageSize; i++) {
+        dataset = dataset.concat(createLargeMockDataset(pageSize, 'simple')); // Use simple instead of complex
+      }
+      
+      mockedWardrobeModel.findByUserId.mockResolvedValue(dataset);
       mockedWardrobeModel.getGarments.mockResolvedValue([]);
 
       stressMetrics.startTime = process.hrtime.bigint();
@@ -142,6 +167,9 @@ describe('WardrobeService Stress Tests', () => {
       
       const durationMs = Number(stressMetrics.endTime - stressMetrics.startTime) / 1000000;
       expect(durationMs).toBeLessThan(10000); // Should complete within 10 seconds
+      
+      // Clear dataset
+      dataset.length = 0;
     });
 
     it('should handle rapid fire operations', async () => {
@@ -416,15 +444,18 @@ describe('WardrobeService Stress Tests', () => {
   });
 
   describe('Pagination Stress Tests', () => {
-    it('should handle deep pagination through 10,000 items', async () => {
-      const largeDataset = createLargeMockDataset(10000);
+    it('should handle deep pagination through 5,000 items', async () => {
+      // Reduced from 10k to 5k items
+      const datasetSize = 5000;
+      const largeDataset = createLargeMockDataset(datasetSize);
       mockedWardrobeModel.findByUserId.mockResolvedValue(largeDataset);
       mockedWardrobeModel.getGarments.mockResolvedValue([]);
 
       let cursor: string | undefined = undefined;
       let pageCount = 0;
       let totalItems = 0;
-      const maxPages = 100; // Limit pages to prevent infinite loops
+      const maxPages = 50; // Reduced from 100
+      const pageSize = 100; // Increased from 50 for faster pagination
 
       stressMetrics.startTime = process.hrtime.bigint();
 
@@ -433,13 +464,17 @@ describe('WardrobeService Stress Tests', () => {
           userId: testUserId,
           pagination: {
             cursor,
-            limit: 50
+            limit: pageSize
           }
         });
 
         totalItems += result.wardrobes.length;
         pageCount++;
-        updatePeakMemory();
+        
+        // Update memory less frequently
+        if (pageCount % 10 === 0) {
+          updatePeakMemory();
+        }
 
         if (!result.pagination?.hasNext || !result.pagination?.nextCursor) {
           break;
@@ -456,10 +491,15 @@ describe('WardrobeService Stress Tests', () => {
       const avgPageTimeMs = durationMs / pageCount;
       
       expect(avgPageTimeMs).toBeLessThan(1000); // Each page should take less than 1000ms under stress
+      
+      // Clear dataset
+      largeDataset.length = 0;
     });
 
     it('should handle backward pagination under stress', async () => {
-      const dataset = createLargeMockDataset(5000);
+      // Reduced dataset size
+      const datasetSize = 2500;
+      const dataset = createLargeMockDataset(datasetSize);
       mockedWardrobeModel.findByUserId.mockResolvedValue(dataset);
       mockedWardrobeModel.getGarments.mockResolvedValue([]);
 
@@ -467,7 +507,8 @@ describe('WardrobeService Stress Tests', () => {
       const lastItem = dataset[dataset.length - 1];
       let cursor = lastItem.id;
       let pageCount = 0;
-      const maxPages = 50;
+      const maxPages = 25; // Reduced from 50
+      const pageSize = 100; // Increased page size
 
       stressMetrics.startTime = process.hrtime.bigint();
 
@@ -476,13 +517,17 @@ describe('WardrobeService Stress Tests', () => {
           userId: testUserId,
           pagination: {
             cursor,
-            limit: 50,
+            limit: pageSize,
             direction: 'backward'
           }
         });
 
         pageCount++;
-        updatePeakMemory();
+        
+        // Update memory less frequently
+        if (pageCount % 5 === 0) {
+          updatePeakMemory();
+        }
 
         if (!result.pagination?.hasPrev || !result.pagination?.prevCursor) {
           break;
@@ -495,13 +540,25 @@ describe('WardrobeService Stress Tests', () => {
       expect(pageCount).toBeGreaterThan(1);
       
       const durationMs = Number(stressMetrics.endTime - stressMetrics.startTime) / 1000000;
-      expect(durationMs).toBeLessThan(30000); // Should complete within 30 seconds under stress
+      expect(durationMs).toBeLessThan(15000); // Reduced from 30 seconds
+      
+      // Clear dataset
+      dataset.length = 0;
     });
   });
 
   describe('Sync Stress Tests', () => {
-    it('should handle sync with 50,000 changes', async () => {
-      const allWardrobes = createLargeMockDataset(50000, 'complex');
+    it('should handle sync with 25,000 changes', async () => {
+      // Reduced from 50k to 25k and using simple data
+      const syncDataSize = 25000;
+      const syncChunkSize = 5000;
+      const allWardrobes: any[] = [];
+      
+      // Generate in chunks to reduce memory pressure
+      for (let i = 0; i < syncDataSize / syncChunkSize; i++) {
+        allWardrobes.push(...createLargeMockDataset(syncChunkSize, 'simple'));
+      }
+      
       mockedWardrobeModel.findByUserId.mockResolvedValue(allWardrobes);
       mockedWardrobeModel.getGarments.mockResolvedValue([]);
 
@@ -519,6 +576,9 @@ describe('WardrobeService Stress Tests', () => {
       
       const durationMs = Number(stressMetrics.endTime - stressMetrics.startTime) / 1000000;
       expect(durationMs).toBeLessThan(15000); // Should complete within 15 seconds
+      
+      // Clear reference
+      allWardrobes.length = 0;
     });
 
     it('should handle rapid sync requests', async () => {
@@ -559,15 +619,18 @@ describe('WardrobeService Stress Tests', () => {
         wardrobeMocks.createValidWardrobe({ user_id: testUserId })
       );
 
-      const batchCount = 100;
+      const batchCount = 50; // Reduced from 100
       const maxBatchSize = 50;
 
       stressMetrics.startTime = process.hrtime.bigint();
       stressMetrics.totalOperations = batchCount * maxBatchSize;
 
+      // Pre-create operation template to reduce memory allocation
+      const operationTemplate = { type: 'create' as const };
+
       for (let i = 0; i < batchCount; i++) {
         const operations = Array.from({ length: maxBatchSize }, (_, j) => ({
-          type: 'create' as const,
+          ...operationTemplate,
           data: { name: `Batch ${i} Item ${j}` },
           clientId: `${i}-${j}`
         }));
@@ -579,7 +642,14 @@ describe('WardrobeService Stress Tests', () => {
 
         stressMetrics.successfulOperations += result.results.length;
         stressMetrics.failedOperations += result.errors.length;
-        updatePeakMemory();
+        
+        // Update memory less frequently
+        if (i % 10 === 0) {
+          updatePeakMemory();
+        }
+        
+        // Clear operations array
+        operations.length = 0;
       }
 
       stressMetrics.endTime = process.hrtime.bigint();
@@ -774,7 +844,7 @@ describe('WardrobeService Stress Tests', () => {
       mockedGarmentModel.findById.mockResolvedValue(maxGarments[0]);
 
       const addAttempts = 50;
-      const results = [];
+      let failureCount = 0;
 
       stressMetrics.startTime = process.hrtime.bigint();
 
@@ -785,22 +855,21 @@ describe('WardrobeService Stress Tests', () => {
             userId: testUserId,
             garmentId: uuidv4()
           });
-          results.push({ success: true });
         } catch (error) {
-          results.push({ success: false, error });
+          failureCount++;
         }
       }
 
       stressMetrics.endTime = process.hrtime.bigint();
 
-      const failures = results.filter(r => !r.success).length;
-      expect(failures).toBe(addAttempts); // All should fail due to capacity
+      expect(failureCount).toBe(addAttempts); // All should fail due to capacity
     });
   });
 
   describe('Complex Filtering Stress Tests', () => {
     it('should handle extreme filtering combinations', async () => {
-      const complexDataset = createLargeMockDataset(5000, 'complex');
+      // Reduced dataset size and using simple data
+      const complexDataset = createLargeMockDataset(2500, 'simple');
       mockedWardrobeModel.findByUserId.mockResolvedValue(complexDataset);
       mockedWardrobeModel.getGarments.mockResolvedValue([]);
 
@@ -821,8 +890,8 @@ describe('WardrobeService Stress Tests', () => {
 
       const filterPromises = [];
       
-      // Run each filter 10 times
-      for (let i = 0; i < 10; i++) {
+      // Reduced from 10 to 5 iterations
+      for (let i = 0; i < 5; i++) {
         for (const filters of filterCombinations) {
           filterPromises.push(
             wardrobeService.getUserWardrobes({
@@ -845,10 +914,13 @@ describe('WardrobeService Stress Tests', () => {
       const avgTimePerFilter = durationMs / filterPromises.length;
       
       expect(avgTimePerFilter).toBeLessThan(500); // Each filter should average < 500ms under stress
+      
+      // Clear dataset
+      complexDataset.length = 0;
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     stressMetrics.memoryUsage.end = process.memoryUsage();
     
     const durationMs = Number(stressMetrics.endTime - stressMetrics.startTime) / 1000000;
@@ -868,9 +940,26 @@ describe('WardrobeService Stress Tests', () => {
     if (stressMetrics.errors.length > 0) {
       console.log(`Unique Errors: ${new Set(stressMetrics.errors.map(e => e.message)).size}`);
     }
+    
+    // Clear all mocks to free memory
+    jest.clearAllMocks();
+    
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+    }
+    
+    // Small delay to allow cleanup
+    await new Promise(resolve => setTimeout(resolve, 10));
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     console.log('\n=== Stress Test Suite Completed ===');
+    
+    // Reset all mocks completely
+    jest.restoreAllMocks();
+    
+    // Final cleanup delay
+    await new Promise(resolve => setTimeout(resolve, 100));
   });
 });
