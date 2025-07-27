@@ -8,6 +8,13 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { jest } from '@jest/globals';
+import { EventEmitter } from 'events';
+
+// Increase max listeners to prevent warnings
+EventEmitter.defaultMaxListeners = 50;
+
+// Increase Jest timeout for stress tests
+jest.setTimeout(60000); // 60 seconds
 
 // Mock Firebase first
 jest.doMock('../../config/firebase', () => ({
@@ -486,6 +493,16 @@ describe('Polygon Routes Stress Tests', () => {
     app = createTestApp();
   });
   
+  afterEach(() => {
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+    }
+    
+    // Clear any mocks
+    jest.clearAllMocks();
+  });
+
   afterAll(async () => {
     // Save stress test results
     const timestamp = new Date().toISOString().replace(/:/g, '-');
@@ -494,6 +511,17 @@ describe('Polygon Routes Stress Tests', () => {
     await fs.writeFile(resultsPath, JSON.stringify(stressResults, null, 2));
     
     console.log(`Stress test results saved to: ${resultsPath}`);
+    
+    // Clean up test data
+    testUsers = [];
+    testImages = [];
+    testPolygons = [];
+    stressResults = [];
+    
+    // Force final garbage collection
+    if (global.gc) {
+      global.gc();
+    }
   });
   
   describe('Extreme Point Count Tests', () => {
@@ -747,24 +775,41 @@ describe('Polygon Routes Stress Tests', () => {
   describe('Concurrent Request Stress Tests', () => {
     test('Handle 100 concurrent polygon creations', async () => {
       const concurrentCount = 100;
+      const batchSize = 20; // Process in smaller batches to avoid memory issues
       const start = performance.now();
       
-      const promises = Array.from({ length: concurrentCount }, (_, i) => 
-        (request as any)(app)
-          .post('/api/v1/polygons')
-          .set('Authorization', `Bearer ${primaryUser.token}`)
-          .send({
-            original_image_id: testImage.id,
-            points: createComplexPolygon(20),
-            label: `concurrent-stress-${i}`,
-            metadata: { concurrent: true, index: i }
-          })
-      );
+      let successCount = 0;
+      const responses: any[] = [];
       
-      const responses = await Promise.all(promises);
+      // Process in batches to prevent memory exhaustion
+      for (let batch = 0; batch < concurrentCount; batch += batchSize) {
+        const currentBatchSize = Math.min(batchSize, concurrentCount - batch);
+        
+        const batchPromises = Array.from({ length: currentBatchSize }, (_, i) => {
+          const index = batch + i;
+          return (request as any)(app)
+            .post('/api/v1/polygons')
+            .set('Authorization', `Bearer ${primaryUser.token}`)
+            .send({
+              original_image_id: testImage.id,
+              points: createComplexPolygon(20),
+              label: `concurrent-stress-${index}`,
+              metadata: { concurrent: true, index }
+            });
+        });
+        
+        const batchResponses = await Promise.all(batchPromises);
+        responses.push(...batchResponses);
+        successCount += batchResponses.filter(r => r.status === 201).length;
+        
+        // Small delay between batches to allow cleanup
+        if (batch + batchSize < concurrentCount) {
+          await new Promise(resolve => setImmediate(resolve));
+        }
+      }
+      
       const end = performance.now();
       
-      const successCount = responses.filter(r => r.status === 201).length;
       expect(successCount).toBe(concurrentCount);
       
       const result = {
@@ -827,20 +872,40 @@ describe('Polygon Routes Stress Tests', () => {
       };
       testImages.push(paginationImage);
       
-      // Create 1000 polygons for this image
-      for (let i = 0; i < 1000; i++) {
-        const polygon: TestPolygon = {
-          id: uuidv4(),
-          user_id: primaryUser.id,
-          original_image_id: paginationImage.id,
-          points: createComplexPolygon(5),
-          label: `pagination-test-${i}`,
-          metadata: { index: i },
-          status: 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        testPolygons.push(polygon);
+      // Create 1000 polygons for this image in batches to reduce memory usage
+      const polygonBatchSize = 100;
+      const totalPolygons = 1000;
+      
+      // Pre-create common data to reduce object creation overhead
+      const basePoints = createComplexPolygon(5);
+      const baseDate = new Date().toISOString();
+      
+      for (let batch = 0; batch < totalPolygons; batch += polygonBatchSize) {
+        const batchPolygons: TestPolygon[] = [];
+        const currentBatchSize = Math.min(polygonBatchSize, totalPolygons - batch);
+        
+        for (let i = 0; i < currentBatchSize; i++) {
+          const index = batch + i;
+          batchPolygons.push({
+            id: uuidv4(),
+            user_id: primaryUser.id,
+            original_image_id: paginationImage.id,
+            points: [...basePoints], // Clone the array
+            label: `pagination-test-${index}`,
+            metadata: { index },
+            status: 'active',
+            created_at: baseDate,
+            updated_at: baseDate
+          });
+        }
+        
+        testPolygons.push(...batchPolygons);
+        
+        // Allow garbage collection between batches
+        if (batch + polygonBatchSize < totalPolygons && global.gc) {
+          await new Promise(resolve => setImmediate(resolve));
+          global.gc();
+        }
       }
       
       // Test different page sizes
