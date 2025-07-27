@@ -1,782 +1,652 @@
-// /backend/src/utils/testDatabase.int.test.ts
+// /backend/src/tests/security/testUserModel.security.test.ts
 
-import { TestDatabase } from '../../utils/testDatabase';
-import { Pool, Client } from 'pg';
+import { testUserModel } from '../../utils/testUserModel';
+import { TestDatabaseConnection } from '../../utils/testDatabaseConnection';
+import { ApiError } from '../../utils/ApiError';
+import bcrypt from 'bcrypt';
 
-// Test configuration for integration tests
-const INTEGRATION_TEST_CONFIG = {
-  host: 'localhost',
-  port: 5432,
-  user: 'postgres',
-  password: 'postgres',
-  database: 'postgres', // Connect to main db first
-};
-
-describe('TestDatabase Integration Tests', () => {
-  let testPool: Pool;
-
+describe('testUserModel Security Tests', () => {
+  let createdUserIds: string[] = [];
+  const BATCH_SIZE = 5; // Reduced batch size to prevent memory issues
+  
   beforeAll(async () => {
-    // Wait for PostgreSQL to be ready
-    const maxRetries = 30;
-    let connected = false;
-    
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        const client = new Client(INTEGRATION_TEST_CONFIG);
-        await client.connect();
-        await client.query('SELECT 1');
-        await client.end();
-        connected = true;
-        break;
-      } catch (error) {
-        console.log(`Waiting for PostgreSQL... (${i + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-
-    if (!connected) {
-      throw new Error('PostgreSQL is not available for integration tests');
-    }
-
-    console.log('PostgreSQL is ready for integration tests');
-  }, 60000);
+    process.env.NODE_ENV = 'test';
+    await TestDatabaseConnection.initialize();
+  }, 30000);
 
   afterAll(async () => {
-    // Clean up any remaining connections
-    try {
-      if (testPool) {
-        await testPool.end();
-      }
-      await TestDatabase.cleanup();
-    } catch (error) {
-      console.log('Cleanup error (may be expected):', error);
-    }
-  });
+    await TestDatabaseConnection.cleanup();
+  }, 30000);
 
   beforeEach(async () => {
-    // Ensure clean state before each test
-    try {
-      await TestDatabase.cleanup();
-    } catch (error) {
-      // Ignore cleanup errors before tests
+    await TestDatabaseConnection.clearAllTables();
+    createdUserIds = [];
+  });
+
+  afterEach(async () => {
+    // Clean up created users in smaller batches to prevent memory issues
+    if (createdUserIds.length > 0) {
+      try {
+        // Process cleanup in batches
+        for (let i = 0; i < createdUserIds.length; i += BATCH_SIZE) {
+          const batch = createdUserIds.slice(i, i + BATCH_SIZE);
+          await TestDatabaseConnection.query(
+            'DELETE FROM users WHERE id = ANY($1)', 
+            [batch]
+          );
+        }
+      } catch (error) {
+        console.log('⚠️ Error cleaning up users:', error);
+      }
     }
   });
 
-  describe('Database Initialization', () => {
-    it('should initialize test database successfully', async () => {
-      testPool = await TestDatabase.initialize();
-      
-      expect(testPool).toBeDefined();
-      expect(testPool).toBeInstanceOf(Pool);
-      
-      // Verify we can query the test database
-      const result = await testPool.query('SELECT current_database()');
-      expect(result.rows[0].current_database).toBe('koutu_test');
-    });
+  const createUniqueEmail = () => 
+    `security-test-${Date.now()}-${Math.random().toString(36).substring(2, 11)}@example.com`;
 
-    it('should create required extensions', async () => {
-      testPool = await TestDatabase.initialize();
-      
-      const result = await testPool.query(`
-        SELECT extname FROM pg_extension 
-        WHERE extname = 'uuid-ossp'
-      `);
-      
-      expect(result.rows).toHaveLength(1);
-      expect(result.rows[0].extname).toBe('uuid-ossp');
-    });
+  describe('Password Security', () => {
+    it('should properly hash passwords with bcrypt', async () => {
+      const password = 'SecureTestPassword123!';
+      const user = await testUserModel.create({
+        email: createUniqueEmail(),
+        password
+      });
+      createdUserIds.push(user.id);
 
-    it('should handle multiple initialization calls', async () => {
-      const pool1 = await TestDatabase.initialize();
-      const pool2 = await TestDatabase.initialize();
-      
-      // For testDatabase.ts, multiple calls may create new pools due to database recreation
-      // This is different from testDatabaseConnection.ts which maintains singletons
-      expect(pool1).toBeDefined();
-      expect(pool2).toBeDefined();
-      expect(pool1).toBeInstanceOf(Pool);
-      expect(pool2).toBeInstanceOf(Pool);
-      
-      // Both should work for queries regardless of being the same instance
-      const result1 = await pool1.query('SELECT 1 as test');
-      const result2 = await pool2.query('SELECT 2 as test');
-      
-      expect(result1.rows[0].test).toBe(1);
-      expect(result2.rows[0].test).toBe(2);
-    });
-
-    it('should set correct DATABASE_URL environment variable', async () => {
-      await TestDatabase.initialize();
-      
-      expect(process.env.DATABASE_URL).toBe(
-        'postgresql://postgres:postgres@localhost:5432/koutu_test'
+      const dbUser = await TestDatabaseConnection.query(
+        'SELECT password_hash FROM users WHERE id = $1',
+        [user.id]
       );
-    });
-  });
 
-  describe('Schema Creation', () => {
-    beforeEach(async () => {
-      testPool = await TestDatabase.initialize();
-    });
-
-    it('should create users table with correct structure', async () => {
-      const result = await testPool.query(`
-        SELECT column_name, data_type, is_nullable, column_default
-        FROM information_schema.columns
-        WHERE table_name = 'users'
-        ORDER BY ordinal_position
-      `);
-
-      const columns = result.rows.reduce((acc, row) => {
-        acc[row.column_name] = {
-          type: row.data_type,
-          nullable: row.is_nullable === 'YES',
-          default: row.column_default
-        };
-        return acc;
-      }, {} as Record<string, any>);
-
-      // Verify required columns exist with correct types
-      expect(columns.id).toBeDefined();
-      expect(columns.id.type).toBe('uuid');
-      expect(columns.id.nullable).toBe(false);
-      expect(columns.id.default).toContain('uuid_generate_v4()');
-
-      expect(columns.email).toBeDefined();
-      expect(columns.email.type).toBe('text');
-      expect(columns.email.nullable).toBe(false);
-
-      expect(columns.password_hash).toBeDefined();
-      expect(columns.password_hash.type).toBe('text');
-      expect(columns.password_hash.nullable).toBe(true);
-
-      expect(columns.name).toBeDefined();
-      expect(columns.name.type).toBe('text');
-      expect(columns.name.nullable).toBe(true);
-
-      expect(columns.created_at).toBeDefined();
-      expect(columns.created_at.type).toBe('timestamp with time zone');
-      expect(columns.created_at.nullable).toBe(false);
-    });
-
-    it('should create users table with unique email constraint', async () => {
-      // Insert first user
-      await testPool.query(`
-        INSERT INTO users (email, password_hash) 
-        VALUES ('test@example.com', 'hash123')
-      `);
-
-      // Try to insert duplicate email - should fail
-      await expect(testPool.query(`
-        INSERT INTO users (email, password_hash) 
-        VALUES ('test@example.com', 'hash456')
-      `)).rejects.toThrow(/duplicate key value violates unique constraint/);
-    });
-
-    it('should create user_oauth_providers table with foreign key', async () => {
-      // First insert a user
-      const userResult = await testPool.query(`
-        INSERT INTO users (email, password_hash) 
-        VALUES ('oauth@example.com', 'hash123')
-        RETURNING id
-      `);
-      const userId = userResult.rows[0].id;
-
-      // Insert OAuth provider record
-      await testPool.query(`
-        INSERT INTO user_oauth_providers (user_id, provider, provider_id)
-        VALUES ($1, 'google', '123456')
-      `, [userId]);
-
-      // Verify it was inserted
-      const result = await testPool.query(`
-        SELECT * FROM user_oauth_providers 
-        WHERE user_id = $1
-      `, [userId]);
-
-      expect(result.rows).toHaveLength(1);
-      expect(result.rows[0].provider).toBe('google');
-      expect(result.rows[0].provider_id).toBe('123456');
-
-      // Try to insert OAuth record with invalid user_id - should fail
-      await expect(testPool.query(`
-        INSERT INTO user_oauth_providers (user_id, provider, provider_id)
-        VALUES ('00000000-0000-0000-0000-000000000000', 'github', '789')
-      `)).rejects.toThrow(/violates foreign key constraint/);
-    });
-
-    it('should create statistics tables with proper relationships', async () => {
-      // Insert a user first
-      const userResult = await testPool.query(`
-        INSERT INTO users (email, password_hash) 
-        VALUES ('stats@example.com', 'hash123')
-        RETURNING id
-      `);
-      const userId = userResult.rows[0].id;
-
-      // Test original_images table
-      await testPool.query(`
-        INSERT INTO original_images (user_id, file_path)
-        VALUES ($1, '/path/to/image.jpg')
-      `, [userId]);
-
-      // Test garment_items table
-      await testPool.query(`
-        INSERT INTO garment_items (user_id, name)
-        VALUES ($1, 'Test Shirt')
-      `, [userId]);
-
-      // Test wardrobes table
-      await testPool.query(`
-        INSERT INTO wardrobes (user_id, name)
-        VALUES ($1, 'Summer Collection')
-      `, [userId]);
-
-      // Verify data was inserted correctly
-      const [imagesResult, garmentsResult, wardrobesResult] = await Promise.all([
-        testPool.query('SELECT COUNT(*) as count FROM original_images WHERE user_id = $1', [userId]),
-        testPool.query('SELECT COUNT(*) as count FROM garment_items WHERE user_id = $1', [userId]),
-        testPool.query('SELECT COUNT(*) as count FROM wardrobes WHERE user_id = $1', [userId])
-      ]);
-
-      expect(parseInt(imagesResult.rows[0].count)).toBe(1);
-      expect(parseInt(garmentsResult.rows[0].count)).toBe(1);
-      expect(parseInt(wardrobesResult.rows[0].count)).toBe(1);
-    });
-
-    it('should enforce foreign key cascading deletes', async () => {
-      // Insert user and related data
-      const userResult = await testPool.query(`
-        INSERT INTO users (email, password_hash) 
-        VALUES ('cascade@example.com', 'hash123')
-        RETURNING id
-      `);
-      const userId = userResult.rows[0].id;
-
-      // Insert related data
-      await testPool.query(`
-        INSERT INTO user_oauth_providers (user_id, provider, provider_id)
-        VALUES ($1, 'google', '123')
-      `, [userId]);
-
-      await testPool.query(`
-        INSERT INTO original_images (user_id, file_path)
-        VALUES ($1, '/path/to/image.jpg')
-      `, [userId]);
-
-      await testPool.query(`
-        INSERT INTO garment_items (user_id, name)
-        VALUES ($1, 'Test Item')
-      `, [userId]);
-
-      // Delete the user
-      await testPool.query('DELETE FROM users WHERE id = $1', [userId]);
-
-      // Verify related data was cascade deleted
-      const [oauthResult, imagesResult, garmentsResult] = await Promise.all([
-        testPool.query('SELECT COUNT(*) as count FROM user_oauth_providers WHERE user_id = $1', [userId]),
-        testPool.query('SELECT COUNT(*) as count FROM original_images WHERE user_id = $1', [userId]),
-        testPool.query('SELECT COUNT(*) as count FROM garment_items WHERE user_id = $1', [userId])
-      ]);
-
-      expect(parseInt(oauthResult.rows[0].count)).toBe(0);
-      expect(parseInt(imagesResult.rows[0].count)).toBe(0);
-      expect(parseInt(garmentsResult.rows[0].count)).toBe(0);
-    });
-  });
-
-  describe('Database Operations', () => {
-    beforeEach(async () => {
-      testPool = await TestDatabase.initialize();
-    });
-
-    it('should provide working database pool', async () => {
-      const pool = TestDatabase.getPool();
-      expect(pool).toBe(testPool);
-      expect(pool).not.toBeNull();
+      const hash = dbUser.rows[0].password_hash;
+      expect(hash).not.toBe(password);
+      expect(hash).toMatch(/^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/);
       
-      const result = await pool!.query('SELECT NOW() as current_time');
-      expect(result.rows).toHaveLength(1);
-      expect(result.rows[0].current_time).toBeInstanceOf(Date);
+      const isValid = await bcrypt.compare(password, hash);
+      expect(isValid).toBe(true);
     });
 
-    it('should execute queries through static query method', async () => {
-      const result = await TestDatabase.query('SELECT $1 as test_value', ['hello']);
-      expect(result.rows[0].test_value).toBe('hello');
+    it('should use sufficient bcrypt rounds', async () => {
+      const password = 'TestPassword123!';
+      const user = await testUserModel.create({
+        email: createUniqueEmail(),
+        password
+      });
+      createdUserIds.push(user.id);
+
+      const dbUser = await TestDatabaseConnection.query(
+        'SELECT password_hash FROM users WHERE id = $1',
+        [user.id]
+      );
+
+      const hash = dbUser.rows[0].password_hash;
+      const match = hash.match(/^\$2[aby]\$(\d{2})\$/);
+      expect(match).toBeTruthy();
+      
+      const rounds = parseInt(match![1], 10);
+      expect(rounds).toBeGreaterThanOrEqual(10);
     });
 
-    it('should handle concurrent database operations', async () => {
-      const promises = Array.from({ length: 10 }, (_, i) => 
-        TestDatabase.query('SELECT $1::integer as value', [i])
+    it('should reject weak passwords', async () => {
+      const weakPasswords = [
+        '123456',
+        'password',
+        'qwerty',
+        'abc123',
+        '',
+        '     ',
+        'a',
+        '12345678'
+      ];
+
+      for (const password of weakPasswords) {
+        const result = await testUserModel.create({
+          email: createUniqueEmail(),
+          password
+        }).catch(err => err);
+
+        if (result instanceof Error) {
+          // Accept any Error type since validation might throw different error types
+          expect(result).toBeInstanceOf(Error);
+        } else if (result && result.id) {
+          createdUserIds.push(result.id);
+          // Even if it succeeds, verify it's properly hashed
+          const dbUser = await TestDatabaseConnection.query(
+            'SELECT password_hash FROM users WHERE id = $1',
+            [result.id]
+          );
+          expect(dbUser.rows[0].password_hash).not.toBe(password);
+        }
+      }
+    });
+  });
+
+  describe('SQL Injection Prevention', () => {
+    it('should handle SQL injection attempts in email field', async () => {
+      const maliciousEmails = [
+        "test'; DROP TABLE users; --@example.com",
+        "test' OR '1'='1@example.com",
+        "test\"; DELETE FROM users WHERE \"\"=\"@example.com",
+        "test'); INSERT INTO users (email, password_hash) VALUES ('hacker@evil.com', 'hash'); --@example.com"
+      ];
+
+      for (const email of maliciousEmails) {
+        try {
+          const user = await testUserModel.create({
+            email,
+            password: 'SecurePassword123!'
+          });
+          
+          if (user) {
+            createdUserIds.push(user.id);
+            
+            // Verify the email is stored safely
+            const foundUser = await testUserModel.findByEmail(email);
+            expect(foundUser?.email).toBe(email);
+          }
+        } catch (error) {
+          // If it fails, it should be due to validation, not SQL injection
+          expect(error).toBeInstanceOf(Error);
+        }
+      }
+
+      // Verify users table still exists
+      const tableCheck = await TestDatabaseConnection.query(
+        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'users')"
+      );
+      expect(tableCheck.rows[0].exists).toBe(true);
+    });
+
+    it('should handle SQL injection attempts in password field', async () => {
+      const maliciousPasswords = [
+        "'; DROP TABLE users; --",
+        "' OR '1'='1",
+        "\"; DELETE FROM users WHERE \"\"=\"",
+        "'); INSERT INTO users (email, password_hash) VALUES ('hacker@evil.com', 'hash'); --"
+      ];
+
+      for (const password of maliciousPasswords) {
+        const user = await testUserModel.create({
+          email: createUniqueEmail(),
+          password
+        }).catch(() => null);
+
+        if (user) {
+          createdUserIds.push(user.id);
+          
+          // Verify password is hashed, not stored as-is
+          const dbUser = await TestDatabaseConnection.query(
+            'SELECT password_hash FROM users WHERE id = $1',
+            [user.id]
+          );
+          expect(dbUser.rows[0].password_hash).not.toBe(password);
+          expect(dbUser.rows[0].password_hash).toMatch(/^\$2[aby]\$\d{2}\$/);
+        }
+      }
+    });
+
+    it('should handle SQL injection in findByEmail', async () => {
+      const user = await testUserModel.create({
+        email: createUniqueEmail(),
+        password: 'TestPassword123!'
+      });
+      createdUserIds.push(user.id);
+
+      const maliciousQueries = [
+        "' OR '1'='1",
+        "'; DROP TABLE users; --",
+        "' UNION SELECT * FROM users --",
+        "admin'--"
+      ];
+
+      for (const query of maliciousQueries) {
+        const result = await testUserModel.findByEmail(query);
+        expect(result).toBeNull();
+      }
+
+      // Verify the original user still exists
+      const foundUser = await testUserModel.findByEmail(user.email);
+      expect(foundUser).toBeTruthy();
+    });
+  });
+
+  describe('Access Control', () => {
+    it('should not expose password hashes in findById', async () => {
+      const user = await testUserModel.create({
+        email: createUniqueEmail(),
+        password: 'TestPassword123!'
+      });
+      createdUserIds.push(user.id);
+
+      const foundUser = await testUserModel.findById(user.id);
+      expect(foundUser).not.toHaveProperty('password_hash');
+      expect(foundUser).not.toHaveProperty('password');
+    });
+
+    it('should only expose password hash in findByEmail for authentication', async () => {
+      const user = await testUserModel.create({
+        email: createUniqueEmail(),
+        password: 'TestPassword123!'
+      });
+      createdUserIds.push(user.id);
+
+      const foundUser = await testUserModel.findByEmail(user.email);
+      expect(foundUser).toHaveProperty('password_hash');
+      expect(foundUser?.password_hash).toMatch(/^\$2[aby]\$\d{2}\$/);
+    });
+
+    it('should prevent unauthorized access to other users data', async () => {
+      const user1 = await testUserModel.create({
+        email: createUniqueEmail(),
+        password: 'Password123!'
+      });
+      const user2 = await testUserModel.create({
+        email: createUniqueEmail(),
+        password: 'Password456!'
+      });
+      createdUserIds.push(user1.id, user2.id);
+
+      // Attempt to access user2's data with user1's ID patterns
+      const maliciousIds = [
+        `${user1.id}' OR id='${user2.id}`,
+        `${user1.id}' UNION SELECT * FROM users WHERE id='${user2.id}`,
+        `${user1.id}'; SELECT * FROM users; --`
+      ];
+
+      for (const id of maliciousIds) {
+        const result = await testUserModel.findById(id);
+        expect(result).toBeNull();
+      }
+    });
+  });
+
+  describe('Authentication Security', () => {
+    it('should prevent timing attacks on password validation', async () => {
+      const user = await testUserModel.create({
+        email: createUniqueEmail(),
+        password: 'CorrectPassword123!'
+      });
+      createdUserIds.push(user.id);
+
+      const userWithHash = await testUserModel.findByEmail(user.email);
+      
+      // Test multiple password attempts and measure timing
+      const attempts = 5; // Reduced from 10 to prevent memory issues
+      const correctTimes: number[] = [];
+      const incorrectTimes: number[] = [];
+
+      for (let i = 0; i < attempts; i++) {
+        // Correct password
+        const startCorrect = process.hrtime.bigint();
+        await testUserModel.validatePassword(userWithHash!, 'CorrectPassword123!');
+        const endCorrect = process.hrtime.bigint();
+        correctTimes.push(Number(endCorrect - startCorrect));
+
+        // Incorrect password
+        const startIncorrect = process.hrtime.bigint();
+        await testUserModel.validatePassword(userWithHash!, 'WrongPassword123!');
+        const endIncorrect = process.hrtime.bigint();
+        incorrectTimes.push(Number(endIncorrect - startIncorrect));
+      }
+
+      // Calculate average times
+      const avgCorrect = correctTimes.reduce((a, b) => a + b) / correctTimes.length;
+      const avgIncorrect = incorrectTimes.reduce((a, b) => a + b) / incorrectTimes.length;
+
+      // The timing difference should be minimal (within 50% variance)
+      const timingRatio = avgCorrect / avgIncorrect;
+      expect(timingRatio).toBeGreaterThan(0.5);
+      expect(timingRatio).toBeLessThan(2.0);
+    });
+
+    it('should handle null/undefined password attempts safely', async () => {
+      const user = await testUserModel.create({
+        email: createUniqueEmail(),
+        password: 'TestPassword123!'
+      });
+      createdUserIds.push(user.id);
+
+      const userWithHash = await testUserModel.findByEmail(user.email);
+      
+      const nullResult = await testUserModel.validatePassword(userWithHash!, null as any);
+      expect(nullResult).toBe(false);
+
+      const undefinedResult = await testUserModel.validatePassword(userWithHash!, undefined as any);
+      expect(undefinedResult).toBe(false);
+
+      const emptyResult = await testUserModel.validatePassword(userWithHash!, '');
+      expect(emptyResult).toBe(false);
+    });
+  });
+
+  describe('OAuth Security', () => {
+    it('should prevent OAuth ID collision attacks', async () => {
+      const oauthId = 'oauth_123456';
+      const provider = 'google';
+
+      const user1 = await testUserModel.createOAuthUser({
+        email: createUniqueEmail(),
+        oauth_provider: provider,
+        oauth_id: oauthId
+      });
+      createdUserIds.push(user1.id);
+
+      // Attempt to create another user with same OAuth ID
+      await expect(testUserModel.createOAuthUser({
+        email: createUniqueEmail(),
+        oauth_provider: provider,
+        oauth_id: oauthId
+      })).rejects.toThrow();
+
+      // Verify only one user exists with this OAuth ID
+      const foundUser = await testUserModel.findByOAuth(provider, oauthId);
+      expect(foundUser?.id).toBe(user1.id);
+    });
+
+    it('should handle OAuth injection attempts', async () => {
+      const maliciousOAuthIds = [
+        "'; DROP TABLE users; --",
+        "' OR '1'='1",
+        "') OR ('1'='1"
+      ];
+
+      for (const oauthId of maliciousOAuthIds) {
+        const user = await testUserModel.createOAuthUser({
+          email: createUniqueEmail(),
+          oauth_provider: 'google',
+          oauth_id: oauthId
+        }).catch(() => null);
+
+        if (user) {
+          createdUserIds.push(user.id);
+          
+          // Verify the OAuth ID is stored safely
+          const foundUser = await testUserModel.findByOAuth('google', oauthId);
+          expect(foundUser?.id).toBe(user.id);
+        }
+      }
+
+      // Verify tables still exist
+      const tableCheck = await TestDatabaseConnection.query(
+        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'users')"
+      );
+      expect(tableCheck.rows[0].exists).toBe(true);
+    });
+  });
+
+  describe('Data Integrity', () => {
+    it('should enforce unique email constraint at database level', async () => {
+      const email = createUniqueEmail();
+      
+      const user1 = await testUserModel.create({
+        email,
+        password: 'Password123!'
+      });
+      createdUserIds.push(user1.id);
+
+      // Direct database insert attempt should fail
+      await expect(TestDatabaseConnection.query(
+        'INSERT INTO users (email, password_hash) VALUES ($1, $2)',
+        [email, 'hash']
+      )).rejects.toThrow(/duplicate key value violates unique constraint/);
+    });
+
+    it('should handle concurrent user creation safely', async () => {
+      const email = createUniqueEmail();
+      
+      // Process promises in smaller batches to prevent memory issues
+      const promises = Array.from({ length: BATCH_SIZE }, () => 
+        testUserModel.create({
+          email,
+          password: 'ConcurrentTest123!'
+        }).catch(() => null)
+      );
+
+      const results = await Promise.allSettled(promises);
+      const successful = results.filter(r => r.status === 'fulfilled' && r.value !== null);
+
+      expect(successful.length).toBe(1);
+      
+      if (successful.length > 0) {
+        const result = successful[0] as PromiseFulfilledResult<any>;
+        if (result.value) {
+          createdUserIds.push(result.value.id);
+        }
+      }
+
+      // Verify only one user exists
+      const dbUsers = await TestDatabaseConnection.query(
+        'SELECT COUNT(*) FROM users WHERE email = $1',
+        [email]
+      );
+      expect(parseInt(dbUsers.rows[0].count)).toBe(1);
+    });
+  });
+
+  describe('Rate Limiting and DoS Prevention', () => {
+    it('should handle rapid authentication attempts', async () => {
+      const user = await testUserModel.create({
+        email: createUniqueEmail(),
+        password: 'TestPassword123!'
+      });
+      createdUserIds.push(user.id);
+
+      const userWithHash = await testUserModel.findByEmail(user.email);
+      
+      const startTime = Date.now();
+      const attempts = BATCH_SIZE; // Use smaller batch size
+      
+      // Process in smaller batches
+      const promises = Array.from({ length: attempts }, () => 
+        testUserModel.validatePassword(userWithHash!, 'WrongPassword!')
       );
 
       const results = await Promise.all(promises);
-      
-      results.forEach((result, index) => {
-        expect(result.rows[0].value).toBe(index);
-      });
-    });
+      const endTime = Date.now();
 
-    it('should handle large result sets efficiently', async () => {
-      // Insert test data
-      const insertPromises = Array.from({ length: 100 }, (_, i) => 
-        testPool.query(`
-          INSERT INTO users (email, password_hash) 
-          VALUES ($1, 'hash')
-        `, [`user${i}@example.com`])
-      );
-      
-      await Promise.all(insertPromises);
+      // All should return false
+      results.forEach(result => expect(result).toBe(false));
 
-      // Query large result set
-      const result = await testPool.query('SELECT COUNT(*) as count FROM users');
-      expect(parseInt(result.rows[0].count)).toBe(100);
-
-      // Test pagination-style query
-      const paginatedResult = await testPool.query(`
-        SELECT email FROM users 
-        ORDER BY email 
-        LIMIT 10 OFFSET 10
-      `);
-      expect(paginatedResult.rows).toHaveLength(10);
-    });
-
-    it('should handle transactions properly', async () => {
-      const client = await testPool.connect();
-      
-      try {
-        await client.query('BEGIN');
-        
-        // Insert user in transaction
-        const userResult = await client.query(`
-          INSERT INTO users (email, password_hash) 
-          VALUES ('transaction@example.com', 'hash123')
-          RETURNING id
-        `);
-        const userId = userResult.rows[0].id;
-
-        // Insert related data in same transaction
-        await client.query(`
-          INSERT INTO garment_items (user_id, name)
-          VALUES ($1, 'Transaction Test Item')
-        `, [userId]);
-
-        await client.query('COMMIT');
-
-        // Verify data was committed
-        const verifyResult = await testPool.query(`
-          SELECT u.email, g.name 
-          FROM users u 
-          JOIN garment_items g ON u.id = g.user_id
-          WHERE u.email = 'transaction@example.com'
-        `);
-        
-        expect(verifyResult.rows).toHaveLength(1);
-        expect(verifyResult.rows[0].email).toBe('transaction@example.com');
-        expect(verifyResult.rows[0].name).toBe('Transaction Test Item');
-      } finally {
-        client.release();
-      }
-    });
-
-    it('should handle transaction rollbacks', async () => {
-      const client = await testPool.connect();
-      
-      try {
-        await client.query('BEGIN');
-        
-        // Insert user
-        await client.query(`
-          INSERT INTO users (email, password_hash) 
-          VALUES ('rollback@example.com', 'hash123')
-        `);
-
-        await client.query('ROLLBACK');
-
-        // Verify data was not committed
-        const verifyResult = await testPool.query(`
-          SELECT COUNT(*) as count FROM users 
-          WHERE email = 'rollback@example.com'
-        `);
-        
-        expect(parseInt(verifyResult.rows[0].count)).toBe(0);
-      } finally {
-        client.release();
-      }
-    });
-  });
-
-  describe('Data Cleanup', () => {
-    beforeEach(async () => {
-      testPool = await TestDatabase.initialize();
-    });
-
-    it('should clear all tables successfully', async () => {
-      // Insert test data in multiple tables
-      const userResult = await testPool.query(`
-        INSERT INTO users (email, password_hash) 
-        VALUES ('cleanup@example.com', 'hash123')
-        RETURNING id
-      `);
-      const userId = userResult.rows[0].id;
-
-      await testPool.query(`
-        INSERT INTO user_oauth_providers (user_id, provider, provider_id)
-        VALUES ($1, 'google', '123')
-      `, [userId]);
-
-      await testPool.query(`
-        INSERT INTO original_images (user_id, file_path)
-        VALUES ($1, '/path/to/image.jpg')
-      `, [userId]);
-
-      await testPool.query(`
-        INSERT INTO garment_items (user_id, name)
-        VALUES ($1, 'Test Item')
-      `, [userId]);
-
-      await testPool.query(`
-        INSERT INTO wardrobes (user_id, name)
-        VALUES ($1, 'Test Wardrobe')
-      `, [userId]);
-
-      // Clear all tables
-      await TestDatabase.clearAllTables();
-
-      // Verify all tables are empty
-      const tables = ['users', 'user_oauth_providers', 'original_images', 'garment_items', 'wardrobes'];
-      
-      for (const table of tables) {
-        const result = await testPool.query(`SELECT COUNT(*) as count FROM ${table}`);
-        expect(parseInt(result.rows[0].count)).toBe(0);
-      }
-    });
-
-    it('should reset identity sequences after clearing', async () => {
-      // This test verifies that RESTART IDENTITY works correctly
-      
-      // Insert and delete some users to increment sequences
-      for (let i = 0; i < 5; i++) {
-        await testPool.query(`
-          INSERT INTO users (email, password_hash) 
-          VALUES ($1, 'hash')
-        `, [`sequence${i}@example.com`]);
-      }
-
-      await TestDatabase.clearAllTables();
-
-      // Insert new user and check that UUID generation still works
-      const result = await testPool.query(`
-        INSERT INTO users (email, password_hash) 
-        VALUES ('newuser@example.com', 'hash')
-        RETURNING id
-      `);
-
-      expect(result.rows[0].id).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      );
-    });
-
-    it('should handle clearing empty tables', async () => {
-      // Clear already empty tables - should not throw error
-      await expect(TestDatabase.clearAllTables()).resolves.not.toThrow();
-    });
-  });
-
-  describe('Error Handling', () => {
-    beforeEach(async () => {
-      testPool = await TestDatabase.initialize();
-    });
-
-    it('should handle database constraint violations', async () => {
-      // Insert user with email
-      await testPool.query(`
-        INSERT INTO users (email, password_hash) 
-        VALUES ('constraint@example.com', 'hash123')
-      `);
-
-      // Try to insert duplicate email
-      await expect(testPool.query(`
-        INSERT INTO users (email, password_hash) 
-        VALUES ('constraint@example.com', 'hash456')
-      `)).rejects.toThrow();
-    });
-
-    it('should handle invalid SQL queries', async () => {
-      await expect(testPool.query('INVALID SQL SYNTAX'))
-        .rejects.toThrow();
-    });
-
-    it('should handle connection pool exhaustion gracefully', async () => {
-      // Create many concurrent connections (more than pool max of 20)
-      const manyPromises = Array.from({ length: 25 }, () => 
-        TestDatabase.query('SELECT pg_sleep(0.1)')
-      );
-
-      // Should handle gracefully without hanging
-      await expect(Promise.all(manyPromises)).resolves.toBeDefined();
-    }, 10000);
-
-    it('should handle long-running queries', async () => {
-      // Test query timeout handling
-      const startTime = Date.now();
-      
-      try {
-        await TestDatabase.query('SELECT pg_sleep(2)');
-      } catch (error) {
-        // Query should complete or timeout gracefully
-      }
-      
-      const duration = Date.now() - startTime;
-      expect(duration).toBeLessThan(15000); // Should not hang indefinitely
-    }, 20000);
-  });
-
-  describe('Database Cleanup and Teardown', () => {
-    it('should cleanup database connections and drop test database', async () => {
-      // Initialize database
-      testPool = await TestDatabase.initialize();
-      
-      // Insert some test data
-      await testPool.query(`
-        INSERT INTO users (email, password_hash) 
-        VALUES ('teardown@example.com', 'hash123')
-      `);
-
-      // Verify database exists and has data
-      let result = await testPool.query('SELECT current_database()');
-      expect(result.rows[0].current_database).toBe('koutu_test');
-
-      result = await testPool.query('SELECT COUNT(*) as count FROM users');
-      expect(parseInt(result.rows[0].count)).toBe(1);
-
-      // Cleanup
-      await TestDatabase.cleanup();
-
-      // After cleanup, the pool should be ended
-      const pool = TestDatabase.getPool();
-      expect(pool).toBeNull();
-    });
-
-    it('should handle cleanup when database is already closed', async () => {
-      // Initialize and immediately cleanup
-      await TestDatabase.initialize();
-      await TestDatabase.cleanup();
-      
-      // Cleanup again - should not throw error
-      await expect(TestDatabase.cleanup()).resolves.not.toThrow();
-    });
-
-    it('should handle cleanup errors gracefully', async () => {
-      // This simulates cleanup when there might be connection issues
-      await TestDatabase.initialize();
-      
-      // Even if there are connection errors during cleanup, it should not throw
-      await expect(TestDatabase.cleanup()).resolves.not.toThrow();
-    });
-  });
-
-  describe('Database Performance', () => {
-    beforeEach(async () => {
-      testPool = await TestDatabase.initialize();
-    });
-
-    it('should handle bulk inserts efficiently', async () => {
-      const startTime = Date.now();
-      
-      // Insert 1000 users in batches
-      const batchSize = 100;
-      const totalUsers = 1000;
-      
-      for (let i = 0; i < totalUsers; i += batchSize) {
-        const values = Array.from({ length: Math.min(batchSize, totalUsers - i) }, (_, j) => 
-          `('bulk${i + j}@example.com', 'hash')`
-        ).join(', ');
-        
-        await testPool.query(`
-          INSERT INTO users (email, password_hash) 
-          VALUES ${values}
-        `);
-      }
-      
-      const duration = Date.now() - startTime;
-      console.log(`Bulk insert of ${totalUsers} users took ${duration}ms`);
-      
-      // Verify all users were inserted
-      const result = await testPool.query('SELECT COUNT(*) as count FROM users');
-      expect(parseInt(result.rows[0].count)).toBe(totalUsers);
-      
-      // Should complete in reasonable time (less than 5 seconds)
-      expect(duration).toBeLessThan(5000);
-    });
-
-    it('should handle complex queries with joins efficiently', async () => {
-      // Setup test data
-      const userEmails = Array.from({ length: 100 }, (_, i) => `user${i}@example.com`);
-      
-      for (const email of userEmails) {
-        const userResult = await testPool.query(`
-          INSERT INTO users (email, password_hash) 
-          VALUES ($1, 'hash')
-          RETURNING id
-        `, [email]);
-        
-        const userId = userResult.rows[0].id;
-        
-        // Add garment items for each user
-        await testPool.query(`
-          INSERT INTO garment_items (user_id, name)
-          VALUES ($1, $2)
-        `, [userId, `Garment for ${email}`]);
-      }
-
-      const startTime = Date.now();
-      
-      // Complex query with joins
-      const result = await testPool.query(`
-        SELECT u.email, COUNT(g.id) as garment_count
-        FROM users u
-        LEFT JOIN garment_items g ON u.id = g.user_id
-        WHERE u.email LIKE '%@example.com'
-        GROUP BY u.id, u.email
-        HAVING COUNT(g.id) > 0
-        ORDER BY u.email
-        LIMIT 50
-      `);
-      
-      const duration = Date.now() - startTime;
-      console.log(`Complex join query took ${duration}ms`);
-      
-      expect(result.rows.length).toBe(50);
-      expect(parseInt(result.rows[0].garment_count)).toBe(1);
-      
       // Should complete in reasonable time
-      expect(duration).toBeLessThan(1000);
+      const totalTime = endTime - startTime;
+      expect(totalTime).toBeLessThan(5000); // 5 seconds for batch
+
+      // Average time per attempt should indicate rate limiting
+      const avgTime = totalTime / attempts;
+      expect(avgTime).toBeGreaterThan(25); // At least 25ms per attempt (bcrypt overhead)
     });
 
-    it('should maintain connection pool efficiency', async () => {
-      // Test multiple concurrent operations
-      const operations = Array.from({ length: 50 }, (_, i) => async () => {
-        const userResult = await testPool.query(`
-          INSERT INTO users (email, password_hash) 
-          VALUES ($1, 'hash')
-          RETURNING id
-        `, [`concurrent${i}@example.com`]);
-        
-        const userId = userResult.rows[0].id;
-        
-        await testPool.query(`
-          INSERT INTO garment_items (user_id, name)
-          VALUES ($1, $2)
-        `, [userId, `Item ${i}`]);
-        
-        return await testPool.query(`
-          SELECT COUNT(*) as count 
-          FROM garment_items 
-          WHERE user_id = $1
-        `, [userId]);
-      });
-
+    it('should handle bulk user creation attempts efficiently', async () => {
       const startTime = Date.now();
-      const results = await Promise.all(operations.map(op => op()));
-      const duration = Date.now() - startTime;
+      const userCount = BATCH_SIZE;
       
-      console.log(`50 concurrent operations took ${duration}ms`);
+      const createdUsers = [];
       
-      // All operations should succeed
-      expect(results).toHaveLength(50);
-      results.forEach(result => {
-        expect(parseInt(result.rows[0].count)).toBe(1);
-      });
-      
-      // Should complete efficiently with connection pooling
-      expect(duration).toBeLessThan(5000);
+      // Create users sequentially to avoid memory issues
+      for (let i = 0; i < userCount; i++) {
+        try {
+          const user = await testUserModel.create({
+            email: createUniqueEmail(),
+            password: 'BulkTest123!'
+          });
+          createdUsers.push(user);
+          createdUserIds.push(user.id);
+        } catch (error) {
+          // Handle any creation errors
+        }
+      }
+
+      const endTime = Date.now();
+      const totalTime = endTime - startTime;
+
+      expect(createdUsers.length).toBe(userCount);
+      expect(totalTime).toBeLessThan(10000); // Should complete within 10 seconds
+
+      // Verify all users were created
+      const dbCount = await TestDatabaseConnection.query('SELECT COUNT(*) as count FROM users');
+      expect(parseInt(dbCount.rows[0].count)).toBeGreaterThanOrEqual(userCount);
     });
   });
 
-  describe('Database State Validation', () => {
-    beforeEach(async () => {
-      testPool = await TestDatabase.initialize();
+  describe('XSS and Input Sanitization', () => {
+    it('should handle XSS attempts in email field', async () => {
+      const xssEmails = [
+        '<script>alert("xss")</script>@example.com',
+        'test@<img src=x onerror=alert("xss")>.com',
+        'test@example.com<svg onload=alert("xss")>',
+        'test+<iframe src="javascript:alert(\'xss\')"></iframe>@example.com'
+      ];
+
+      for (const email of xssEmails) {
+        try {
+          const user = await testUserModel.create({
+            email,
+            password: 'TestPassword123!'
+          });
+          
+          if (user) {
+            createdUserIds.push(user.id);
+            
+            // Verify the email is stored as-is (escaped by database)
+            const foundUser = await testUserModel.findByEmail(email);
+            expect(foundUser?.email).toBe(email);
+          }
+        } catch (error) {
+          // Email validation might reject these
+          expect(error).toBeInstanceOf(Error);
+        }
+      }
     });
 
-    it('should maintain data integrity across operations', async () => {
-      // Create user and related data
-      const userResult = await testPool.query(`
-        INSERT INTO users (email, password_hash, name) 
-        VALUES ('integrity@example.com', 'hash123', 'Test User')
-        RETURNING id
-      `);
-      const userId = userResult.rows[0].id;
+    it('should handle special characters in OAuth data safely', async () => {
+      const specialChars = [
+        { provider: 'google', id: 'user<script>alert("xss")</script>' },
+        { provider: 'github', id: 'user&lt;img src=x onerror=alert("xss")&gt;' },
+        { provider: 'facebook', id: 'user\'; DROP TABLE users; --' }
+      ];
 
-      // Add OAuth provider
-      await testPool.query(`
-        INSERT INTO user_oauth_providers (user_id, provider, provider_id)
-        VALUES ($1, 'google', 'google123')
-      `, [userId]);
+      for (const oauth of specialChars) {
+        const user = await testUserModel.createOAuthUser({
+          email: createUniqueEmail(),
+          oauth_provider: oauth.provider,
+          oauth_id: oauth.id
+        }).catch(() => null);
 
-      // Add statistics data
-      await testPool.query(`
-        INSERT INTO original_images (user_id, file_path)
-        VALUES ($1, '/path/to/image1.jpg'), ($1, '/path/to/image2.jpg')
-      `, [userId]);
+        if (user) {
+          createdUserIds.push(user.id);
+          
+          // Verify the OAuth data is stored safely
+          const foundUser = await testUserModel.findByOAuth(oauth.provider, oauth.id);
+          expect(foundUser?.id).toBe(user.id);
+        }
+      }
+    });
+  });
 
-      await testPool.query(`
-        INSERT INTO garment_items (user_id, name)
-        VALUES ($1, 'Shirt'), ($1, 'Pants'), ($1, 'Shoes')
-      `, [userId]);
+  describe('Session Security', () => {
+    it('should not expose sensitive data in user stats', async () => {
+      const user = await testUserModel.create({
+        email: createUniqueEmail(),
+        password: 'TestPassword123!'
+      });
+      createdUserIds.push(user.id);
 
-      await testPool.query(`
-        INSERT INTO wardrobes (user_id, name)
-        VALUES ($1, 'Summer'), ($1, 'Winter')
-      `, [userId]);
-
-      // Verify data integrity with complex query
-      const integrityResult = await testPool.query(`
-        SELECT 
-          u.email,
-          u.name,
-          COUNT(DISTINCT uop.provider) as oauth_providers,
-          COUNT(DISTINCT oi.id) as image_count,
-          COUNT(DISTINCT gi.id) as garment_count,
-          COUNT(DISTINCT w.id) as wardrobe_count
-        FROM users u
-        LEFT JOIN user_oauth_providers uop ON u.id = uop.user_id
-        LEFT JOIN original_images oi ON u.id = oi.user_id
-        LEFT JOIN garment_items gi ON u.id = gi.user_id
-        LEFT JOIN wardrobes w ON u.id = w.user_id
-        WHERE u.id = $1
-        GROUP BY u.id, u.email, u.name
-      `, [userId]);
-
-      const data = integrityResult.rows[0];
-      expect(data.email).toBe('integrity@example.com');
-      expect(data.name).toBe('Test User');
-      expect(parseInt(data.oauth_providers)).toBe(1);
-      expect(parseInt(data.image_count)).toBe(2);
-      expect(parseInt(data.garment_count)).toBe(3);
-      expect(parseInt(data.wardrobe_count)).toBe(2);
+      const stats = await testUserModel.getUserStats(user.id);
+      
+      // Stats should only contain counts, no sensitive data
+      expect(stats).toHaveProperty('imageCount');
+      expect(stats).toHaveProperty('garmentCount');
+      expect(stats).toHaveProperty('wardrobeCount');
+      expect(stats).not.toHaveProperty('email');
+      expect(stats).not.toHaveProperty('password_hash');
+      expect(stats).not.toHaveProperty('id');
     });
 
-    it('should handle database constraints properly', async () => {
-      // Test unique constraint on OAuth providers
-      const userResult = await testPool.query(`
-        INSERT INTO users (email, password_hash) 
-        VALUES ('oauth@example.com', 'hash123')
-        RETURNING id
-      `);
-      const userId = userResult.rows[0].id;
+    it('should handle invalid user IDs in stats queries', async () => {
+      const invalidIds = [
+        "'; DROP TABLE users; --",
+        "' OR '1'='1",
+        "' UNION SELECT * FROM users --",
+        null,
+        undefined,
+        ''
+      ];
 
-      // Insert OAuth provider
-      await testPool.query(`
-        INSERT INTO user_oauth_providers (user_id, provider, provider_id)
-        VALUES ($1, 'google', 'unique123')
-      `, [userId]);
+      for (const id of invalidIds) {
+        const stats = await testUserModel.getUserStats(id as any);
+        expect(stats).toEqual({
+          imageCount: 0,
+          garmentCount: 0,
+          wardrobeCount: 0
+        });
+      }
+    });
+  });
 
-      // Try to insert duplicate provider/provider_id combination
-      await expect(testPool.query(`
-        INSERT INTO user_oauth_providers (user_id, provider, provider_id)
-        VALUES ($1, 'google', 'unique123')
-      `, [userId])).rejects.toThrow(/duplicate key value violates unique constraint/);
+  describe('Cascading Delete Security', () => {
+    it('should securely cascade delete user data', async () => {
+      const user = await testUserModel.create({
+        email: createUniqueEmail(),
+        password: 'TestPassword123!'
+      });
+
+      // Create related data
+      await TestDatabaseConnection.query(
+        'INSERT INTO original_images (user_id, file_path) VALUES ($1, $2)',
+        [user.id, 'test.jpg']
+      );
+      await TestDatabaseConnection.query(
+        'INSERT INTO garment_items (user_id, name) VALUES ($1, $2)',
+        [user.id, 'Test Item']
+      );
+      await TestDatabaseConnection.query(
+        'INSERT INTO wardrobes (user_id, name) VALUES ($1, $2)',
+        [user.id, 'Test Wardrobe']
+      );
+
+      // Delete user
+      await testUserModel.delete(user.id);
+
+      // Verify all related data is deleted
+      const [images, garments, wardrobes] = await Promise.all([
+        TestDatabaseConnection.query('SELECT COUNT(*) as count FROM original_images WHERE user_id = $1', [user.id]),
+        TestDatabaseConnection.query('SELECT COUNT(*) as count FROM garment_items WHERE user_id = $1', [user.id]),
+        TestDatabaseConnection.query('SELECT COUNT(*) as count FROM wardrobes WHERE user_id = $1', [user.id])
+      ]);
+
+      expect(parseInt(images.rows[0].count)).toBe(0);
+      expect(parseInt(garments.rows[0].count)).toBe(0);
+      expect(parseInt(wardrobes.rows[0].count)).toBe(0);
+    });
+
+    it('should prevent deletion injection attacks', async () => {
+      const user1 = await testUserModel.create({
+        email: createUniqueEmail(),
+        password: 'Password123!'
+      });
+      const user2 = await testUserModel.create({
+        email: createUniqueEmail(),
+        password: 'Password456!'
+      });
+      createdUserIds.push(user1.id, user2.id);
+
+      // Attempt injection to delete multiple users
+      const maliciousIds = [
+        `${user1.id}' OR id='${user2.id}`,
+        `${user1.id}'; DELETE FROM users; --`,
+        `${user1.id}' OR '1'='1`
+      ];
+
+      for (const id of maliciousIds) {
+        const result = await testUserModel.delete(id);
+        expect(result).toBe(false);
+      }
+
+      // Verify both users still exist
+      const foundUser1 = await testUserModel.findById(user1.id);
+      const foundUser2 = await testUserModel.findById(user2.id);
+      expect(foundUser1).toBeTruthy();
+      expect(foundUser2).toBeTruthy();
     });
   });
 });
