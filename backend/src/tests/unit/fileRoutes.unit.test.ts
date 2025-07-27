@@ -144,29 +144,63 @@ describe('FileRoutes Unit Tests', () => {
 
     // Reset validation middleware mocks
     mockValidateFileContentBasic.mockImplementation((req: any, res: any, next: any) => {
+      const filepath = req.params.filepath || '';
+      let fileType = 'unknown';
+      
+      // Determine file type based on extension for proper testing
+      const ext = filepath.toLowerCase();
+      if (ext.endsWith('.jpg') || ext.endsWith('.jpeg')) fileType = 'image/jpeg';
+      else if (ext.endsWith('.png')) fileType = 'image/png';
+      else if (ext.endsWith('.webp')) fileType = 'image/webp';
+      else if (ext.endsWith('.bmp')) fileType = 'image/bmp';
+      else if (ext.endsWith('.gif')) fileType = 'image/gif';
+      else if (ext.endsWith('.pdf')) fileType = 'application/pdf';
+      else if (ext.endsWith('.txt')) fileType = 'text/plain';
+      
       req.fileValidation = { 
-        filepath: req.params.filepath, 
+        filepath: filepath, 
         isValid: true, 
-        fileType: 'unknown' 
+        fileType: fileType 
       };
       next();
     });
 
     mockValidateFileContent.mockImplementation((req: any, res: any, next: any) => {
+      const filepath = req.params.filepath || '';
+      let fileType = 'image/jpeg';
+      
+      // Determine file type based on extension for proper testing
+      const ext = filepath.toLowerCase();
+      if (ext.endsWith('.png')) fileType = 'image/png';
+      else if (ext.endsWith('.webp')) fileType = 'image/webp';
+      else if (ext.endsWith('.bmp')) fileType = 'image/bmp';
+      else if (ext.endsWith('.gif')) fileType = 'image/gif';
+      else if (ext.endsWith('.pdf')) fileType = 'application/pdf';
+      else if (ext.endsWith('.txt')) fileType = 'text/plain';
+      
       req.fileValidation = { 
-        filepath: req.params.filepath, 
+        filepath: filepath, 
         isValid: true, 
-        fileType: 'image/jpeg', 
+        fileType: fileType, 
         fileSize: 1024 
       };
       next();
     });
 
     mockValidateImageFile.mockImplementation((req: any, res: any, next: any) => {
+      const filepath = req.params.filepath || '';
+      let fileType = 'image/jpeg';
+      
+      // Determine file type based on extension for proper testing
+      if (filepath.endsWith('.png')) fileType = 'image/png';
+      else if (filepath.endsWith('.webp')) fileType = 'image/webp';
+      else if (filepath.endsWith('.bmp')) fileType = 'image/bmp';
+      else if (filepath.endsWith('.gif')) fileType = 'image/gif';
+      
       req.fileValidation = { 
-        filepath: req.params.filepath, 
+        filepath: filepath, 
         isValid: true, 
-        fileType: 'image/jpeg' 
+        fileType: fileType 
       };
       next();
     });
@@ -177,13 +211,19 @@ describe('FileRoutes Unit Tests', () => {
 
     // Mock Express response methods with minimal implementation
     const sendFileMock = jest.fn(function(this: Response) {
-      this.setHeader('Content-Type', 'application/octet-stream');
+      // Don't override Content-Type if it was already set by the route handler
+      if (!this.get('Content-Type')) {
+        this.setHeader('Content-Type', 'application/octet-stream');
+      }
       this.status(200).send('file');
       return this;
     });
     
     const downloadMock = jest.fn(function(this: Response, path: string, filename?: string) {
-      this.setHeader('Content-Type', 'application/octet-stream');
+      // Don't override Content-Type if it was already set by the route handler
+      if (!this.get('Content-Type')) {
+        this.setHeader('Content-Type', 'application/octet-stream');
+      }
       this.setHeader('Content-Disposition', `attachment; filename="${filename || 'download'}"`);
       this.status(200).send('dl');
       return this;
