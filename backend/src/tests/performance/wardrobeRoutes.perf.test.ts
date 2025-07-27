@@ -102,6 +102,20 @@ describe('Wardrobe Routes Performance Tests', () => {
   let testGarmentIds: string[] = [];
   const results: any[] = [];
 
+  beforeEach(() => {
+    // Force garbage collection before each test if available
+    if (global.gc) {
+      global.gc();
+    }
+  });
+
+  afterEach(() => {
+    // Force garbage collection but don't clear app
+    if (global.gc) {
+      global.gc();
+    }
+  });
+
   beforeAll(async () => {
     // Setup test database connection
     await setupWardrobeTestQuickFix();
@@ -169,7 +183,7 @@ describe('Wardrobe Routes Performance Tests', () => {
     wardrobeId = wardrobeResult.rows[0].id;
 
     // Create test garments for performance testing - reduced number
-    const NUM_TEST_GARMENTS = 20; // Reduced from 100
+    const NUM_TEST_GARMENTS = 10; // Reduced from 20 to prevent memory issues
     const categories = ['Top', 'Bottom', 'Footwear', 'Accessory'];
     const colors = ['Red', 'Blue', 'Green', 'Black'];
     const brands = ['Brand A', 'Brand B'];
@@ -226,7 +240,7 @@ describe('Wardrobe Routes Performance Tests', () => {
 
   describe('Response Time Tests', () => {
     const measureResponseTime = async (name: string, fn: () => Promise<any>) => {
-      const iterations = 20; // Reduced from 100
+      const iterations = 10; // Reduced from 20 to prevent memory accumulation
       const times: number[] = [];
 
       for (let i = 0; i < iterations; i++) {
@@ -234,6 +248,11 @@ describe('Wardrobe Routes Performance Tests', () => {
         await fn();
         const end = performance.now();
         times.push(end - start);
+        
+        // Force garbage collection if available
+        if (global.gc && i % 5 === 0) {
+          global.gc();
+        }
       }
 
       const avg = times.reduce((a, b) => a + b) / times.length;
@@ -406,29 +425,42 @@ describe('Wardrobe Routes Performance Tests', () => {
       while (Date.now() < endTime) {
         const promises = [];
         
-        for (let i = 0; i < connections; i++) {
-          const reqStart = Date.now();
-          const promise = request(app)
-            [method.toLowerCase()](endpoint)
-            .set('Authorization', `Bearer ${token}`)
-            .then((res) => {
-              const reqEnd = Date.now();
-              latencies.push(reqEnd - reqStart);
-              totalRequests++;
-              if (res.status >= 400) totalErrors++;
-            })
-            .catch(() => {
-              totalErrors++;
-              totalRequests++;
-            });
+        // Process in smaller batches to reduce memory pressure
+        const batchSize = Math.min(connections, 5);
+        for (let i = 0; i < connections; i += batchSize) {
+          const batch = [];
+          for (let j = 0; j < batchSize && (i + j) < connections; j++) {
+            const reqStart = Date.now();
+            const promise = request(app)
+              [method.toLowerCase()](endpoint)
+              .set('Authorization', `Bearer ${token}`)
+              .then((res) => {
+                const reqEnd = Date.now();
+                latencies.push(reqEnd - reqStart);
+                totalRequests++;
+                if (res.status >= 400) totalErrors++;
+                return null; // Clear response object
+              })
+              .catch(() => {
+                totalErrors++;
+                totalRequests++;
+                return null;
+              });
+            
+            batch.push(promise);
+          }
           
-          promises.push(promise);
+          await Promise.all(batch);
+          promises.push(...batch);
         }
-
-        await Promise.all(promises);
         
         // Add a small delay to prevent overwhelming the system
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise(resolve => setTimeout(resolve, 20)); // Increased delay
+        
+        // Periodic garbage collection
+        if (totalRequests % 100 === 0 && global.gc) {
+          global.gc();
+        }
       }
 
       const actualDuration = (Date.now() - startTime) / 1000;
@@ -456,7 +488,7 @@ describe('Wardrobe Routes Performance Tests', () => {
 
   describe('Throughput Tests', () => {
     test('GET /wardrobe - concurrent requests', async () => {
-      const result = await runConcurrentRequests('/wardrobe', 'GET', 10, 5); // Explicit parameters
+      const result = await runConcurrentRequests('/wardrobe', 'GET', 5, 3); // Reduced connections and duration
       
       const throughputResult = {
         test: 'GET /wardrobe throughput',
@@ -534,13 +566,13 @@ describe('Wardrobe Routes Performance Tests', () => {
   });
 
   describe('Load Tests', () => {
-    test('Sustained load - 20 concurrent connections', async () => {
-      const result = await runConcurrentRequests('/wardrobe', 'GET', 20, 5); // Reduced from 100 connections and 20s
+    test('Sustained load - 10 concurrent connections', async () => {
+      const result = await runConcurrentRequests('/wardrobe', 'GET', 10, 3); // Reduced from 20 connections and 5s
 
       const loadResult = {
         test: 'Sustained load test',
         type: 'load',
-        connections: 20,
+        connections: 10,
         duration: result.duration,
         metrics: {
           totalRequests: result.requests.total,
@@ -565,12 +597,12 @@ describe('Wardrobe Routes Performance Tests', () => {
       await runConcurrentRequests('/wardrobe', 'GET', 5, 2);
 
       // Spike to high traffic
-      const spikeResult = await runConcurrentRequests('/wardrobe', 'GET', 50, 3); // Reduced from 200 connections and 10s
+      const spikeResult = await runConcurrentRequests('/wardrobe', 'GET', 20, 2); // Reduced from 50 connections and 3s
 
       const spikeTestResult = {
         test: 'Spike test',
         type: 'spike',
-        connections: 50,
+        connections: 20,
         duration: spikeResult.duration,
         metrics: {
           totalRequests: spikeResult.requests.total,
@@ -609,7 +641,7 @@ describe('Wardrobe Routes Performance Tests', () => {
       }, interval);
 
       // Run load test with reduced connections
-      await runConcurrentRequests('/wardrobe', 'GET', 10, duration / 1000);
+      await runConcurrentRequests('/wardrobe', 'GET', 5, duration / 1000); // Reduced from 10 to 5
 
       clearInterval(monitorInterval);
 

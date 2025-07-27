@@ -1,0 +1,15 @@
+[
+  {
+    "test": "GET /wardrobe",
+    "type": "response_time",
+    "iterations": 10,
+    "metrics": {
+      "avg": 2.46,
+      "min": 1.67,
+      "max": 6.55,
+      "p95": 6.55,
+      "p99": 6.55
+    },
+    "unit": "ms"
+  }
+]
