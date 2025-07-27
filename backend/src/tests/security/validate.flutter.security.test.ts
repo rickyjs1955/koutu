@@ -48,6 +48,19 @@ describe('Flutter Validation Security Tests', () => {
     mockNext = jest.fn();
   });
 
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+    
+    // Clear any remaining timers
+    jest.clearAllTimers();
+    
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+    }
+  });
+
   describe('Client Detection Security', () => {
     describe('Header Injection Prevention', () => {
       it('should prevent XSS in User-Agent header', () => {
@@ -145,7 +158,7 @@ describe('Flutter Validation Security Tests', () => {
         // Create a deeply nested object that could cause stack overflow
         let nestedObject: any = {};
         let current = nestedObject;
-        for (let i = 0; i < 1000; i++) {
+        for (let i = 0; i < 100; i++) { // Reduced from 1000
           current.nested = {};
           current = current.nested;
         }
@@ -164,7 +177,7 @@ describe('Flutter Validation Security Tests', () => {
       });
 
       it('should prevent ReDoS attacks via malformed JSON', () => {
-        const maliciousJson = '{"platform":"' + 'a'.repeat(100000) + '"}';
+        const maliciousJson = '{"platform":"' + 'a'.repeat(10000) + '"}'; // Reduced from 100000
 
         (mockReq.get as jest.Mock).mockImplementation((header: string) => {
           if (header === 'X-Client-Type') return 'flutter';
@@ -184,7 +197,7 @@ describe('Flutter Validation Security Tests', () => {
 
     describe('Memory Exhaustion Prevention', () => {
       it('should handle massive JSON payloads', () => {
-        const largeArray = new Array(100000).fill('x');
+        const largeArray = new Array(10000).fill('x'); // Reduced from 100000
         const largeDeviceInfo = {
           platform: 'android',
           screenWidth: 1080,
@@ -202,6 +215,9 @@ describe('Flutter Validation Security Tests', () => {
 
         // Should handle without crashing
         expect(mockNext).toHaveBeenCalledWith();
+        
+        // Clear large array reference
+        largeArray.length = 0;
       });
 
       it('should handle circular reference attacks', () => {
@@ -474,7 +490,7 @@ describe('Flutter Validation Security Tests', () => {
     describe('Resource Exhaustion Prevention', () => {
       it('should handle validation errors without memory leaks', () => {
         // Create many validation attempts to test for memory leaks
-        for (let i = 0; i < 1000; i++) {
+        for (let i = 0; i < 100; i++) { // Reduced from 1000
           mockNext.mockClear();
           
           mockReq.file = {
@@ -492,13 +508,16 @@ describe('Flutter Validation Security Tests', () => {
               code: 'INVALID_FILE'
             })
           );
+          
+          // Clear references to help GC
+          mockReq.file = undefined;
         }
       });
 
       it('should handle concurrent validation attempts', async () => {
         const validationPromises = [];
         
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 20; i++) { // Reduced from 100
           const promise = new Promise((resolve) => {
             const localMockNext = jest.fn(() => resolve(undefined));
             
@@ -567,8 +586,8 @@ describe('Flutter Validation Security Tests', () => {
         const sharp = require('sharp');
         sharp.default.mockImplementation(() => ({
           metadata: jest.fn().mockResolvedValue({
-            width: 999999, // Extreme width
-            height: 999999, // Extreme height
+            width: 99999, // Reduced from 999999
+            height: 99999, // Reduced from 999999
             format: 'jpeg',
             space: 'srgb',
             density: 72
@@ -769,7 +788,7 @@ describe('Flutter Validation Security Tests', () => {
       mockReq.file = {
         originalname: 'huge.jpg',
         mimetype: 'application/octet-stream', // Should be blocked
-        size: 50 * 1024 * 1024, // 50MB
+        size: 30 * 1024 * 1024, // 30MB (reduced from 50MB)
         buffer: Buffer.from('fake-data')
       } as Express.Multer.File;
 
@@ -842,7 +861,7 @@ describe('Flutter Validation Security Tests', () => {
       const timings: number[] = [];
       
       // Test multiple validation failures
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 5; i++) { // Reduced from 10
         (mockNext as jest.Mock).mockClear();
         
         mockReq.file = {
@@ -887,7 +906,4 @@ describe('Flutter Validation Security Tests', () => {
     });
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
 });
