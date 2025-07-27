@@ -115,24 +115,21 @@ describe('FileRoutes Unit Tests', () => {
     // Default mocks - ALWAYS set local mode first
     mockConfig.storageMode = 'local';
     
-    mockAuthenticate.mockImplementation(async(req: any, res: any, next: any) => {
+    // Use simpler mock implementations to reduce memory
+    mockAuthenticate.mockImplementation((req: any, res: any, next: any) => {
       req.user = { id: 'user123' };
       next();
     });
     
-    mockApiError.notFound = jest.fn().mockImplementation((message) => {
+    mockApiError.notFound = jest.fn((message) => {
       const error = new Error(message);
       (error as any).statusCode = 404;
       (error as any).code = 'NOT_FOUND';
       return error;
     });
 
-    // Mock storageService.getAbsolutePath to return a valid path
-    mockStorageService.getAbsolutePath = jest.fn().mockImplementation((filepath: string) => {
-      return `/mock/storage/path/${filepath}`;
-    });
-
-    // Mock storageService.getSignedUrl for Firebase tests
+    // Mock storageService with minimal implementations
+    mockStorageService.getAbsolutePath = jest.fn((filepath: string) => `/mock/storage/path/${filepath}`);
     mockStorageService.getSignedUrl = jest.fn().mockResolvedValue('https://firebase.url/signed');
 
     // Mock path functions
@@ -178,35 +175,47 @@ describe('FileRoutes Unit Tests', () => {
       next();
     });
 
-    // Mock Express response methods globally
-    jest.spyOn(express.response, 'sendFile').mockImplementation(function(this: Response, path: string, options?: any, callback?: any) {
-      this.setHeader('Content-Type', this.getHeader('Content-Type') || 'application/octet-stream');
-      this.status(200).send('mocked file content');
+    // Mock Express response methods with minimal implementation
+    const sendFileMock = jest.fn(function(this: Response) {
+      this.setHeader('Content-Type', 'application/octet-stream');
+      this.status(200).send('file');
       return this;
     });
-
-    jest.spyOn(express.response, 'download').mockImplementation(function(this: Response, path: string, filename?: string, options?: any, callback?: any) {
-      this.setHeader('Content-Type', this.getHeader('Content-Type') || 'application/octet-stream');
+    
+    const downloadMock = jest.fn(function(this: Response, path: string, filename?: string) {
+      this.setHeader('Content-Type', 'application/octet-stream');
       this.setHeader('Content-Disposition', `attachment; filename="${filename || 'download'}"`);
-      this.status(200).send('mocked download content');
+      this.status(200).send('dl');
       return this;
     });
-
-    const originalRedirect = express.response.redirect;
-    jest.spyOn(express.response, 'redirect').mockImplementation(function(this: Response, status: number | string, url?: string) {
+    
+    const redirectMock = jest.fn(function(this: Response, status: number | string, url?: string) {
       if (typeof status === 'string') {
         url = status;
         status = 302;
       }
-      this.status(status as number);
-      this.setHeader('Location', url || '');
-      this.send();
+      this.status(status as number).setHeader('Location', url || '').send();
       return this;
     });
+    
+    jest.spyOn(express.response, 'sendFile').mockImplementation(sendFileMock);
+    jest.spyOn(express.response, 'download').mockImplementation(downloadMock);
+    jest.spyOn(express.response, 'redirect').mockImplementation(redirectMock);
   });
 
   afterEach(() => {
+    // Clear all mocks and timers
+    jest.clearAllMocks();
     jest.restoreAllMocks();
+    jest.clearAllTimers();
+    
+    // Reset mock implementations to reduce memory retention
+    mockValidateFileContentBasic.mockReset();
+    mockValidateFileContent.mockReset();
+    mockValidateImageFile.mockReset();
+    mockLogFileAccess.mockReset();
+    mockAuthenticate.mockReset();
+    
     // Force garbage collection if available
     if (global.gc) {
       global.gc();
@@ -214,8 +223,18 @@ describe('FileRoutes Unit Tests', () => {
   });
 
   afterAll(() => {
-    // Clean up the test app
-    testApp = null;
+    // Clean up the test app and all references
+    if (testApp) {
+      testApp = null;
+    }
+    
+    // Clear module cache to free memory
+    jest.resetModules();
+    
+    // Final garbage collection
+    if (global.gc) {
+      global.gc();
+    }
   });
 
   describe('GET /:filepath* (Public Route)', () => {

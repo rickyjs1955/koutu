@@ -1,0 +1,18 @@
+[
+  {
+    "test": "Statistics calculation performance",
+    "type": "calculation_test",
+    "results": [
+      {
+        "user": "perf-test@example.com",
+        "garmentCount": 1000,
+        "calculationTime": 30.76
+      },
+      {
+        "user": "perf-test-2@example.com",
+        "garmentCount": 500,
+        "calculationTime": 9.13
+      }
+    ]
+  }
+]

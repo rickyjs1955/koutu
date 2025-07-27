@@ -20,7 +20,8 @@ module.exports = {
     '!src/**/__helpers__/**'
   ],
   setupFiles: [
-    '<rootDir>/src/tests/pre-setup.ts'
+    '<rootDir>/src/tests/pre-setup.ts',
+    '<rootDir>/jest.setup.memory.js'
   ],
   setupFilesAfterEnv: [
     '<rootDir>/src/tests/setup.ts'

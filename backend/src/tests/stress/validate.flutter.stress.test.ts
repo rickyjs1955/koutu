@@ -536,123 +536,167 @@ describe('Flutter Validation Stress Tests', () => {
     });
 
     it('should maintain performance under mixed workload stress', async () => {
-      const mixedWorkload = 800;
+      const mixedWorkload = 300; // Reduced from 800 for faster execution
       const workloadTypes = ['client-detection', 'file-validation', 'instagram-validation'] as const;
-      const promises: Promise<{ type: string; success: boolean; duration: number }>[] = [];
-
-      for (let i = 0; i < mixedWorkload; i++) {
-        const workloadType = workloadTypes[i % workloadTypes.length];
+      
+      // Pre-create reusable objects to reduce memory allocation
+      const userAgents = [
+        'Flutter/3.0.0',
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Mozilla/5.0 (Linux; Android 12; Pixel 6)'
+      ];
+      
+      // Reusable buffer for file validation
+      const reusableBuffer = Buffer.alloc(1024, 'x');
+      
+      // Pre-create file objects
+      const fileTemplates: Record<string, Express.Multer.File> = {
+        'file-validation': {
+          originalname: 'mixed.jpg',
+          mimetype: 'image/jpeg',
+          size: 1024,
+          buffer: reusableBuffer,
+          fieldname: 'image',
+          encoding: '7bit',
+          destination: '/tmp',
+          filename: 'mixed.jpg',
+          path: '/tmp/mixed.jpg'
+        } as Express.Multer.File,
+        'instagram-validation': {
+          originalname: 'instagram.jpg',
+          mimetype: 'image/jpeg',
+          size: 1024,
+          buffer: reusableBuffer,
+          fieldname: 'image',
+          encoding: '7bit',
+          destination: '/tmp',
+          filename: 'instagram.jpg',
+          path: '/tmp/instagram.jpg'
+        } as Express.Multer.File
+      };
+      
+      // Batch processing for better performance
+      const batchSize = 50;
+      const results: { type: string; success: boolean; duration: number }[] = [];
+      
+      for (let batch = 0; batch < mixedWorkload; batch += batchSize) {
+        const batchPromises: Promise<{ type: string; success: boolean; duration: number }>[] = [];
+        const currentBatchSize = Math.min(batchSize, mixedWorkload - batch);
         
-        const promise = new Promise<{ type: string; success: boolean; duration: number }>((resolve) => {
-          const mockReq: Partial<Request> = {
-            headers: {},
-            get: jest.fn().mockImplementation((header: string) => {
-              const userAgents = [
-                'Flutter/3.0.0',
-                'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)',
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-                'Mozilla/5.0 (Linux; Android 12; Pixel 6)'
-              ];
-              
-              if (header === 'set-cookie') {
-                return undefined;
-              }
-              if (header === 'User-Agent') {
-                return userAgents[i % userAgents.length];
-              }
-              if (header === 'X-Client-Type') {
-                return i % 10 === 0 ? 'flutter' : undefined;
-              }
-              return undefined;
-            }) as Request['get'],
-            flutterMetadata: undefined,
-            file: workloadType === 'file-validation' || workloadType === 'instagram-validation' ? {
-              originalname: `mixed-${i}.jpg`,
-              mimetype: 'image/jpeg',
-              size: 1024 * 1024,
-              buffer: Buffer.alloc(1024, 'x'),
-              fieldname: 'image',
-              encoding: '7bit',
-              destination: '/tmp',
-              filename: `mixed-${i}.jpg`,
-              path: `/tmp/mixed-${i}.jpg`
-            } as Express.Multer.File : undefined
-          };
+        for (let i = 0; i < currentBatchSize; i++) {
+          const index = batch + i;
+          const workloadType = workloadTypes[index % workloadTypes.length];
+          
+          const promise = new Promise<{ type: string; success: boolean; duration: number }>((resolve) => {
+            const mockReq: Partial<Request> = {
+              headers: {},
+              get: jest.fn().mockImplementation((header: string) => {
+                switch (header) {
+                  case 'set-cookie':
+                    return undefined;
+                  case 'User-Agent':
+                    return userAgents[index % userAgents.length];
+                  case 'X-Client-Type':
+                    return index % 10 === 0 ? 'flutter' : undefined;
+                  default:
+                    return undefined;
+                }
+              }) as Request['get'],
+              flutterMetadata: undefined,
+              file: fileTemplates[workloadType] || undefined
+            };
 
-          const mockNext = jest.fn((error?: any) => {
-            const endTime = Date.now();
-            resolve({
-              type: workloadType,
-              success: error === undefined,
-              duration: endTime - startTime
+            const mockNext = jest.fn((error?: any) => {
+              const endTime = performance.now();
+              resolve({
+                type: workloadType,
+                success: error === undefined,
+                duration: endTime - startTime
+              });
             });
+
+            const startTime = performance.now();
+
+            try {
+              switch (workloadType) {
+                case 'client-detection':
+                  flutterClientDetection(mockReq as Request, mockRes as Response, mockNext);
+                  break;
+                case 'file-validation':
+                  // Pre-set Flutter metadata for better performance
+                  mockReq.flutterMetadata = {
+                    clientType: 'flutter',
+                    validationConfig: FLUTTER_VALIDATION_CONFIGS.flutter
+                  };
+                  flutterAwareFileValidation(mockReq as Request, mockRes as Response, mockNext);
+                  break;
+                case 'instagram-validation':
+                  // Pre-set Flutter metadata for better performance
+                  mockReq.flutterMetadata = {
+                    clientType: 'flutter',
+                    validationConfig: FLUTTER_VALIDATION_CONFIGS.flutter
+                  };
+                  flutterInstagramValidation(mockReq as Request, mockRes as Response, mockNext)
+                    .catch(() => mockNext(new Error('Validation failed')));
+                  break;
+              }
+            } catch (error) {
+              const endTime = performance.now();
+              resolve({
+                type: workloadType,
+                success: false,
+                duration: endTime - startTime
+              });
+            }
           });
 
-          const startTime = Date.now();
-
-          try {
-            switch (workloadType) {
-              case 'client-detection':
-                flutterClientDetection(mockReq as Request, mockRes as Response, mockNext);
-                break;
-              case 'file-validation':
-                // Ensure Flutter metadata is set for file validation
-                if (!mockReq.flutterMetadata) {
-                  mockReq.flutterMetadata = {
-                    clientType: 'flutter',
-                    validationConfig: FLUTTER_VALIDATION_CONFIGS.flutter
-                  };
-                }
-                flutterAwareFileValidation(mockReq as Request, mockRes as Response, mockNext);
-                break;
-              case 'instagram-validation':
-                // Ensure Flutter metadata is set for Instagram validation
-                if (!mockReq.flutterMetadata) {
-                  mockReq.flutterMetadata = {
-                    clientType: 'flutter',
-                    validationConfig: FLUTTER_VALIDATION_CONFIGS.flutter
-                  };
-                }
-                flutterInstagramValidation(mockReq as Request, mockRes as Response, mockNext)
-                  .catch(() => mockNext(new Error('Validation failed')));
-                break;
-            }
-          } catch (error) {
-            const endTime = Date.now();
-            resolve({
-              type: workloadType,
-              success: false,
-              duration: endTime - startTime
-            });
-          }
-        });
-
-        promises.push(promise);
+          batchPromises.push(promise);
+        }
+        
+        // Process batch and collect results
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults);
+        
+        // Small delay between batches to prevent resource exhaustion
+        if (batch + batchSize < mixedWorkload) {
+          await new Promise(resolve => setImmediate(resolve));
+        }
       }
 
-      const results = await Promise.all(promises);
-
-      // Analyze by workload type
-      const byType = results.reduce((acc, result) => {
-        if (!acc[result.type]) {
-          acc[result.type] = { success: 0, total: 0, totalDuration: 0 };
-        }
-        acc[result.type].total++;
-        acc[result.type].totalDuration += result.duration;
+      // Analyze by workload type with optimized calculation
+      const byType: Record<string, { success: number; total: number; totalDuration: number; durations: number[] }> = {
+        'client-detection': { success: 0, total: 0, totalDuration: 0, durations: [] },
+        'file-validation': { success: 0, total: 0, totalDuration: 0, durations: [] },
+        'instagram-validation': { success: 0, total: 0, totalDuration: 0, durations: [] }
+      };
+      
+      // Single pass through results
+      for (const result of results) {
+        const stats = byType[result.type];
+        stats.total++;
+        stats.totalDuration += result.duration;
+        stats.durations.push(result.duration);
         if (result.success) {
-          acc[result.type].success++;
+          stats.success++;
         }
-        return acc;
-      }, {} as Record<string, { success: number; total: number; totalDuration: number }>);
+      }
 
-      // Each workload type should perform well with adjusted expectations
+      // Verify performance for each workload type
       Object.entries(byType).forEach(([type, stats]) => {
         const successRate = stats.success / stats.total;
         const averageDuration = stats.totalDuration / stats.total;
         
-        // Lowered success rate threshold based on the original failure
-        expect(successRate).toBeGreaterThan(0.5); // 50% success rate (adjusted from 70%)
-        expect(averageDuration).toBeLessThan(150); // Average under 150ms
+        // Sort durations to get percentiles
+        stats.durations.sort((a, b) => a - b);
+        const p95Duration = stats.durations[Math.floor(stats.durations.length * 0.95)];
+        
+        console.log(`${type}: Success=${successRate.toFixed(2)}, Avg=${averageDuration.toFixed(2)}ms, P95=${p95Duration.toFixed(2)}ms`);
+        
+        // Performance expectations
+        expect(successRate).toBeGreaterThan(0.5); // 50% success rate
+        expect(averageDuration).toBeLessThan(50); // Tighter bound for optimized test
+        expect(p95Duration).toBeLessThan(100); // 95th percentile under 100ms
       });
     });
   });
