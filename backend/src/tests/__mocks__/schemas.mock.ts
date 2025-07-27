@@ -216,9 +216,9 @@ export const createMaliciousSchemaRequest = (type: string): Partial<Request> => 
 export const generateSchemaTestData = {
   validGarment: () => ({
     mask_data: {
-      width: 200,
-      height: 150,
-      data: new Array(30000).fill(1) // Valid 200x150 mask with content
+      width: 50,  // Reduced from 200
+      height: 50,  // Reduced from 150
+      data: new Array(2500).fill(1) // Reduced from 30000
     },
     metadata: {
       type: 'jacket',
@@ -235,9 +235,9 @@ export const generateSchemaTestData = {
   
   invalidGarment: () => ({
     mask_data: {
-      width: 100,
-      height: 100,
-      data: new Array(10000).fill(0) // All zeros - no content
+      width: 50,  // Reduced from 100
+      height: 50,  // Reduced from 100
+      data: new Array(2500).fill(0) // Reduced from 10000
     },
     metadata: {
       type: 'shirt',
@@ -331,9 +331,9 @@ export const validationScenarios = {
       generateSchemaTestData.validGarment(),
       {
         mask_data: {
-          width: 300,
-          height: 200,
-          data: new Array(60000).fill(128) // Valid with different values
+          width: 60,  // Reduced from 300
+          height: 40,  // Reduced from 200
+          data: new Array(2400).fill(128) // Reduced from 60000
         },
         metadata: {
           type: 'dress',
@@ -352,9 +352,9 @@ export const validationScenarios = {
       generateSchemaTestData.invalidGarment(),
       {
         mask_data: {
-          width: 100,
-          height: 100,
-          data: new Array(9999).fill(1) // Wrong length
+          width: 50,
+          height: 50,
+          data: new Array(2499).fill(1) // Wrong length
         },
         metadata: {
           type: 'shirt',

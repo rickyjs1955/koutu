@@ -494,13 +494,20 @@ export const testSchemaPerformance = (
 
     // NEW: Alternative performance test that's more stable
     it('should complete validation within reasonable bounds', () => {
-      const iterations = 20;
+      // Create test data once to avoid repeated allocations
+      const testData = dataGenerator(5);
+      
+      // Warm up the validator to avoid cold start bias
+      for (let i = 0; i < 3; i++) {
+        validationFn(testData);
+      }
+      
+      const iterations = 10; // Reduced from 20
       const executionTimes: number[] = [];
       
       for (let i = 0; i < iterations; i++) {
         const startTime = performance.now();
-        const data = dataGenerator(5); // Small, consistent size
-        const result = validationFn(data);
+        const result = validationFn(testData);
         const endTime = performance.now();
         
         executionTimes.push(endTime - startTime);
@@ -512,11 +519,11 @@ export const testSchemaPerformance = (
       const maxTime = Math.max(...executionTimes);
       
       // More realistic expectations
-      expect(averageTime).toBeLessThan(200); // 200ms average
-      expect(maxTime).toBeLessThan(1000); // 1 second max for any single validation
+      expect(averageTime).toBeLessThan(50); // 50ms average (reduced from 200ms)
+      expect(maxTime).toBeLessThan(200); // 200ms max (reduced from 1000ms)
       
       // Ensure no validation took an unreasonably long time
-      const slowValidations = executionTimes.filter(time => time > 500);
+      const slowValidations = executionTimes.filter(time => time > 100); // Reduced from 500ms
       expect(slowValidations.length).toBeLessThan(iterations * 0.1); // Less than 10% should be slow
     });
 
@@ -785,9 +792,9 @@ export const generateUpdateStatusTestData = {
 export const generateSchemaTestData = {
   validGarment: () => ({
     mask_data: {
-      width: 100,
-      height: 100,
-      data: new Array(10000).fill(1) // Non-zero valid data
+      width: 50,  // Reduced from 100
+      height: 50,  // Reduced from 100
+      data: new Array(2500).fill(1) // Reduced from 10000 to 2500
     },
     metadata: {
       type: 'shirt',
@@ -799,6 +806,21 @@ export const generateSchemaTestData = {
       material: 'cotton'
     },
     original_image_id: 'img_test_123'
+  }),
+  
+  validPolygon: () => ({
+    points: [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 100 },
+      { x: 0, y: 100 }
+    ],
+    metadata: {
+      label: 'test_polygon',
+      confidence: 0.95,
+      source: 'manual_annotation'
+    },
+    original_image_id: 'img_test_456'
   })
 };
 

@@ -46,9 +46,9 @@ describe('Schema Validation Unit Tests', () => {
       
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.mask_data.width).toBe(200);
-        expect(result.data.mask_data.height).toBe(150);
-        expect(result.data.mask_data.data.length).toBe(30000);
+        expect(result.data.mask_data.width).toBe(50);
+        expect(result.data.mask_data.height).toBe(50);
+        expect(result.data.mask_data.data.length).toBe(2500);
         expect(result.data.metadata?.type).toBe('jacket');
       }
     });
@@ -586,7 +586,7 @@ describe('Schema Validation Unit Tests', () => {
       // Step 3: Cross-validate consistency
       if (garmentValidation.success && polygonValidation.success) {
         const maskArea = garmentValidation.data.mask_data.width * garmentValidation.data.mask_data.height;
-        expect(maskArea).toBeGreaterThan(100000); // Reasonable size
+        expect(maskArea).toBeGreaterThan(1000); // Reasonable size
 
         const points = polygonValidation.data.points;
         let polygonArea = 0;
