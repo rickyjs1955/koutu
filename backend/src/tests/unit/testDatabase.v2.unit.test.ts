@@ -782,7 +782,15 @@ describe('TestDatabase v2 - Docker Database Implementation', () => {
           throw new Error('Connection failed');
         });
 
+        // Mock setTimeout to speed up the test
+        jest.spyOn(global, 'setTimeout').mockImplementation((callback: any) => {
+          callback();
+          return null as any;
+        });
+
         await expect(TestDatabase.initialize()).rejects.toThrow();
+
+        (global.setTimeout as unknown as jest.Mock).mockRestore();
       });
     });
 
@@ -999,7 +1007,15 @@ describe('TestDatabase v2 - Docker Database Implementation', () => {
           throw new Error('Connection failed');
         });
 
+        // Mock setTimeout to speed up the test
+        jest.spyOn(global, 'setTimeout').mockImplementation((callback: any) => {
+          callback();
+          return null as any;
+        });
+
         await expect(TestDatabase.initialize()).rejects.toThrow();
+
+        (global.setTimeout as unknown as jest.Mock).mockRestore();
       });
 
       test('should not expose internal database structure in schema errors', async () => {
