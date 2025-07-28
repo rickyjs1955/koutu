@@ -1,4 +1,4 @@
-// /backend/migrations/create_wardrobe_items_table.sql
+-- /backend/migrations/create_wardrobe_items_table.sql
 
 -- Create wardrobe_items table if it doesn't exist
 CREATE TABLE IF NOT EXISTS wardrobe_items (

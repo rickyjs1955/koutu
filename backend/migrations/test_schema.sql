@@ -171,8 +171,12 @@ CREATE TABLE IF NOT EXISTS polygons (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   original_image_id UUID REFERENCES original_images(id) ON DELETE CASCADE,
-  coordinates JSONB DEFAULT '[]',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  points JSONB NOT NULL DEFAULT '[]',
+  label VARCHAR(255),
+  metadata JSONB NOT NULL DEFAULT '{}',
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Grant permissions (if needed)
