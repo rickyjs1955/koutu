@@ -1,7 +1,7 @@
 // /backend/src/tests/fixtures/testHelpers.ts
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcrypt';
-import { testDb } from './testDb';
+import { TestDatabaseConnection } from '../../utils/testDatabaseConnection';
 
 interface CreateUserOptions {
     email?: string;
@@ -39,7 +39,7 @@ export class TestHelpers {
             ? await bcrypt.hash('testpassword123', 10)
             : null;
 
-        await testDb.query(
+        await TestDatabaseConnection.query(
             `INSERT INTO users (
                 id, email, password_hash, 
                 created_at, updated_at
@@ -67,7 +67,7 @@ export class TestHelpers {
             format: 'jpeg'
         };
 
-        await testDb.query(
+        await TestDatabaseConnection.query(
             `INSERT INTO original_images (
                 id, user_id, original_filename, file_path, 
                 status, original_metadata, upload_date, created_at, updated_at
@@ -110,7 +110,7 @@ export class TestHelpers {
     ): Promise<string> {
         const polygonId = uuidv4();
 
-        await testDb.query(
+        await TestDatabaseConnection.query(
             `INSERT INTO polygons (
                 id, user_id, original_image_id, points, 
                 label, metadata, created_at, updated_at
@@ -147,7 +147,7 @@ export class TestHelpers {
         const name = options.name || `Test Garment ${garmentId.slice(0, 8)}`;
         const type = options.type || 'shirt';
 
-        await testDb.query(
+        await TestDatabaseConnection.query(
             `INSERT INTO garments (
                 id, user_id, polygon_id, name, type,
                 brand, color, pattern, material, size,
@@ -179,7 +179,7 @@ export class TestHelpers {
         const wardrobeId = uuidv4();
         const name = options.name || `Test Wardrobe ${wardrobeId.slice(0, 8)}`;
 
-        await testDb.query(
+        await TestDatabaseConnection.query(
             `INSERT INTO wardrobes (
                 id, user_id, name, description, 
                 is_public, created_at, updated_at
@@ -202,7 +202,7 @@ export class TestHelpers {
         garmentId: string,
         position?: number
     ): Promise<void> {
-        await testDb.query(
+        await TestDatabaseConnection.query(
             `INSERT INTO wardrobe_items (
                 wardrobe_id, garment_id, position, added_at
             ) VALUES ($1, $2, $3, NOW())`,

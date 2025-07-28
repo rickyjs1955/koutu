@@ -1,7 +1,7 @@
 // /backend/src/tests/integration/polygonService.p2.int.test.ts
 import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import { polygonService } from '../../services/polygonService';
-import { testDb } from '../fixtures/testDb';
+import { TestDatabaseConnection } from '../../utils/testDatabaseConnection';
 import { testHelpers } from '../fixtures/testHelpers';
 import { ApiError } from '../../utils/ApiError';
 import { storageService } from '../../services/storageService';
@@ -32,7 +32,7 @@ describe('PolygonService Integration Tests', () => {
     beforeAll(async () => {
         // Skip database tests if no database connection
         try {
-            await testDb.initialize();
+            await TestDatabaseConnection.initialize();
         } catch (error) {
             console.warn('Database connection failed, skipping integration tests');
             console.warn('Make sure PostgreSQL is running on port 5433 or update TEST_DATABASE_URL');
@@ -78,13 +78,13 @@ describe('PolygonService Integration Tests', () => {
     });
 
     afterAll(async () => {
-        await testDb.cleanup();
+        await TestDatabaseConnection.cleanup();
         // Clean up test upload directory
         await fs.rm(uploadDir, { recursive: true, force: true });
     });
 
     beforeEach(async () => {
-        await testDb.clear();
+        await TestDatabaseConnection.clearAllTables();
         // Create test user and image
         const { userId, imageId } = await testHelpers.createUserWithImage({
             imageStatus: 'new',
@@ -389,7 +389,7 @@ describe('PolygonService Integration Tests', () => {
 
         test('should prevent adding polygons to labeled images', async () => {
             // Update image status to labeled
-            await testDb.query(
+            await TestDatabaseConnection.query(
                 'UPDATE original_images SET status = $1 WHERE id = $2',
                 ['labeled', testImageId]
             );
@@ -553,7 +553,7 @@ describe('PolygonService Integration Tests', () => {
             
             // Verify the simplified polygon still represents roughly the same shape
             // by checking it's still a valid polygon with reasonable area
-            const originalArea = await testDb.query(
+            const originalArea = await TestDatabaseConnection.query(
                 `SELECT id FROM polygons WHERE id = $1`,
                 [polygonId]
             );
