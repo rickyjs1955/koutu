@@ -509,9 +509,18 @@ describe('Flutter Auth Routes Integration Tests', () => {
       const response = await request(app)
         .post('/api/auth/device/register')
         .set(createFlutterHeaders(authenticatedUser.token))
-        .send(newDevice)
-        .expect(200);
+        .send(newDevice);
 
+      // Log error details if the request fails
+      if (response.status !== 200) {
+        console.error('Device registration failed:', {
+          status: response.status,
+          body: response.body,
+          headers: response.headers
+        });
+      }
+
+      expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
         status: 'success',
         message: 'Device registered successfully',

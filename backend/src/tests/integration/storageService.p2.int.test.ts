@@ -196,7 +196,9 @@ describe('StorageService - Integration Tests', () => {
         const absolutePath = storageService.getAbsolutePath(relativePath);
         
         expect(path.isAbsolute(absolutePath)).toBe(true);
-        expect(absolutePath).toContain(relativePath);
+        // Normalize paths for cross-platform compatibility
+        const normalizedAbsPath = absolutePath.replace(/\\/g, '/');
+        expect(normalizedAbsPath).toContain(relativePath);
       });
     });
 

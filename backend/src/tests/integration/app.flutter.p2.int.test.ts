@@ -22,14 +22,69 @@ jest.mock('../../config', () => ({
     port: 3000,
     nodeEnv: 'test',
     jwtSecret: 'test-jwt-secret-flutter',
-    storageMode: 'local'
+    storageMode: 'local',
+    uploadsDir: '/tmp/test-uploads',
+    cloudflareAccountId: 'test-account',
+    cloudflareApiKey: 'test-key',
+    s3BucketName: 'test-bucket',
+    cloudflareImagesDeliveryUrl: 'https://test.cloudflare.com'
   }
 }));
 
-// Import test utilities from the main integration test
-import { TestDataFactory, RequestHelper, TEST_CONFIG } from './app.int.test';
+// Import app and uuid
 import { app } from '../../app';
 import { v4 as uuidv4 } from 'uuid';
+
+// Define test utilities inline since app.int.test.ts doesn't exist
+const TEST_CONFIG = {
+  TIMEOUT: 30000,
+  PORT: 0, // Use dynamic port
+  JWT_SECRET: 'test-jwt-secret-flutter'
+};
+
+const TestDataFactory = {
+  generateTestUser: () => ({
+    id: uuidv4(),
+    email: `test_${Date.now()}@example.com`,
+    password: 'TestPassword123!',
+    created_at: new Date()
+  }),
+  
+  generateTestGarment: () => ({
+    id: uuidv4(),
+    name: `Test Garment ${Date.now()}`,
+    category: 'Tops',
+    color: 'Blue',
+    brand: 'Test Brand',
+    size: 'M'
+  }),
+  
+  generateTestWardrobe: (userId: string) => ({
+    id: uuidv4(),
+    user_id: userId,
+    name: `Test Wardrobe ${Date.now()}`,
+    description: 'Test wardrobe description'
+  })
+};
+
+const RequestHelper = {
+  createAuthHeaders: (token: string) => ({
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  }),
+  
+  createFlutterHeaders: (token?: string) => {
+    const headers: Record<string, string> = {
+      'User-Agent': 'Dart/3.0 (dart:io)',
+      'X-App-Platform': 'flutter',
+      'Content-Type': 'application/json'
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  }
+};
 
 describe('🤖 Flutter-Specific Integration Tests', () => {
   let server: Server;

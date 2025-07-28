@@ -436,12 +436,16 @@ const registerDevice = async (req: Request, res: Response, next: NextFunction) =
       data: {
         device_id,
         device_type,
+        device_name,
         registered,
         push_notifications_enabled: Boolean(push_token),
-        biometric_available: ['ios', 'android'].includes(device_type)
+        biometric_available: ['ios', 'android'].includes(device_type),
+        app_version,
+        os_version
       }
     });
   } catch (error) {
+    console.error('Device registration error:', error);
     next(error);
   }
 };
@@ -584,7 +588,14 @@ router.post('/device/register',
   authenticate,
   requireAuth,
   rateLimitByUser(5, 60 * 60 * 1000), // 5 attempts per hour
-  validateBody(DeviceRegistrationSchema),
+  validateBody(z.object({
+    device_id: z.string(),
+    device_type: z.enum(['ios', 'android']),
+    device_name: z.string(),
+    push_token: z.string().optional(),
+    app_version: z.string(),
+    os_version: z.string()
+  })),
   registerDevice
 );
 
