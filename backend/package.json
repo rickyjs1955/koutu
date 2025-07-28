@@ -16,7 +16,7 @@
     "test:integration": "jest --config jest.config.cjs --testMatch='**/*.integration.test.ts' --runInBand",
     "test:integration:all": "jest --config jest.config.cjs --testMatch='**/*.integration.test.ts' --runInBand --forceExit",
     "test:security": "jest --config jest.config.cjs --testMatch='**/*.security.test.ts' --runInBand",
-    "test:security:all": "jest --config jest.config.cjs --testMatch='**/*.security.test.ts' --maxWorkers=2 --forceExit",
+    "test:security:all": "jest --config jest.config.cjs --testMatch='**/*.security.test.ts' --runInBand --forceExit",
     "test:performance": "jest --config jest.config.cjs --testMatch='**/*.perf.test.ts' --runInBand",
     "test:performance:all": "jest --config jest.config.cjs --testMatch='**/*.perf.test.ts' --runInBand --forceExit",
     "test:stress": "cross-env NODE_OPTIONS='--max-old-space-size=4096 --expose-gc' jest --config=jest.stress.config.js --runInBand",
