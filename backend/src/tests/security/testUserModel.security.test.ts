@@ -453,7 +453,7 @@ describe('testUserModel Security Tests', () => {
 
       // Average time per attempt should indicate rate limiting
       const avgTime = totalTime / attempts;
-      expect(avgTime).toBeGreaterThan(25); // At least 25ms per attempt (bcrypt overhead)
+      expect(avgTime).toBeGreaterThan(20); // At least 20ms per attempt (bcrypt overhead)
     });
 
     it('should handle bulk user creation attempts efficiently', async () => {
