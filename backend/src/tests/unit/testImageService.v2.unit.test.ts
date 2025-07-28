@@ -4280,43 +4280,95 @@ describe('ImageServiceTestHelper v2 - Dual-Mode Image Operations', () => {
             test('should demonstrate linear scalability characteristics', async () => {
                 const scalabilityTests = [10, 20, 50, 100];
                 const baselineOperations = 10;
+                const warmupIterations = 5;
+                const testIterations = 3;
 
+                // Configure mock with consistent timing
                 mockQuery.mockImplementation(async () => {
-                await new Promise(resolve => setTimeout(resolve, 2)); // 2ms simulated DB time
-                return { rows: [] };
-            });
+                    await new Promise(resolve => setTimeout(resolve, 2)); // 2ms simulated DB time
+                    return { rows: [] };
+                });
 
-                let baselineTime = 0;
+                // Warm up the JIT compiler and cache
+                for (let i = 0; i < warmupIterations; i++) {
+                    await imageService.createTestUser();
+                }
+
+                const results: { operations: number; avgTime: number; perOp: number }[] = [];
 
                 for (const operationCount of scalabilityTests) {
-                const startTime = process.hrtime.bigint();
+                    const iterationTimes: number[] = [];
 
-                const promises = Array.from({ length: operationCount }, () => 
-                imageService.createTestUser()
-                );
+                    // Run multiple iterations for statistical accuracy
+                    for (let iteration = 0; iteration < testIterations; iteration++) {
+                        const startTime = process.hrtime.bigint();
 
-                await Promise.all(promises);
+                        const promises = Array.from({ length: operationCount }, (_, index) => 
+                            imageService.createTestUser({
+                                email: `scalability-test-${operationCount}-${iteration}-${index}@example.com`
+                            })
+                        );
 
-                const endTime = process.hrtime.bigint();
-                const totalTime = Number(endTime - startTime) / 1000000; // Convert to ms
+                        await Promise.all(promises);
 
-                if (operationCount === baselineOperations) {
-                baselineTime = totalTime;
+                        const endTime = process.hrtime.bigint();
+                        const totalTime = Number(endTime - startTime) / 1e6; // Convert to ms
+                        iterationTimes.push(totalTime);
+                    }
+
+                    // Calculate average time excluding outliers
+                    iterationTimes.sort((a, b) => a - b);
+                    const medianTime = iterationTimes[Math.floor(iterationTimes.length / 2)];
+                    const avgTime = iterationTimes.reduce((sum, t) => sum + t, 0) / iterationTimes.length;
+                    const perOperationTime = avgTime / operationCount;
+
+                    results.push({
+                        operations: operationCount,
+                        avgTime,
+                        perOp: perOperationTime
+                    });
                 }
 
-                const scalingFactor = operationCount / baselineOperations;
-                const expectedTime = baselineTime * scalingFactor;
-                const actualScalingFactor = totalTime / baselineTime;
+                // Analyze scalability
+                const baseline = results.find(r => r.operations === baselineOperations)!;
+                let maxDeviation = 0;
 
-                // Should scale roughly linearly (within 2x of expected)
-                expect(actualScalingFactor).toBeLessThan(scalingFactor * 2);
+                for (const result of results) {
+                    const scalingFactor = result.operations / baselineOperations;
+                    const expectedTime = baseline.avgTime * scalingFactor;
+                    const actualScalingFactor = result.avgTime / baseline.avgTime;
+                    const scalingEfficiency = (expectedTime / result.avgTime) * 100;
+                    const deviation = Math.abs(actualScalingFactor - scalingFactor);
 
-                console.log(`Scalability test - ${operationCount} operations:
-                - Time: ${totalTime.toFixed(2)}ms
-                - Expected scaling: ${scalingFactor}x
-                - Actual scaling: ${actualScalingFactor.toFixed(2)}x
-                - Per operation: ${(totalTime / operationCount).toFixed(2)}ms`);
+                    maxDeviation = Math.max(maxDeviation, deviation);
+
+                    // Linear scalability test: actual scaling should be close to expected
+                    // Allow up to 50% deviation for small scales, 100% for larger scales
+                    const allowedDeviation = scalingFactor <= 5 ? 0.5 : 1.0;
+                    expect(deviation).toBeLessThan(scalingFactor * allowedDeviation);
+
+                    // Per-operation time should remain relatively constant
+                    const perOpVariation = Math.abs(result.perOp - baseline.perOp) / baseline.perOp;
+                    expect(perOpVariation).toBeLessThan(0.5); // Within 50% of baseline
+
+                    console.log(`Scalability test - ${result.operations} operations:
+                    - Average time: ${result.avgTime.toFixed(2)}ms
+                    - Per operation: ${result.perOp.toFixed(3)}ms
+                    - Expected scaling: ${scalingFactor.toFixed(1)}x
+                    - Actual scaling: ${actualScalingFactor.toFixed(2)}x
+                    - Scaling efficiency: ${scalingEfficiency.toFixed(1)}%
+                    - Deviation: ${(deviation * 100).toFixed(1)}%`);
                 }
+
+                // Overall scalability assessment
+                const overallEfficiency = maxDeviation < 0.3 ? 'Excellent' : 
+                                         maxDeviation < 0.6 ? 'Good' : 
+                                         maxDeviation < 1.0 ? 'Acceptable' : 'Poor';
+
+                console.log(`\nOverall scalability: ${overallEfficiency} (max deviation: ${(maxDeviation * 100).toFixed(1)}%)`);
+                
+                // Verify overall linear scalability
+                expect(maxDeviation).toBeLessThan(1.0); // Max 100% deviation from perfect linear
             });
 
             test('should handle memory efficiently under sustained load', async () => {
