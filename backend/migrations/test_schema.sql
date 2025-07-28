@@ -166,18 +166,8 @@ CREATE TABLE IF NOT EXISTS exclude_test_table (
   EXCLUDE USING gist (range WITH &&)
 );
 
--- Create optional polygons table for dependency checking tests
-CREATE TABLE IF NOT EXISTS polygons (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  original_image_id UUID REFERENCES original_images(id) ON DELETE CASCADE,
-  points JSONB NOT NULL DEFAULT '[]',
-  label VARCHAR(255),
-  metadata JSONB NOT NULL DEFAULT '{}',
-  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+-- Polygons table is created by migration 003_add_polygons.sql
+-- No need to create it here
 
 -- Grant permissions (if needed)
 -- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO postgres;
