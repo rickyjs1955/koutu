@@ -211,8 +211,8 @@ describe('FileRoutes Unit Tests', () => {
 
     // Mock Express response methods with minimal implementation
     const sendFileMock = jest.fn(function(this: Response) {
-      // Don't override Content-Type if it was already set by the route handler
-      if (!this.get('Content-Type')) {
+      // Only set Content-Type if it hasn't been set already
+      if (!this.getHeader('Content-Type')) {
         this.setHeader('Content-Type', 'application/octet-stream');
       }
       this.status(200).send('file');
@@ -220,8 +220,8 @@ describe('FileRoutes Unit Tests', () => {
     });
     
     const downloadMock = jest.fn(function(this: Response, path: string, filename?: string) {
-      // Don't override Content-Type if it was already set by the route handler
-      if (!this.get('Content-Type')) {
+      // Only set Content-Type if it hasn't been set already
+      if (!this.getHeader('Content-Type')) {
         this.setHeader('Content-Type', 'application/octet-stream');
       }
       this.setHeader('Content-Disposition', `attachment; filename="${filename || 'download'}"`);

@@ -34,7 +34,8 @@ module.exports = {
   // Exclude dist folder to avoid duplicate mock conflicts
   testPathIgnorePatterns: [
     '/node_modules/',
-    '/dist/'
+    '/dist/',
+    '/backup/'
   ],
   // Module name mapping
   moduleNameMapper: {

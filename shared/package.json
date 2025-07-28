@@ -36,6 +36,11 @@
     "test:lint:strict": "eslint src/schemas --ext .ts --max-warnings 0",
     "test:lint:quiet": "eslint src/schemas --ext .ts --quiet",
     
+    "test:unit": "jest --config jest.config.cjs --testMatch='**/*.unit.test.ts'",
+    "test:integration": "jest --config jest.config.cjs --testMatch='**/*.integration.test.ts' --runInBand",
+    "test:security": "jest --config jest.config.cjs --testMatch='**/*.security.test.ts' --runInBand",
+    "test:performance": "jest --config jest.config.cjs --testMatch='**/*.perf.test.ts' --runInBand",
+    "test:stress": "jest --config jest.config.cjs --testMatch='**/*.stress.test.ts' --runInBand",
     "test:watch": "jest --config jest.config.cjs --watch src/schemas/export.test.ts",
     "test:coverage": "npm run test:core -- --coverage",
     "test:debug": "jest --config jest.config.cjs --runInBand --no-cache --verbose",

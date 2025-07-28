@@ -1,5 +1,5 @@
 // tests/security/InstagramApiService.security.test.ts
-import { InstagramAPIService } from '../../services/InstagramApiService';
+import { InstagramAPIService } from '../../services/InstagramAPIService';
 import { ApiError } from '../../utils/ApiError';
 import {
   mockFetchGlobal,

@@ -12,6 +12,11 @@
     "test:ui": "cross-env VITE_CJS_IGNORE_WARNING=true vitest --ui",
     "test:coverage": "cross-env VITE_CJS_IGNORE_WARNING=true vitest run --coverage",
     "test:watch": "cross-env VITE_CJS_IGNORE_WARNING=true vitest watch",
+    "test:unit": "cross-env VITE_CJS_IGNORE_WARNING=true vitest run --testNamePattern='\\.unit\\.'",
+    "test:integration": "cross-env VITE_CJS_IGNORE_WARNING=true vitest run --testNamePattern='\\.integration\\.'",
+    "test:security": "cross-env VITE_CJS_IGNORE_WARNING=true vitest run --testNamePattern='\\.security\\.'",
+    "test:performance": "cross-env VITE_CJS_IGNORE_WARNING=true vitest run --testNamePattern='\\.perf\\.'",
+    "test:stress": "cross-env VITE_CJS_IGNORE_WARNING=true vitest run --testNamePattern='\\.stress\\.'",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

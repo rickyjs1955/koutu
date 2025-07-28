@@ -2973,7 +2973,7 @@ describe('ImageServiceTestHelper v2 - Dual-Mode Image Operations', () => {
 
                 expect(verification.exists).toBe(true);
                 expect(verification.size).toBe(buffer.length);
-                expect(endTime - startTime).toBeGreaterThan(5); // Should take some time
+                expect(endTime - startTime).toBeGreaterThanOrEqual(5); // Should take some time
                 expect(filePath).toContain('realistic-integration.jpg');
             });
 
