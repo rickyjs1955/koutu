@@ -288,7 +288,9 @@ describe('StorageService - Unit Tests', () => {
       const relativePath = 'uploads/test-file.jpg';
       const result = storageService.getAbsolutePath(relativePath);
       
-      expect(result).toContain(relativePath);
+      // Normalize path separators for cross-platform compatibility
+      const normalizedResult = result.replace(/\\/g, '/');
+      expect(normalizedResult).toContain(relativePath);
       expect(require('path').isAbsolute(result)).toBe(true);
     });
   });

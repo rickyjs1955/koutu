@@ -167,7 +167,7 @@ describe('InstagramAPIService Unit Tests', () => {
       // Expect the service to reject the promise
       await expect(service.importInstagramImage(urlToImport, testUserId))
         .rejects.toMatchObject({
-          name: 'Error', // More likely if ApiError doesn't explicitly set its own 'name' property to 'ApiError'
+          name: 'ApiError', // ApiError sets its name property to 'ApiError'
           statusCode: 409,  // HTTP 409 Conflict for duplicates
           message: expect.stringMatching(/already (been )?imported|duplicate|conflict/i), // Broadened regex to include 'conflict'
           // errorCode: 'CONFLICT' // Or a more specific code like 'DUPLICATE_IMPORT' if your ApiError sets one
