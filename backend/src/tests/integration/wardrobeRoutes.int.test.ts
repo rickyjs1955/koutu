@@ -49,8 +49,10 @@ import {
     getTestDatabaseConnection, 
     setupWardrobeTestQuickFix,
     getTestUserModel,
-    getTestGarmentModel
+    getTestGarmentModel,
+    createTestImageDirect
 } from '../../utils/dockerMigrationHelper';
+import { setupTestDatabase, cleanupTestData, teardownTestDatabase } from '../../utils/testSetup';
 import { wardrobeModel } from '../../models/wardrobeModel';
 import { garmentModel } from '../../models/garmentModel';
 
@@ -278,10 +280,10 @@ describe('Wardrobe Routes - Comprehensive Integration Test Suite', () => {
         await ensureUploadDirectories();
         
         try {
-            // Initialize dual-mode test infrastructure
-            const setup = await setupWardrobeTestQuickFix();
-            TestDatabaseConnection = setup.TestDB;
-            testUserModel = setup.testUserModel;
+            // Initialize test database
+            await setupTestDatabase();
+            TestDatabaseConnection = getTestDatabaseConnection();
+            testUserModel = getTestUserModel();
             
             // Initialize test models
             testWardrobeModel = wardrobeModel;
@@ -398,7 +400,7 @@ describe('Wardrobe Routes - Comprehensive Integration Test Suite', () => {
             // Create test image helper
             createTestImage = async (userId: string, name: string) => {
                 imageCounter++;
-                return await setup.createTestImage(userId, name, imageCounter);
+                return await createTestImageDirect(TestDatabaseConnection, userId, name, imageCounter);
             };
 
             // Configure Express application with real routes
@@ -852,7 +854,7 @@ describe('Wardrobe Routes - Comprehensive Integration Test Suite', () => {
             // Create test image helper
             createTestImage = async (userId: string, name: string) => {
                 imageCounter++;
-                return await setup.createTestImage(userId, name, imageCounter);
+                return await createTestImageDirect(TestDatabaseConnection, userId, name, imageCounter);
             };
 
         } catch (error) {
@@ -873,9 +875,8 @@ describe('Wardrobe Routes - Comprehensive Integration Test Suite', () => {
             // Force close any open connections
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            if (TestDatabaseConnection && TestDatabaseConnection.cleanup) {
-                await TestDatabaseConnection.cleanup();
-            }
+            // Use teardownTestDatabase instead of direct cleanup
+            await teardownTestDatabase();
             
             // Close the global database pool to prevent open handles
             const db = require('../../models/db');
