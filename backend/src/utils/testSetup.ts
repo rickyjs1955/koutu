@@ -11,6 +11,11 @@ let initializationPromise: Promise<void> | null = null;
  * Determine if we should use Docker for database (but not necessarily Firebase)
  */
 const shouldUseDockerForDatabase = (): boolean => {
+  // Check if manual tests are explicitly requested
+  if (process.env.USE_MANUAL_TESTS === 'true') {
+    return false;
+  }
+  
   // Check if Docker database port is available
   if (process.env.USE_DOCKER_TESTS === 'true') {
     return true;

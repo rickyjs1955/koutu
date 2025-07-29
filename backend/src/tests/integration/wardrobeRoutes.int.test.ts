@@ -54,24 +54,51 @@ import {
 import { wardrobeModel } from '../../models/wardrobeModel';
 import { garmentModel } from '../../models/garmentModel';
 
+// Store reference to TestDB at module level
+let cachedTestDB: any = null;
+
 // Mock database layer to use dual-mode connection
 jest.doMock('../../models/db', () => ({
   query: async (text: string, params?: any[]) => {
-    const TestDB = getTestDatabaseConnection();
-    console.log('🔍 DB Mock - Query:', text);
-    console.log('🔍 DB Mock - Params:', params);
-    return TestDB.query(text, params);
+    try {
+      // Get or create TestDB instance
+      if (!cachedTestDB) {
+        cachedTestDB = getTestDatabaseConnection();
+        // Ensure it's initialized
+        await cachedTestDB.initialize();
+      }
+      
+      console.log('🔍 DB Mock - Query:', text);
+      console.log('🔍 DB Mock - Params:', params);
+      const result = await cachedTestDB.query(text, params);
+      console.log('🔍 DB Mock - Result rows:', result.rows?.length || 0);
+      return result;
+    } catch (error) {
+      console.error('❌ DB Mock - Query Error:', error);
+      throw error;
+    }
   }
 }));
 
 // Also mock the modelUtils to use the same connection:
 jest.doMock('../../utils/modelUtils', () => ({
   getQueryFunction: () => {
-    const TestDB = getTestDatabaseConnection();
     return async (text: string, params?: any[]) => {
-      console.log('🔍 ModelUtils Mock - Query:', text);
-      console.log('🔍 ModelUtils Mock - Params:', params);
-      return TestDB.query(text, params);
+      try {
+        // Get or create TestDB instance
+        if (!cachedTestDB) {
+          cachedTestDB = getTestDatabaseConnection();
+          // Ensure it's initialized
+          await cachedTestDB.initialize();
+        }
+        
+        console.log('🔍 ModelUtils Mock - Query:', text);
+        console.log('🔍 ModelUtils Mock - Params:', params);
+        return cachedTestDB.query(text, params);
+      } catch (error) {
+        console.error('❌ ModelUtils Mock - Query Error:', error);
+        throw error;
+      }
     };
   }
 }));
@@ -243,6 +270,11 @@ describe('Wardrobe Routes - Comprehensive Integration Test Suite', () => {
 
     // #region Test Setup and Teardown
     beforeAll(async () => {
+        console.log('🚀 Starting beforeAll setup...');
+        console.log('USE_DOCKER_TESTS:', process.env.USE_DOCKER_TESTS);
+        console.log('USE_MANUAL_TESTS:', process.env.USE_MANUAL_TESTS);
+        console.log('NODE_ENV:', process.env.NODE_ENV);
+        
         await ensureUploadDirectories();
         
         try {
@@ -800,6 +832,20 @@ describe('Wardrobe Routes - Comprehensive Integration Test Suite', () => {
             });
 
             // Global error handler - Import and use the enhanced error handler
+            // Add custom error handler to capture errors
+            app.use((err: any, req: any, res: any, next: any) => {
+                console.error('❌ Error in test:', err);
+                console.error('Stack:', err.stack);
+                res.status(500).json({
+                    success: false,
+                    error: {
+                        message: err.message || 'Internal server error',
+                        code: 'INTERNAL_ERROR',
+                        details: process.env.NODE_ENV === 'test' ? err.stack : undefined
+                    }
+                });
+            });
+            
             const { errorHandler } = require('../../middlewares/errorHandler');
             app.use(errorHandler);
 
@@ -931,6 +977,12 @@ describe('Wardrobe Routes - Comprehensive Integration Test Suite', () => {
                 .get('/api/v1/wardrobes')
                 .set('Authorization', `Bearer ${authToken1}`)
                 .set('Accept', 'application/json');
+
+            if (response.status !== 200) {
+                console.error('Response status:', response.status);
+                console.error('Response body:', response.body);
+                console.error('Response text:', response.text);
+            }
 
             expect(response.status).toBe(200);
             
