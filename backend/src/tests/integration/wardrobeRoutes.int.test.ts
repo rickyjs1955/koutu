@@ -834,20 +834,6 @@ describe('Wardrobe Routes - Comprehensive Integration Test Suite', () => {
             });
 
             // Global error handler - Import and use the enhanced error handler
-            // Add custom error handler to capture errors
-            app.use((err: any, req: any, res: any, next: any) => {
-                console.error('❌ Error in test:', err);
-                console.error('Stack:', err.stack);
-                res.status(500).json({
-                    success: false,
-                    error: {
-                        message: err.message || 'Internal server error',
-                        code: 'INTERNAL_ERROR',
-                        details: process.env.NODE_ENV === 'test' ? err.stack : undefined
-                    }
-                });
-            });
-            
             const { errorHandler } = require('../../middlewares/errorHandler');
             app.use(errorHandler);
 
@@ -1018,10 +1004,19 @@ describe('Wardrobe Routes - Comprehensive Integration Test Suite', () => {
             expect(listResponse.body.data.wardrobes).toHaveLength(0);
 
             // User2 should not access user1's specific wardrobe
-            await request(app)
+            const forbiddenResponse = await request(app)
                 .get(`/api/v1/wardrobes/${wardrobeId}`)
-                .set('Authorization', `Bearer ${authToken2}`)
-                .expect(403);
+                .set('Authorization', `Bearer ${authToken2}`);
+            
+            if (forbiddenResponse.status !== 403) {
+                await fs.writeFile('test-debug.json', JSON.stringify({
+                    status: forbiddenResponse.status,
+                    body: forbiddenResponse.body,
+                    headers: forbiddenResponse.headers
+                }, null, 2));
+            }
+            
+            expect(forbiddenResponse.status).toBe(403);
 
             // User1 should see their own wardrobe
             const user1Response = await request(app)
@@ -1124,6 +1119,15 @@ describe('Wardrobe Routes - Comprehensive Integration Test Suite', () => {
                     expect(response.status).toBe(201);
                     expect(response.body.success).toBe(true);
                 } else {
+                    // Log error details when status is not 400
+                    if (response.status !== 400) {
+                        console.error(`Unexpected status for test case "${testCase.description}":`, {
+                            expectedStatus: 400,
+                            actualStatus: response.status,
+                            body: response.body,
+                            testCase
+                        });
+                    }
                     expect(response.status).toBe(400);
                     expect(response.body.success).toBe(false);
                     // Check if error structure exists
@@ -1352,9 +1356,15 @@ describe('Wardrobe Routes - Comprehensive Integration Test Suite', () => {
                 
                 const response = await request(app)
                     .get(`/api/v1/wardrobes/${wardrobeId}`)
-                    .set('Authorization', `Bearer ${authToken2}`)
-                    .expect(403);
+                    .set('Authorization', `Bearer ${authToken2}`);
 
+                if (response.status !== 403) {
+                    console.error('Expected 403 but got:', response.status);
+                    console.error('Response body:', JSON.stringify(response.body, null, 2));
+                    console.error('Response headers:', response.headers);
+                }
+                
+                expect(response.status).toBe(403);
                 expect(response.body.success).toBe(false);
                 expect(response.body.error.message).toContain('permission');
             });
@@ -2929,14 +2939,15 @@ describe('Wardrobe Routes - Comprehensive Integration Test Suite', () => {
                 .set('Authorization', `Bearer ${authToken1}`)
                 .expect(200);
 
-            // If the request timed out, name should remain unchanged
-            // If it succeeded (very fast server), name would be updated
-            if (timedOut) {
-                expect(stateCheck.body.data.wardrobe.name).toBe('Network Test Wardrobe');
-            } else {
-                // The update succeeded, so we accept either outcome
-                expect(['Network Test Wardrobe', 'Should timeout']).toContain(stateCheck.body.data.wardrobe.name);
-            }
+            // The test should accept both outcomes:
+            // 1. If client timed out but server processed the request: name = 'Should timeout'
+            // 2. If client timed out before server processed: name = 'Network Test Wardrobe'
+            // Both are valid scenarios in a network interruption
+            expect(['Network Test Wardrobe', 'Should timeout']).toContain(stateCheck.body.data.wardrobe.name);
+            
+            // The important thing is that the wardrobe remains accessible and consistent
+            expect(stateCheck.body.data.wardrobe.id).toBe(wardrobeId);
+            expect(stateCheck.body.success).toBe(true);
         });
 
         test('should handle database connection issues gracefully', async () => {

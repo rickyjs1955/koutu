@@ -4,6 +4,7 @@ import { wardrobeController } from '../controllers/wardrobeController';
 import { authenticate } from '../middlewares/auth';
 import { validateBody, validateParams } from '../middlewares/validate';
 import { UUIDParamSchema } from '../validators/schemas';
+import { asyncErrorHandler } from '../middlewares/errorHandler';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -13,12 +14,35 @@ router.use(authenticate);
 
 // Validation schemas
 const CreateWardrobeSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100, 'Name cannot exceed 100 characters'),
+  name: z.string()
+    .min(1, 'Name is required')
+    .max(100, 'Name cannot exceed 100 characters')
+    .refine((val) => val.trim().length > 0, 'Name cannot be empty')
+    .refine(
+      (val) => !/[@#$%^&*()+=\[\]{}|\\:";'<>?,/]/.test(val),
+      'Name contains invalid characters. Only letters, numbers, spaces, hyphens, underscores, and dots are allowed'
+    )
+    .refine(
+      (val) => /[a-zA-Z0-9]/.test(val),
+      'Name must contain at least one letter or number'
+    ),
   description: z.string().max(1000, 'Description cannot exceed 1000 characters').optional()
 });
 
 const UpdateWardrobeSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100, 'Name cannot exceed 100 characters').optional(),
+  name: z.string()
+    .min(1, 'Name is required')
+    .max(100, 'Name cannot exceed 100 characters')
+    .refine((val) => val.trim().length > 0, 'Name cannot be empty')
+    .refine(
+      (val) => !/[@#$%^&*()+=\[\]{}|\\:";'<>?,/]/.test(val),
+      'Name contains invalid characters. Only letters, numbers, spaces, hyphens, underscores, and dots are allowed'
+    )
+    .refine(
+      (val) => /[a-zA-Z0-9]/.test(val),
+      'Name must contain at least one letter or number'
+    )
+    .optional(),
   description: z.string().max(1000, 'Description cannot exceed 1000 characters').optional()
 });
 
@@ -57,7 +81,7 @@ const BatchOperationSchema = z.object({
  */
 router.post('/', 
   validateBody(CreateWardrobeSchema), 
-  wardrobeController.createWardrobe
+  asyncErrorHandler(wardrobeController.createWardrobe)
 );
 
 /**
@@ -66,7 +90,7 @@ router.post('/',
  * @access Private
  */
 router.get('/', 
-  wardrobeController.getWardrobes
+  asyncErrorHandler(wardrobeController.getWardrobes)
 );
 
 /**
@@ -76,7 +100,7 @@ router.get('/',
  */
 router.get('/:id', 
   validateParams(UUIDParamSchema),
-  wardrobeController.getWardrobe
+  asyncErrorHandler(wardrobeController.getWardrobe)
 );
 
 /**
@@ -87,7 +111,7 @@ router.get('/:id',
 router.put('/:id', 
   validateParams(UUIDParamSchema),
   validateBody(UpdateWardrobeSchema),
-  wardrobeController.updateWardrobe
+  asyncErrorHandler(wardrobeController.updateWardrobe)
 );
 
 /**
@@ -98,7 +122,7 @@ router.put('/:id',
 router.post('/:id/items', 
   validateParams(UUIDParamSchema),
   validateBody(AddGarmentToWardrobeSchema),
-  wardrobeController.addGarmentToWardrobe
+  asyncErrorHandler(wardrobeController.addGarmentToWardrobe)
 );
 
 /**
@@ -111,7 +135,7 @@ router.delete('/:id/items/:itemId',
     id: z.string().uuid('Invalid wardrobe ID format'),
     itemId: z.string().uuid('Invalid item ID format')
   })),
-  wardrobeController.removeGarmentFromWardrobe
+  asyncErrorHandler(wardrobeController.removeGarmentFromWardrobe)
 );
 
 /**
@@ -121,7 +145,7 @@ router.delete('/:id/items/:itemId',
  */
 router.delete('/:id', 
   validateParams(UUIDParamSchema),
-  wardrobeController.deleteWardrobe
+  asyncErrorHandler(wardrobeController.deleteWardrobe)
 );
 
 /**
@@ -132,7 +156,7 @@ router.delete('/:id',
 router.put('/:id/items/reorder',
   validateParams(UUIDParamSchema),
   validateBody(ReorderGarmentsSchema),
-  wardrobeController.reorderGarments
+  asyncErrorHandler(wardrobeController.reorderGarments)
 );
 
 /**
@@ -142,7 +166,7 @@ router.put('/:id/items/reorder',
  */
 router.get('/:id/stats',
   validateParams(UUIDParamSchema),
-  wardrobeController.getWardrobeStats
+  asyncErrorHandler(wardrobeController.getWardrobeStats)
 );
 
 // Offline sync routes
@@ -156,7 +180,7 @@ router.get('/:id/stats',
  */
 router.post('/sync',
   validateBody(SyncSchema),
-  wardrobeController.syncWardrobes
+  asyncErrorHandler(wardrobeController.syncWardrobes)
 );
 
 /**
@@ -167,7 +191,7 @@ router.post('/sync',
  */
 router.post('/batch',
   validateBody(BatchOperationSchema),
-  wardrobeController.batchOperations
+  asyncErrorHandler(wardrobeController.batchOperations)
 );
 
 export { router as wardrobeRoutes };

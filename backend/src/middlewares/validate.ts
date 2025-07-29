@@ -234,11 +234,19 @@ export const createValidationMiddleware = (schema: z.ZodSchema, field: 'body' | 
           return sanitizedIssue;
         });
         
-        const error = new Error('Validation failed');
-        (error as any).statusCode = 400;
-        (error as any).code = 'VALIDATION_ERROR';
-        (error as any).details = sanitizedErrors;
-        next(error); // Failure - call next() with error
+        // Use ApiError for consistent error handling
+        const errorMessage = `Validation error: ${result.error.issues.map(
+          (e) => `${e.path.join('.')}: ${e.message}`
+        ).join(', ')}`;
+        
+        next(ApiError.badRequest(
+          errorMessage, 
+          'VALIDATION_ERROR',
+          { 
+            validationErrors: sanitizedErrors,
+            source: field 
+          }
+        ));
       }
     } catch (err) {
       const error = new Error('Validation middleware error');
