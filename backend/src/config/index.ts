@@ -14,12 +14,7 @@ if (process.env.NODE_ENV === 'test') {
     console.log(`[DOTENV_DEBUG] Attempting to load .env.test from path: ${pathToEnvTest}`);
     dotenv.config({ path: pathToEnvTest });
 
-    // --- HARDCODE FOR DEBUGGING ONLY ---
-    // This line will DIRECTLY SET the TEST_DATABASE_URL variable
-    // It is a temporary measure to bypass the loading issue.
-    process.env.TEST_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5433/koutu_test';
-    console.log(`[DOTENV_DEBUG] FORCED TEST_DATABASE_URL to: ${process.env.TEST_DATABASE_URL}`);
-    // --- END HARDCODE ---
+    // Remove hardcoded override - let testSetup.ts handle the port selection based on USE_DOCKER_TESTS
 
 } else {
     dotenv.config();

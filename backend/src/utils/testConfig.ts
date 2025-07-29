@@ -2,9 +2,17 @@
 
 import { PoolConfig } from 'pg';
 
+// Determine the port based on USE_DOCKER_TESTS environment variable
+const getDbPort = () => {
+  if (process.env.USE_DOCKER_TESTS === 'true') {
+    return 5433;
+  }
+  return parseInt(process.env.DB_PORT || '5432');
+};
+
 export const MAIN_DB_CONFIG: PoolConfig = {
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
+  port: getDbPort(),
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   database: 'postgres', // Main database for administrative operations
@@ -16,7 +24,7 @@ export const MAIN_DB_CONFIG: PoolConfig = {
 
 export const TEST_DB_CONFIG: PoolConfig = {
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
+  port: getDbPort(),
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   database: 'koutu_test',
