@@ -1,6 +1,7 @@
 # PowerShell script to run integration tests with proper setup
 param(
-    [string]$TestFile = "polygonService.p2.int.test.ts"
+    [string]$TestFile = "",
+    [switch]$All = $false
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,11 +32,19 @@ try {
 # Small delay to ensure database is ready
 Start-Sleep -Seconds 1
 
-# Run the test
-Write-Host "`nRunning test: $TestFile" -ForegroundColor Cyan
-try {
-    npx jest $TestFile --forceExit
-} catch {
-    Write-Host "Test execution completed with errors" -ForegroundColor Yellow
-    # Don't exit with error code, let user see the results
+# Run the tests
+if ($All -or $TestFile -eq "") {
+    Write-Host "`nRunning ALL integration tests..." -ForegroundColor Cyan
+    try {
+        npm run test:integration:all -w backend
+    } catch {
+        Write-Host "Some tests failed. Check the output above for details." -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "`nRunning test: $TestFile" -ForegroundColor Cyan
+    try {
+        npx jest $TestFile --forceExit
+    } catch {
+        Write-Host "Test execution completed with errors" -ForegroundColor Yellow
+    }
 }

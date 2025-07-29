@@ -51,6 +51,13 @@ if (config.nodeEnv !== 'test' && process.env.SKIP_DB_CONNECTION_TEST !== 'true')
   });
 }
 
+// Import TestDatabaseConnection for test mode
+let TestDatabaseConnection: any;
+if (config.nodeEnv === 'test') {
+    // Lazy load TestDatabaseConnection only in test mode to avoid circular dependencies
+    TestDatabaseConnection = require('../utils/testDatabaseConnection').TestDatabaseConnection;
+}
+
 // Helper functions
 export const query = async (text: string, params?: any[]) => {
     if (!text || text.trim().length === 0) {
@@ -60,7 +67,14 @@ export const query = async (text: string, params?: any[]) => {
     const start = Date.now();
 
     try {
-        const res = await pool.query(text, params);
+        // Use TestDatabaseConnection in test mode
+        let res;
+        if (config.nodeEnv === 'test' && TestDatabaseConnection && TestDatabaseConnection.initialized) {
+            res = await TestDatabaseConnection.query(text, params);
+        } else {
+            res = await pool.query(text, params);
+        }
+        
         const duration = Date.now() - start;
 
         if (config.nodeEnv === 'development') {
@@ -80,7 +94,12 @@ export const query = async (text: string, params?: any[]) => {
 
 export const getClient = async () => {
     try {
-        return await pool.connect();
+        // Use TestDatabaseConnection in test mode
+        if (config.nodeEnv === 'test' && TestDatabaseConnection && TestDatabaseConnection.initialized) {
+            return await TestDatabaseConnection.getPool().connect();
+        } else {
+            return await pool.connect();
+        }
     } catch (error) {
         return Promise.reject(error);
     }
