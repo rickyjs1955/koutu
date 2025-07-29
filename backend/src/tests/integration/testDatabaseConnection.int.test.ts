@@ -7,7 +7,7 @@ import { TEST_DB_CONFIG, MAIN_DB_CONFIG } from '../../utils/testConfig';
 // Test configuration for integration tests
 const INTEGRATION_TEST_CONFIG = {
   host: 'localhost',
-  port: 5432,
+  port: 5433, // Use Docker port
   user: 'postgres',
   password: 'postgres',
   database: 'postgres', // Connect to main db initially
@@ -16,7 +16,7 @@ const INTEGRATION_TEST_CONFIG = {
 // Updated expected configuration to match enhanced TestDatabaseConnection
 const EXPECTED_TEST_CONFIG = {
   host: 'localhost',
-  port: 5432,
+  port: 5433, // Use Docker port
   user: 'postgres',
   password: 'postgres',
   database: 'koutu_test',

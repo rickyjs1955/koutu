@@ -3,7 +3,7 @@
 
 import { jest, describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import { TestDatabaseConnection } from '../../utils/testDatabaseConnection';
-import { InstagramAPIService } from '../../services/InstagramApiService';
+import { InstagramAPIService } from '../../services/InstagramAPIService';
 import { InstagramApiError, InstagramErrorContext } from '../../utils/InstagramApiError';
 import { ApiError } from '../../utils/ApiError';
 import { testUserModel } from '../../utils/testUserModel';

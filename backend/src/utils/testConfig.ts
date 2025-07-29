@@ -4,10 +4,9 @@ import { PoolConfig } from 'pg';
 
 // Determine the port based on USE_DOCKER_TESTS environment variable
 const getDbPort = () => {
-  if (process.env.USE_DOCKER_TESTS === 'true') {
-    return 5433;
-  }
-  return parseInt(process.env.DB_PORT || '5432');
+  // For now, always use port 5433 since that's where our test PostgreSQL is running
+  // regardless of USE_DOCKER_TESTS or USE_MANUAL_TESTS flags
+  return 5433;
 };
 
 export const MAIN_DB_CONFIG: PoolConfig = {
