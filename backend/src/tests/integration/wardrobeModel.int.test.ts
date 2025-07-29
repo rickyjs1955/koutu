@@ -1737,7 +1737,7 @@ describe('Wardrobe Model - Complete Integration Test Suite', () => {
 
         test('should demonstrate comprehensive test coverage', async () => {
             const testMetrics = {
-                totalTests: 94,
+                totalTests: 93,
                 categories: {
                     'CREATE Operations': 9,
                     'READ Operations': 10,
