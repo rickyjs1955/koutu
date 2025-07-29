@@ -18,10 +18,13 @@
  */
 
 import { jest } from '@jest/globals';
-import { TestDatabaseConnection } from '../../utils/testDatabaseConnection';
-import { testUserModel } from '../../utils/testUserModel';
-import { testGarmentModel } from '../../utils/testGarmentModel';
+import { setupWardrobeTestQuickFix } from '../../utils/dockerMigrationHelper';
 import { v4 as uuidv4, validate as isUuid } from 'uuid';
+
+// Initialize dual-mode test components
+let TestDatabaseConnection: any;
+let testUserModel: any;
+let createTestImage: any;
 
 // #region Utility Functions
 /**
@@ -108,15 +111,22 @@ describe('Wardrobe Model - Complete Integration Test Suite', () => {
         
         for (let i = 0; i < count; i++) {
             const testId = generateTestId();
-            const garment = await testGarmentModel.create({
-                user_id: userId,
-                metadata: {
-                    name: `Test Garment ${i + 1} ${testId}`,
-                    category: ['shirt', 'pants', 'jacket'][i % 3],
-                    color: ['blue', 'red', 'green'][i % 3]
-                }
-            });
-            garments.push(garment);
+            const garmentId = uuidv4();
+            
+            // Create garment directly with database query
+            const result = await TestDatabaseConnection.query(`
+                INSERT INTO garment_items (id, user_id, name, category, color, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+                RETURNING *
+            `, [
+                garmentId,
+                userId,
+                `Test Garment ${i + 1} ${testId}`,
+                ['shirt', 'pants', 'jacket'][i % 3],
+                ['blue', 'red', 'green'][i % 3]
+            ]);
+            
+            garments.push(result.rows[0]);
         }
         
         return garments;
@@ -186,27 +196,11 @@ describe('Wardrobe Model - Complete Integration Test Suite', () => {
      */
     beforeAll(async () => {
         try {
-            // Initialize test database with retry logic
-            let dbReady = false;
-            let attempts = 0;
-            const maxAttempts = 3;
-            
-            while (!dbReady && attempts < maxAttempts) {
-                try {
-                    await TestDatabaseConnection.initialize();
-                    dbReady = true;
-                } catch (error) {
-                    attempts++;
-                    if (attempts === maxAttempts) throw error;
-                    await sleep(2000);
-                }
-            }
-
-            // Ensure all required tables exist
-            await TestDatabaseConnection.ensureTablesExist();
-
-            // Clear existing test data
-            await TestDatabaseConnection.clearAllTables();
+            // Use the dual-mode quick fix setup
+            const setup = await setupWardrobeTestQuickFix();
+            TestDatabaseConnection = setup.TestDB;
+            testUserModel = setup.testUserModel;
+            createTestImage = setup.createTestImage;
             
             // Create test users
             testUser1 = await testUserModel.create({
@@ -929,7 +923,7 @@ describe('Wardrobe Model - Complete Integration Test Suite', () => {
 
         test('should handle many garment associations efficiently', async () => {
             const wardrobe = await createTestWardrobe(testUser1.id);
-            const manyGarments = await testGarmentModel.createMultiple(testUser1.id, 50);
+            const manyGarments = await createTestGarments(testUser1.id, 50);
 
             const startTime = Date.now();
             
@@ -957,7 +951,7 @@ describe('Wardrobe Model - Complete Integration Test Suite', () => {
 
             // Create and work with large dataset
             const wardrobes = await createMultipleWardrobes(testUser1.id, 50);
-            const garments = await testGarmentModel.createMultiple(testUser1.id, 100);
+            const garments = await createTestGarments(testUser1.id, 100);
 
             // Add garments to wardrobes
             for (let i = 0; i < wardrobes.length; i++) {
@@ -1369,7 +1363,7 @@ describe('Wardrobe Model - Complete Integration Test Suite', () => {
 
         test('should handle wardrobe capacity limits gracefully', async () => {
             const wardrobe = await createTestWardrobe(testUser1.id);
-            const manyGarments = await testGarmentModel.createMultiple(testUser1.id, 100);
+            const manyGarments = await createTestGarments(testUser1.id, 100);
 
             // Add many garments to test capacity
             for (let i = 0; i < manyGarments.length; i++) {
