@@ -125,6 +125,13 @@
  * @returns {boolean} true = Docker mode, false = Manual mode
  */
 export const shouldUseDocker = (): boolean => {
+  // 🚨 TEMPORARY FIX: Always use manual mode for database connections
+  // Both modes use port 5433 anyway, and v1 initialization is more stable
+  if (process.env.NODE_ENV === 'test') {
+    console.log('🔧 Using MANUAL test setup (forced for test stability)');
+    return false;
+  }
+  
   // 🚨 EMERGENCY FALLBACK: Manual override (highest priority)
   // Use case: Docker infrastructure is broken, team needs to continue working
   if (process.env.USE_MANUAL_TESTS === 'true') {

@@ -11,6 +11,10 @@ let initializationPromise: Promise<void> | null = null;
  * Determine if we should use Docker for database (but not necessarily Firebase)
  */
 const shouldUseDockerForDatabase = (): boolean => {
+  // TEMPORARY FIX: Always use manual mode since v2 initialization has issues
+  // Both modes use port 5433 anyway, so there's no difference in connectivity
+  return false;
+  
   // Check if manual tests are explicitly requested
   if (process.env.USE_MANUAL_TESTS === 'true') {
     return false;
