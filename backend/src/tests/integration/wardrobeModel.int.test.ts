@@ -913,19 +913,27 @@ describe('Wardrobe Model - Complete Integration Test Suite', () => {
             expect(garments).toEqual([]);
         });
 
-        test('should handle wardrobe-garment operations when tables do not exist', async () => {
+        test('should handle wardrobe-garment operations with non-existent garment', async () => {
             const wardrobe = await createTestWardrobe(testUser1.id);
-            const garmentId = uuidv4();
+            const nonExistentGarmentId = uuidv4();
 
-            // These operations should handle missing tables gracefully
+            // Adding a non-existent garment should fail with foreign key error
             try {
-                await wardrobeModel.addGarment(wardrobe.id, garmentId, 1);
-                await wardrobeModel.removeGarment(wardrobe.id, garmentId);
-                await wardrobeModel.getGarments(wardrobe.id);
+                await wardrobeModel.addGarment(wardrobe.id, nonExistentGarmentId, 1);
+                fail('Should have thrown an error for non-existent garment');
             } catch (error) {
                 expect(error instanceof Error).toBe(true);
-                expect(error.message).toContain('table not found');
+                // Should get foreign key constraint violation
+                expect(error.message).toContain('foreign key constraint');
             }
+
+            // Removing a non-existent garment should return false gracefully
+            const removeResult = await wardrobeModel.removeGarment(wardrobe.id, nonExistentGarmentId);
+            expect(removeResult).toBe(false);
+
+            // Getting garments should return empty array for wardrobe with no garments
+            const garments = await wardrobeModel.getGarments(wardrobe.id);
+            expect(garments).toEqual([]);
         });
     });
     // #endregion
